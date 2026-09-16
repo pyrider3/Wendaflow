@@ -112,3 +112,25 @@ Wendaflow 的目标不是把普通聊天窗口搬到画布上，而是让 AI 成
 Wendaflow · WDF  
 让对话自由分岔。
 
+## 开源与贡献
+
+Wendaflow 以 [GNU Affero General Public License v3.0](LICENSE) 开源。你可以查看、运行、修改和分发代码，但必须遵守该协议，尤其是向网络用户提供修改版服务时对应的源码提供义务。
+
+欢迎通过 Issue 报告问题或提出建议。准备提交代码前，请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)；构建说明见 [docs/BUILDING.md](docs/BUILDING.md)，安全问题请遵循 [SECURITY.md](SECURITY.md)。
+
+## 快速开始
+
+```bash
+npm install
+npm run build
+npm run desktop:dev
+```
+
+源码结构：
+
+- `src/`：React 客户端界面与业务逻辑
+- `electron-main.mjs`：Electron 主进程
+- `server.mjs`：本地模型代理与桌面辅助服务
+- `notification-server/`：通知与授权服务端
+- `notification-manager/`：服务端管理软件
+- `website/`：Wendaflow 官网静态文件

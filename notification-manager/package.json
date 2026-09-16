@@ -1,0 +1,43 @@
+{
+  "name": "wendaflow-notification-manager",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "pg": "^8.23.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "xyz.qnjyxh.wendaflow-notification-manager",
+    "productName": "Wendaflow 通知服务",
+    "asar": false,
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "renderer/**/*",
+      "server/**/*",
+      "deployment/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

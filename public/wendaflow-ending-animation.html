@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Wendaflow · 15 秒片尾动画</title>
+<style>
+  :root { --ink:#15211c; --green:#278059; --mint:#d9eee2; --muted:#718178; }
+  * { box-sizing:border-box } html,body { width:100%;height:100%;margin:0;overflow:hidden;background:#f7faf7;font-family:"Microsoft YaHei","PingFang SC",sans-serif;color:var(--ink) }
+  .stage { position:relative; width:min(100vw,177.777vh);height:min(100vh,56.25vw);margin:auto;overflow:hidden;background:radial-gradient(circle at 10px 10px,#aab7b0 1.3px,transparent 1.55px) 0 0/32px 32px; }
+  .wash { position:absolute;inset:0;background:radial-gradient(circle at 49% 52%,#ffffff 0 11%,#f7fbf8cc 35%,#eff5f0 100%); }
+  .line { position:absolute;left:8%;top:54%;width:84%;height:2px;background:#cbd8d1;transform-origin:left;transform:scaleX(0);animation:grow 1.8s .25s ease forwards; }
+  .node { position:absolute;width:24px;height:24px;border:5px solid var(--green);border-radius:50%;background:#fff;opacity:0;transform:scale(.2);box-shadow:0 0 0 9px #e0f1e7;animation:pop .5s ease forwards; }
+  .n1{left:18%;top:calc(54% - 11px);animation-delay:1.6s}.n2{left:48%;top:calc(54% - 11px);animation-delay:2.65s}.n3{left:77%;top:calc(54% - 11px);animation-delay:3.7s}
+  .branch { position:absolute;z-index:0;fill:none;stroke:#438c68;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:520;stroke-dashoffset:520;animation:draw 1.15s ease forwards; }
+  .b1{left:18%;top:23%;width:31%;height:33%;animation-delay:4s}.b2{left:48%;top:53%;width:29%;height:26%;animation-delay:5.15s}.b3{left:48%;top:23%;width:29%;height:32%;animation-delay:6.25s}
+  .card { position:absolute;z-index:2;width:236px;padding:18px 19px;border:1px solid #dce7df;border-radius:16px;background:#fffffff0;box-shadow:0 14px 36px #23443014;opacity:0;transform:translateY(12px) scale(.94);animation:card .48s cubic-bezier(.2,.85,.22,1) forwards; }
+  .card small{color:var(--green);font-weight:800}.card b{display:block;margin-top:7px;font-size:18px}.card p{margin:7px 0 0;color:var(--muted);font-size:12px;line-height:1.55}.c1{left:31%;top:17%;animation-delay:4.72s}.c2{left:66%;top:68%;animation-delay:5.85s}.c3{left:66%;top:16%;animation-delay:6.95s}
+  .focus { position:absolute;z-index:4;left:50%;top:50%;width:0;height:0;border-radius:50%;background:#e0f2e6;opacity:0;transform:translate(-50%,-50%);animation:focus 1.25s 8s ease forwards; }
+  .map { position:absolute;z-index:5;left:50%;top:50%;width:560px;height:360px;transform:translate(-50%,-50%) scale(.84);opacity:0;animation:map .7s 8.4s ease forwards; }
+  .map .hub{position:absolute;left:225px;top:135px;width:110px;height:80px;display:grid;place-items:center;border:2px solid var(--green);border-radius:18px;background:#fff;color:var(--green);font-weight:900;box-shadow:0 12px 26px #287d5722}.mini{position:absolute;padding:9px 12px;border:1px solid #d9e4dd;border-radius:10px;background:#fff;color:#53665c;font-size:12px;box-shadow:0 7px 18px #203d2712}.m1{left:10px;top:38px}.m2{right:6px;top:40px}.m3{left:34px;bottom:20px}.m4{right:20px;bottom:22px}.map svg{position:absolute;inset:0;width:100%;height:100%}.map path{fill:none;stroke:#9cb8a9;stroke-width:2}
+  .final{position:absolute;z-index:9;inset:0;display:grid;place-items:center;background:#f7faf7;opacity:0;animation:final 1s 11.8s ease forwards}.brand{text-align:center;transform:translateY(10px);animation:rise .7s 12.2s ease forwards}.mark{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 17px;border-radius:20px;background:#14221b;color:#fff;font-size:40px;font-weight:900}.brand h1{margin:0;font-size:46px;letter-spacing:-2px}.brand p{margin:10px 0 0;color:#6d8175;font-size:18px}.tag{margin-top:33px;color:var(--green)!important;font-size:21px!important;font-weight:800}.controls{position:absolute;z-index:20;right:20px;bottom:18px;display:flex;gap:8px;align-items:center;padding:8px;border:1px solid #d8e5dc;border-radius:12px;background:#ffffffde}.controls button{border:0;border-radius:8px;padding:8px 11px;background:#edf4ef;color:var(--ink);font:700 12px inherit}.controls button:first-child{background:var(--green);color:#fff}.clock{color:#718178;font-size:12px;padding:0 4px}
+  @keyframes grow{to{transform:scaleX(1)}}@keyframes draw{to{stroke-dashoffset:0}}@keyframes pop{to{opacity:1;transform:scale(1)}}@keyframes card{to{opacity:1;transform:none}}@keyframes focus{0%{opacity:0;width:0;height:0}30%{opacity:1}100%{opacity:0;width:1100px;height:1100px}}@keyframes map{to{opacity:1;transform:translate(-50%,-50%) scale(1)}}@keyframes final{to{opacity:1}}@keyframes rise{to{transform:none}}
+  .paused *{animation-play-state:paused!important}.capture .controls{display:none}
+</style>
+</head>
+<body>
+<main class="stage" id="stage">
+  <div class="wash"></div><div class="line"></div>
+  <div class="node n1"></div><div class="node n2"></div><div class="node n3"></div>
+  <svg class="branch b1" viewBox="0 0 400 220"><path d="M0 220 C85 215 104 29 400 10"/></svg>
+  <svg class="branch b2" viewBox="0 0 400 220"><path d="M0 0 C84 4 125 192 400 210"/></svg>
+  <svg class="branch b3" viewBox="0 0 400 220"><path d="M0 212 C110 180 150 35 400 5"/></svg>
+  <article class="card c1"><small>新的方向</small><b>从这里重新开始</b><p>保留原来的思路，不带走无关上下文。</p></article>
+  <article class="card c2"><small>行动 · Codex</small><b>把想法交给执行</b><p>生成文件、整理资料、推进任务。</p></article>
+  <article class="card c3"><small>多模型并行</small><b>让不同观点共存</b><p>不覆盖答案，继续长成新的分支。</p></article>
+  <div class="focus"></div>
+  <section class="map"><svg viewBox="0 0 560 360"><path d="M80 70 C170 85 190 145 225 160M475 72 C395 80 370 140 335 160M115 293 C182 255 205 215 235 198M448 295 C387 245 365 214 328 198"/></svg><div class="hub">你的思考</div><div class="mini m1">新想法</div><div class="mini m2">另一条路</div><div class="mini m3">保留上下文</div><div class="mini m4">行动结果</div></section>
+  <section class="final"><div class="brand"><div class="mark">W</div><h1>Wendaflow</h1><p>人类的思考，从来不是一条线。</p><p class="tag">不是让你聊得更久。<br>而是让你想得更远。</p></div></section>
+  <div class="controls"><button id="replay">↻ 重播</button><button id="pause">Ⅱ 暂停</button><span class="clock" id="clock">0:00 / 0:15</span></div>
+</main>
+<script>
+  const stage=document.querySelector('#stage'), pause=document.querySelector('#pause'), clock=document.querySelector('#clock');
+  let paused=false, started=Date.now(), elapsed=0, timer;
+  const tick=()=>{ if(!paused){elapsed=Math.min(15,(Date.now()-started)/1000);clock.textContent=`0:${String(Math.floor(elapsed)).padStart(2,'0')} / 0:15`; } timer=requestAnimationFrame(tick) };tick();
+  pause.onclick=()=>{paused=!paused;stage.classList.toggle('paused',paused);if(paused){elapsed=(Date.now()-started)/1000;pause.textContent='▶ 继续'}else{started=Date.now()-elapsed*1000;pause.textContent='Ⅱ 暂停'}};
+  document.querySelector('#replay').onclick=()=>location.reload();
+  if(new URLSearchParams(location.search).has('capture')) stage.classList.add('capture');
+</script>
+</body></html>

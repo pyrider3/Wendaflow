@@ -1,0 +1,66 @@
+/* Real product captures replace the most abstract tour illustrations. */
+.screen-canvas .canvas-ui,
+.screen-map .wide-map {
+  display: none;
+}
+
+.real-product-shot {
+  margin: 24px 28px 0;
+  overflow: hidden;
+  border: 1px solid rgba(40, 88, 64, 0.16);
+  border-radius: 22px;
+  background: #f7faf7;
+  box-shadow: 0 24px 56px rgba(28, 55, 42, 0.1);
+}
+
+.real-product-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #f7faf7;
+}
+
+.real-product-shot figcaption {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 45px;
+  padding: 0 16px;
+  border-top: 1px solid rgba(40, 88, 64, 0.1);
+  color: #577064;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.real-product-shot figcaption span {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #25805c;
+  box-shadow: 0 0 0 5px rgba(37, 128, 92, 0.1);
+}
+
+.screen-canvas .real-product-shot {
+  max-width: 1240px;
+  margin-inline: auto;
+}
+
+.screen-map .real-product-shot {
+  max-width: 1420px;
+  margin-inline: auto;
+}
+
+@media (max-width: 760px) {
+  .real-product-shot {
+    margin: 16px 14px 0;
+    border-radius: 14px;
+  }
+
+  .real-product-shot figcaption {
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}

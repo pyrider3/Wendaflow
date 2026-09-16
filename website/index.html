@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Wendaflow — 让对话自由分岔的 AI 思维画布。" />
+    <title>Wendaflow — 让对话自由分岔</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./enhancements.css" />
+    <link rel="stylesheet" href="./product-tour.css" />
+    <link rel="stylesheet" href="./product-tour-fixes.css" />
+    <link rel="stylesheet" href="./hero-product-ui.css" />
+    <link rel="stylesheet" href="./map-connections.css" />
+    <link rel="stylesheet" href="./real-product-shots.css" />
+    <style>
+      .download{align-items:start}.download-platforms{display:grid;gap:12px}.platform-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2px}.platform-badges span{font-size:11px;font-weight:750;color:#38684f;background:#e7f2ea;border:1px solid #cee1d3;padding:7px 10px;border-radius:999px}.download-platforms .download-card{grid-template-columns:46px 1fr auto;padding:16px 18px;box-shadow:0 10px 25px #28433312}.download-platforms .download-card .button{grid-column:auto;margin:0;padding:10px 13px;border-radius:11px;gap:12px;white-space:nowrap}.sponsor{padding-top:20px;padding-bottom:145px;display:grid;grid-template-columns:.8fr 1.2fr;gap:80px;align-items:start}.sponsor-copy{position:sticky;top:36px}.sponsor h2{font-size:clamp(42px,5vw,64px);letter-spacing:-.06em;line-height:1;margin:0 0 22px}.sponsor-copy>p:last-child{color:#68786d;font-size:14px;line-height:1.8;margin:0;max-width:340px}.sponsor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.sponsor-card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;text-decoration:none;color:var(--ink);background:#fff;border:1px solid #dce7df;border-radius:22px;box-shadow:0 12px 26px #28433312;transition:transform .2s ease,box-shadow .2s ease}.sponsor-card:hover{transform:translateY(-5px);box-shadow:0 20px 35px #28433322}.sponsor-card img{display:block;width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:13px;background:#f7f9f7}.sponsor-card span{font-size:14px;font-weight:800}.sponsor-card small{width:100%;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:9px;color:#66786d;text-align:center;overflow-wrap:anywhere}@media(max-width:720px){.download-platforms .download-card{grid-template-columns:42px 1fr}.download-platforms .download-card .button{grid-column:1/-1}.sponsor{grid-template-columns:1fr;gap:38px;padding-top:0;padding-bottom:85px}.sponsor-copy{position:static}.sponsor-grid{gap:10px}.sponsor-card{padding:10px;border-radius:16px}.sponsor-card span{font-size:12px}.sponsor-card small{font-size:7px}}
+      .community{padding-top:20px;padding-bottom:145px;display:grid;grid-template-columns:.8fr 1.2fr;gap:80px;align-items:start}.community h2{font-size:clamp(42px,5vw,64px);letter-spacing:-.06em;line-height:1;margin:0 0 22px}.community>div:first-child>p:last-child{max-width:350px;margin:0;color:#68786d;font-size:14px;line-height:1.8}.community-links{display:grid;gap:16px}.bilibili-card,.qq-card{border-radius:22px;padding:25px;background:#fff;border:1px solid #dce7df;box-shadow:0 12px 26px #28433312}.bilibili-card{display:flex;align-items:center;gap:17px;color:var(--ink);text-decoration:none;transition:transform .2s ease,box-shadow .2s ease}.bilibili-card:hover{transform:translateY(-4px);box-shadow:0 20px 35px #28433322}.community-icon{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:13px;color:#fff;background:#236b4c;font-weight:900}.bilibili-card small,.qq-card small{display:block;font-size:11px;color:#718177;margin-bottom:5px}.bilibili-card strong,.qq-card strong{font-size:18px;letter-spacing:-.03em}.bilibili-card>b{margin-left:auto;color:#236b4c;font-size:12px}.qq-card-head{display:flex;align-items:center;gap:17px}.qq-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:22px}.qq-groups span{padding:12px 10px;border-radius:12px;background:#eff5f0;color:#557064;font-size:12px}.qq-groups b{display:block;color:#17221d;font-size:14px;margin-top:4px}.community+.sponsor{padding-top:20px}@media(max-width:720px){.community{grid-template-columns:1fr;gap:38px;padding-top:0;padding-bottom:85px}.qq-groups{grid-template-columns:1fr}.bilibili-card,.qq-card{padding:18px}}
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav class="nav wrap">
+        <a class="brand" href="#top" aria-label="Wendaflow 首页"><span>W</span> Wendaflow</a>
+        <div class="nav-actions">
+          <a href="#features">功能</a><a href="#download">下载</a><a href="#community">社区</a><a href="#sponsor">赞助</a>
+          <a class="button small" href="#download">获取 Wendaflow</a>
+        </div>
+      </nav>
+
+      <section id="top" class="hero wrap">
+        <p class="eyebrow">AI CANVAS · DESKTOP FIRST</p>
+        <h1>把 AI 对话，<br /><em>变成你的思维空间。</em></h1>
+        <p class="lead">Wendaflow 是给深度思考者、创作者与执行者的 AI 画布。<br />不再丢失上下文，不再开十几个新聊天，也不再让好想法消失在滚动记录里。</p>
+        <p class="manifesto">人类的真实思考是网状和跳跃的，而目前的 AI 交互被迫变成了单向的线性流。</p>
+        <div class="hero-actions"><a class="button" href="#download">下载 Wendaflow <b>↓</b></a><a class="text-link" href="#why">它和聊天框有什么不同 <b>→</b></a></div>
+        <div class="hero-proof"><span>分支对话</span><span>多模型协作</span><span>本地智能体</span><span>文件理解</span></div>
+        <div class="canvas" aria-label="Wendaflow 画布示意图">
+          <div class="edge e1"></div><div class="edge e2"></div><div class="edge e3"></div>
+          <div class="pulse p1"></div><div class="pulse p2"></div>
+          <article class="node n1"><small>起点</small><strong>我想探索一个新想法</strong></article>
+          <article class="node n2 active"><small>OpenAI · gpt-5.4</small><strong>从这里开始，分出新的路径</strong><p>如果你的目标是验证这个方向，我建议先并行推进三件事：</p><ul><li>访谈用户真正在哪一步放弃继续</li><li>对比现有聊天产品的上下文机制</li><li>用一个分支画布原型测试核心体验</li></ul></article>
+          <article class="node n3"><small>想法</small><strong>换一个角度</strong></article>
+          <article class="node n4"><small>行动</small><strong>交给智能体执行</strong></article>
+          <article class="node h5"><small>Claude Code · 行动</small><strong>把方案整理成 MVP 清单</strong><p>已写入 6 个用户故事与验收标准。</p><span>已完成</span></article>
+          <aside class="hero-inspector"><small>当前节点</small><strong>从这里开始，分出新的路径</strong><div><b>上下文</b><span>3 个节点</span></div><div><b>附件</b><span>用户访谈.pdf</span></div><button>从这里创建新分支</button></aside>
+          <div class="hero-composer"><small>沿着「从这里开始」继续</small><p>继续提问，或让 AI 帮我完成下一步……</p><span>对话</span><span>想法</span><span>行动</span><b>↑</b></div>
+          <div class="hero-minimap"><i></i><i></i><i></i><i></i><b>小地图</b></div>
+        </div>
+      </section>
+
+      <section id="why" class="why wrap">
+        <p class="eyebrow">WHY WENDAFLOW</p>
+        <h2>你不是缺一个聊天机器人。<br />你缺的是<strong>能记住、连接并推进思考</strong>的工作台。</h2>
+        <div class="why-grid">
+          <article><span>传统聊天</span><h3>越聊越长，越难回去</h3><p>一个想法分岔，就要反复复制上下文、重开对话；好结论最后埋在几百条消息里。</p></article>
+          <article class="solution"><span>Wendaflow</span><h3>每个方向，都有自己的位置</h3><p>把问题、答案、文件、行动和成果组织成可操作的图。你看见思考，AI 也看见它。</p></article>
+        </div>
+      </section>
+
+      <section class="workflow wrap" aria-label="Wendaflow 的工作流程">
+        <div class="workflow-copy"><p class="eyebrow">THINK IN BRANCHES</p><h2>一次提问，<br />不止一条答案。</h2><p>不是把聊天拉得越来越长，而是选择一个节点，保留你需要的上下文，再朝新的方向走。</p></div>
+        <div class="steps">
+          <article><span>01</span><div><strong>选择一个节点</strong><p>从任意历史问题、回答或想法重新开始。</p></div></article>
+          <article><span>02</span><div><strong>决定继承什么</strong><p>上下文可见、可排除，AI 知道自己该知道什么。</p></div></article>
+          <article><span>03</span><div><strong>生成新的分支</strong><p>让不同模型、文件和行动在同一张图里协作。</p></div></article>
+        </div>
+      </section>
+
+      <section id="features" class="features wrap">
+        <p class="eyebrow">A DIFFERENT WAY TO THINK</p>
+        <h2>不是聊天记录。<br />是一张会生长的思维图。</h2>
+        <div class="feature-grid">
+          <article><i>01</i><h3>从任何节点继续</h3><p>回到任何一句话，立即开启一条独立分支。上下文按路径继承，而不是被线性对话绑住。</p></article>
+          <article><i>02</i><h3>让模型各司其职</h3><p>接入本地与云端模型；在同一张画布中使用它们各自擅长的能力。</p></article>
+          <article><i>03</i><h3>文件、图片与产物同行</h3><p>拖入文件，让 AI 理解；行动完成后，代码、图片与文档都回到对应卡片。</p></article>
+          <article><i>04</i><h3>把行动留在画布上</h3><p>Codex、Claude Code 与 Harness 的执行过程、结果和产物可回溯、可复用。</p></article>
+        </div>
+      </section>
+
+      <section class="product-tour wrap" aria-label="Wendaflow 产品界面展示">
+        <div class="tour-intro"><p class="eyebrow">SEE THE PRODUCT, NOT JUST THE PROMISE</p><h2>像打开软件一样，<br />先看它怎么工作。</h2><p>这不是概念图。每一块都对应 Wendaflow 里真实存在的工作方式。</p></div>
+
+        <article class="screen screen-canvas">
+          <div class="window-bar"><div class="window-brand"><b>W</b> Wendaflow</div><div class="fake-tabs"><span class="selected">选题探索 <i>×</i></span><span>产品方案 <i>×</i></span><em>＋</em></div><div class="window-actions"><span>保存</span><span>适应画布</span><span>小地图</span></div></div>
+          <figure class="real-product-shot shot-branches">
+            <img src="./wendaflow-branching-demo.png" alt="Wendaflow 中由长篇 AI 输出继续分叉的真实画布" />
+            <figcaption><span></span>真实产品界面 · 长篇回答、分支路径与模型思考过程都保留在画布中</figcaption>
+          </figure>
+          <div class="canvas-ui">
+            <aside class="toolbar"><b>⌘</b><b>⌕</b><b>▱</b></aside>
+            <p class="canvas-tip">拖动画布 · 右键框选 · Shift 多选 · Alt 拖动子树</p>
+            <div class="ui-edge ue1"></div><div class="ui-edge ue2"></div><div class="ui-edge ue3"></div><div class="ui-edge ue4"></div>
+            <div class="ui-node root"><small>想法</small><strong>怎样验证这个产品方向？</strong><p>我希望做一款不受线性对话限制的 AI 工具。</p></div>
+            <div class="ui-node answer"><small>OpenAI · gpt-5.4</small><strong>先拆成三条路径</strong><p>建议先验证：用户问题、产品差异化、MVP 验证方式。</p></div>
+            <div class="ui-node branch one"><small>分支 · Gemini</small><strong>先做哪些功能？</strong><p>优先解决“从历史对话重新开始”。</p></div>
+            <div class="ui-node branch two"><small>分支 · DeepSeek</small><strong>竞品怎么做？</strong><p>大多只能分聊天，不能管理上下文。</p></div>
+            <div class="ui-node branch three"><small>行动 · Codex</small><strong>生成可执行方案</strong><p>已写入 MVP 的 6 个用户故事。</p><span>已完成</span></div>
+            <button class="node-plus" aria-label="创建新分支">＋</button>
+            <div class="mini-composer"><small>从「先拆成三条路径」继续 · 继承 2 个节点</small><p>沿着这个节点继续思考，或交给 AI 执行……</p><div><b>对话</b><span>想法</span><span>行动</span><em>OpenAI · gpt-5.4⌄</em><button>↑</button></div></div>
+          </div>
+          <div class="tour-caption"><span>01 / 无限分支画布</span><h3>对任何一句话重新开始，而不丢掉前面的思考。</h3><p>每张卡片都是上下文节点。拖动、折叠、连接、框选和重新分叉，像操作思维导图一样操作 AI 对话。</p></div>
+        </article>
+
+        <article class="screen screen-context">
+          <div class="context-copy"><p class="eyebrow">CONTEXT INSPECTOR</p><h3>发送前，先看 AI<br />到底会收到什么。</h3><p>不再猜“它为什么不知道前面的内容”。你可以保留、排除或合并每一个上下文节点和附件。</p><ul><li><b>路径继承</b>：只带上当前分支真正需要的历史</li><li><b>临时排除</b>：这一次不想让 AI 看见？一键取消</li><li><b>请求记录</b>：问题、模型与上下文可以回溯</li></ul></div>
+          <div class="context-panel"><div class="panel-head"><span>本次发送给 AI</span><b>上下文 4/6</b></div><div class="panel-route"><i>1</i><div><strong>起点：产品方向</strong><small>我想做一个不被线性对话限制的 AI 工具。</small></div><em>✓</em></div><div class="panel-route"><i>2</i><div><strong>核心需求</strong><small>每轮问答都是可继续、可分叉的独立节点。</small></div><em>✓</em></div><div class="panel-route muted"><i>3</i><div><strong>竞品资料（暂不发送）</strong><small>附带 2 个网页摘录</small></div><em>○</em></div><div class="panel-file">▱ <b>用户访谈记录.pdf</b><span>2.8 MB</span></div><button>开始生成 <b>→</b></button></div>
+          <div class="tour-caption"><span>02 / 正式上下文可视化</span><h3>上下文不再是黑箱。</h3><p>每次请求都能看见 AI 继承了哪些路径、图片和文件；需要时可临时排除，再发给模型。</p></div>
+        </article>
+
+        <article class="screen screen-action">
+          <div class="action-window"><div class="action-top"><span>行动</span><b>执行中</b></div><h3>把访谈结论整理成<br />一份产品需求文档</h3><p>使用 Claude Code · 高推理强度 · Wonderful 项目目录</p><div class="action-tabs"><b>动态</b><span>终端</span><span>思考</span><span>产物</span></div><div class="run-log"><div><i>✓</i><span><strong>已读取上下文与附件</strong><small>4 个节点 · 2 个文件</small></span><em>刚刚</em></div><div><i>⌘</i><span><strong>正在分析访谈结论</strong><small>提取用户痛点与优先级</small></span><em>进行中</em></div><div><i>↗</i><span><strong>已生成产品需求文档</strong><small>product-requirements.md</small></span><em>产物</em></div></div><div class="artifact-row"><span>MD</span><b>product-requirements.md</b><em>打开 ↗</em></div></div>
+          <div class="action-notes"><p><b>行动不是黑盒执行。</b></p><span>实时状态</span><span>终端输出</span><span>思考过程</span><span>文件产物</span></div>
+          <div class="tour-caption"><span>03 / 本地行动工作台</span><h3>把 Codex、Claude Code、Harness 叫到同一张图里工作。</h3><p>选择工作目录和权限后，行动节点会留下实时过程、终端记录、文件改动和最终产物。</p></div>
+        </article>
+
+        <article class="screen screen-files">
+          <div class="files-copy"><p class="eyebrow">FILES LIVE WITH THE THINKING</p><h3>文件不是附件。<br />它们也是上下文。</h3><p>把 PPT、PDF、图片、代码或文档直接拖进画布或对话框，AI 在对应分支内理解它们。</p><div class="dropzone"><span>＋</span><b>拖放文件到这里</b><small>图片、PDF、PPTX、DOCX、代码文件…</small></div></div>
+          <div class="file-stack"><article><span class="doc ppt">PPT</span><div><b>用户访谈汇总.pptx</b><small>18.4 MB · 已加入上下文</small></div><em>✓</em></article><article><span class="doc img">IMG</span><div><b>原型截图.png</b><small>2.1 MB · AI 可识别图片内容</small></div><em>✓</em></article><article><span class="doc md">MD</span><div><b>竞品研究.md</b><small>已由行动节点生成</small></div><em>↗</em></article></div>
+          <div class="tour-caption"><span>04 / 文件与产物在原处</span><h3>上传的素材和生成的结果，都留在产生它的思考旁边。</h3><p>不必翻聊天记录，也不必重新找下载目录。一个节点，就是一次完整工作的可回溯现场。</p></div>
+        </article>
+
+        <article class="screen screen-map">
+          <div class="map-title"><p class="eyebrow">A REAL, GROWING THINKING MAP</p><h3>一个复杂项目，不会只长成一条聊天记录。</h3><p>从一个问题出发，同时推进调研、内容、技术和执行；每条线都可以继续问、继续接文件、继续交给不同的 AI。</p></div>
+          <figure class="real-product-shot shot-workspace">
+            <img src="./wendaflow-workspace-demo.png" alt="Wendaflow 的多分支画布、行动产物和右侧节点操作面板" />
+            <figcaption><span></span>真实产品界面 · 多模型回答、行动产物、文件、右侧操作与继续输入在同一张工作地图中</figcaption>
+          </figure>
+          <div class="wide-map" aria-label="多分支长画布示意图">
+            <div class="map-line ml1"></div><div class="map-line ml2"></div><div class="map-line ml3"></div><div class="map-line ml4"></div><div class="map-line ml5"></div><div class="map-line ml6"></div><div class="map-line ml7"></div><div class="map-line ml8"></div>
+            <article class="map-node m-root"><small>起点</small><b>我想做一个 AI 原生的内容产品</b></article>
+            <article class="map-node m-research"><small>研究 · Claude</small><b>目标用户真正卡在哪里？</b><p>访谈显示：他们会开 5–10 个聊天，却无法保留分支决策。</p></article>
+            <article class="map-node m-content"><small>创作 · Gemini</small><b>怎样构建内容与世界观？</b><p>把人物、选题和脚本拆为可并行推进的故事线。</p></article>
+            <article class="map-node m-tech"><small>技术 · Qwen</small><b>模型与本地能力怎么组合？</b><p>云端负责推理，本地 Agent 读取文件并执行任务。</p></article>
+            <article class="map-node m-plan"><small>行动 · Codex</small><b>生成 MVP 验证计划</b><p>已建立访谈、原型、回访三阶段任务。</p><span>已完成</span></article>
+            <article class="map-node m-user"><small>分支 · AI 输出</small><b>用户访谈问题清单</b><p>先问：哪一次你因为上下文太长而放弃继续？</p></article>
+            <article class="map-node m-market"><small>分支 · AI 输出</small><b>竞品定位对比</b><p>差异不在“多一个聊天”，而在路径可视化。</p></article>
+            <article class="map-node m-script"><small>分支 · AI 输出</small><b>第一期内容大纲</b><p>从“一个想法的七种走向”切入真实使用场景。</p></article>
+            <article class="map-node m-prompt"><small>分支 · AI 输出</small><b>提示词与工作流</b><p>发送前明确选择继承节点，避免无关信息污染回答。</p></article>
+            <article class="map-node m-result"><small>产物 · 已生成</small><b>mvp-validation-plan.md</b><p>包含 3 周实验计划、访谈样本与成功指标 ↗</p></article>
+          </div>
+          <div class="tour-caption"><span>05 / 复杂思考，也能一眼看清</span><h3>不是一条更长的对话，而是可以一直生长的工作地图。</h3><p>画布能容纳几十、上百个节点；必要时用小地图、搜索、专注路径和自动整理，把复杂关系重新看清。</p></div>
+        </article>
+      </section>
+
+      <section id="scenarios" class="scenarios">
+        <div class="wrap">
+          <p class="eyebrow">MADE FOR HOW YOU ACTUALLY WORK</p>
+          <h2>不是一个功能。<br />是很多种工作的共同底座。</h2>
+          <p class="scenario-lead">当问题复杂、信息很多、路径会分叉，Wendaflow 就开始变得不可替代。</p>
+          <div class="scenario-grid">
+            <article class="scenario s1"><div class="scenario-icon">✦</div><small>创作者 / 策划</small><h3>从模糊灵感到完整内容宇宙</h3><p>把世界观、角色、选题、脚本和改稿拆成分支。每次改方向，都不必毁掉原来的版本。</p><b>写作 · 视频策划 · 设计研究</b></article>
+            <article class="scenario s2"><div class="scenario-icon">⌘</div><small>开发者 / 产品人</small><h3>让 AI 真正参与项目推进</h3><p>把需求、调研、代码、截图和行动任务放在同一画布；调用 Codex、Claude Code 等智能体完成工作。</p><b>需求拆解 · 代码协作 · 方案评审</b></article>
+            <article class="scenario s3"><div class="scenario-icon">↗</div><small>研究者 / 学习者</small><h3>把碎片信息，长成自己的知识网络</h3><p>围绕论文、课程、笔记、问题不断分岔；随时回到任意判断重新推演，不怕思路走丢。</p><b>论文阅读 · 考试复习 · 决策分析</b></article>
+            <article class="scenario s4"><div class="scenario-icon">◌</div><small>独立工作者</small><h3>一个人，也拥有一支随时调度的 AI 团队</h3><p>不同模型各做擅长的事；行动产出的文件、图片、代码和记录都沉淀回工作上下文。</p><b>客户项目 · 运营规划 · 个人创业</b></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="statement"><div class="wrap"><p>“灵感不该在滑走之后，<br /><em>再靠记忆找回来。</em>”</p></div></section>
+
+      <section class="proof wrap">
+        <div class="proof-head"><p class="eyebrow">BUILT FOR REAL WORK</p><h2>思考、执行与产物，<br />终于在同一个地方。</h2></div>
+        <div class="proof-grid">
+          <article class="activity-card"><div class="card-top"><span class="status-dot"></span><small>行动正在进行</small><b>38s</b></div><strong>把这份研究整理成产品方向</strong><p>正在读取 4 个上下文节点、2 个文件…</p><div class="terminal"><span>›</span> 分析关系与历史决策<span class="cursor"></span></div></article>
+          <article class="context-card"><small>本次将发送给 AI</small><div><b>起点</b><span>✓</span></div><div><b>用户访谈摘录.pdf</b><span>✓</span></div><div><b>竞品想法</b><span>○</span></div><p>真正看得见的上下文，而不是盲猜。</p></article>
+          <article class="artifact-card"><small>产物</small><div class="file-icon">↗</div><strong>产品方向草案.md</strong><p>刚刚由行动节点生成</p><a href="#download">查看产物 →</a></article>
+        </div>
+      </section>
+
+      <section id="download" class="download wrap">
+        <div><p class="eyebrow">DOWNLOAD</p><h2>把下一次复杂思考，<br />留在看得见的地方。</h2><p>Wendaflow 现已支持 Windows、macOS 与 Linux。选择一个你访问方便的下载站，在网盘中找到对应系统的安装包即可。</p></div>
+        <div class="download-platforms">
+          <div class="platform-badges"><span>Windows 10 / 11</span><span>macOS · Apple Silicon</span><span>Linux · AppImage</span></div>
+          <div class="download-card"><span class="logo">W</span><div><strong>123 云盘</strong><small>国内下载推荐</small></div><a class="button" href="https://1849713929.share.123pan.cn/123pan/rH1ovd-1zJ3d" target="_blank" rel="noopener">前往下载 <b>→</b></a></div>
+          <div class="download-card"><span class="logo">W</span><div><strong>夸克网盘</strong><small>可在夸克 App 中打开</small></div><a class="button" href="https://pan.quark.cn/s/7df2bc94f78c" target="_blank" rel="noopener">前往下载 <b>→</b></a></div>
+          <div class="download-card"><span class="logo">W</span><div><strong>天翼云盘</strong><small>访问码：7kxp</small></div><a class="button" href="https://cloud.189.cn/t/b2qYFb3EfA3y" target="_blank" rel="noopener">前往下载 <b>→</b></a></div>
+          <div class="download-card"><span class="logo">W</span><div><strong>GitHub Releases</strong><small>适合 GitHub 访问顺畅的用户</small></div><a class="button" href="https://github.com/pyrider3/Wendaflow/releases/tag/test" target="_blank" rel="noopener">前往下载 <b>→</b></a></div>
+        </div>
+      </section>
+
+      <section id="sponsor" class="sponsor wrap">
+        <div class="sponsor-copy"><p class="eyebrow">SUPPORT WENDAFLOW</p><h2>赞助 Wendaflow</h2><p>如果 Wendaflow 对你有帮助，欢迎任选一种方式支持持续开发。点击二维码可放大查看。</p></div>
+        <div class="sponsor-grid">
+          <a class="sponsor-card" href="./sponsor-wechat.jpg" target="_blank"><img src="./sponsor-wechat.jpg" alt="微信支付赞助二维码" /><span>微信支付</span></a>
+          <a class="sponsor-card" href="./sponsor-alipay.jpg" target="_blank"><img src="./sponsor-alipay.jpg" alt="支付宝赞助二维码" /><span>支付宝</span></a>
+          <a class="sponsor-card" href="./sponsor-binance.jpg" target="_blank"><img src="./sponsor-binance.jpg" alt="币安支付赞助二维码" /><span>币安支付</span></a>
+          <a class="sponsor-card" href="./sponsor-usdt-tron.jpg" target="_blank"><img src="./sponsor-usdt-tron.jpg" alt="USDT TRON 赞助二维码" /><span>USDT · TRON</span><small>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</small></a>
+        </div>
+      </section>
+
+      <section id="community" class="community wrap">
+        <div><p class="eyebrow">COMMUNITY</p><h2>一起把思考<br />做得更自由。</h2><p>关注开发进展、观看产品演示，或加入交流群直接讨论功能与反馈问题。</p></div>
+        <div class="community-links">
+          <a class="bilibili-card" href="https://space.bilibili.com/397449163" target="_blank" rel="noopener"><span class="community-icon">▶</span><div><small>视频与开发记录</small><strong>Wendaflow B站主页</strong></div><b>前往 →</b></a>
+          <article class="qq-card"><div class="qq-card-head"><span class="community-icon">Q</span><div><small>交流、反馈与内测信息</small><strong>QQ 交流群</strong></div></div><div class="qq-groups"><span>1 群 <b>432090967</b></span><span>2 群 <b>1109678102</b></span><span>3 群 <b>1109675266</b></span></div></article>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap"><a class="brand" href="#top"><span>W</span> Wendaflow</a><p>让对话自由分岔。</p><p>© 2026 Wendaflow</p></footer>
+  </body>
+</html>

@@ -1,0 +1,95 @@
+{
+  "name": "wendaflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A branching AI conversation canvas with visible context and local actions.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://cn.qnjyxh.xyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pyrider3/Wendaflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pyrider3/Wendaflow/issues"
+  },
+  "type": "module",
+  "main": "electron-main.mjs",
+  "scripts": {
+    "dev": "vite",
+    "proxy": "node server.mjs",
+    "app": "concurrently -k \"npm:dev\" \"npm:proxy\"",
+    "build": "npm run audit:i18n && vite build",
+    "preview": "vite preview",
+    "desktop": "electron .",
+    "desktop:dev": "concurrently -k \"npm:dev\" \"npm:desktop\"",
+    "make-icon": "node scripts/make-icon.mjs",
+    "make-icon:mac": "node scripts/make-icon.mjs --mac",
+    "audit:i18n": "node scripts/audit-i18n.mjs",
+    "dist:win": "npm run make-icon && npm run build && electron-builder --win nsis",
+    "dist:linux": "npm run make-icon && npm run build && electron-builder --linux AppImage deb",
+    "dist:linux:deb": "npm run make-icon && npm run build && electron-builder --linux deb",
+    "dist:linux:portable": "npm run make-icon && npm run build && electron-builder --linux tar.gz"
+    ,"dist:mac": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64 --arm64",
+    "dist:mac:arm64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --arm64",
+    "dist:mac:x64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.28.5",
+    "concurrently": "^10.0.5",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.3"
+  },
+  "build": {
+    "appId": "com.wonderful.canvas",
+    "productName": "Wendaflow",
+    "asar": true,
+    "files": [
+      "dist/**/*",
+      "electron-main.mjs",
+      "electron-preload.cjs",
+      "package.json",
+      "build/icon.ico",
+      "build/icon.png",
+      "build/icon.icns"
+    ],
+    "extraResources": [
+      "server.mjs"
+    ],
+    "icon": "build/icon.ico",
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

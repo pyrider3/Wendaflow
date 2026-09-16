@@ -1,0 +1,1982 @@
+[
+  [
+    "无法打开画布数据库",
+    "Cannot open canvas database"
+  ],
+  [
+    "主画布",
+    "Main canvas"
+  ],
+  [
+    "未知",
+    "Unknown"
+  ],
+  [
+    "已完成",
+    "Completed"
+  ],
+  [
+    "排队中",
+    "Queued"
+  ],
+  [
+    "执行中",
+    "Running"
+  ],
+  [
+    "思考中",
+    "Thinking"
+  ],
+  [
+    "生成中",
+    "Generating"
+  ],
+  [
+    "等待授权",
+    "Awaiting approval"
+  ],
+  [
+    "失败",
+    "Failed"
+  ],
+  [
+    "已暂停",
+    "Stopped"
+  ],
+  [
+    "新起点",
+    "New starting point"
+  ],
+  [
+    "生成内容",
+    "Generated content"
+  ],
+  [
+    "生成文件",
+    "Generated file"
+  ],
+  [
+    "新增文件",
+    "New file"
+  ],
+  [
+    "已删除",
+    "Deleted"
+  ],
+  [
+    "已修改",
+    "Modified"
+  ],
+  [
+    "选择模型",
+    "Select model"
+  ],
+  [
+    "默认",
+    "Default"
+  ],
+  [
+    "雾青",
+    "Mist"
+  ],
+  [
+    "琥珀",
+    "Amber"
+  ],
+  [
+    "玫瑰",
+    "Rose"
+  ],
+  [
+    "晴空",
+    "Sky"
+  ],
+  [
+    "紫雾",
+    "Lilac"
+  ],
+  [
+    "综合结论",
+    "Synthesize conclusions"
+  ],
+  [
+    "并列比较",
+    "Compare side by side"
+  ],
+  [
+    "找出冲突",
+    "Find conflicts"
+  ],
+  [
+    "制定行动",
+    "Plan actions"
+  ],
+  [
+    "当前输入",
+    "Current input"
+  ],
+  [
+    "浏览器画布数据库不可用；仍可点击“保存”写入本地 WDF。",
+    "Local cache unavailable. Use Save to write a WDF file."
+  ],
+  [
+    "自动缓存失败；请点击“保存”写入本地 WDF。",
+    "Local cache unavailable. Use Save to write a WDF file."
+  ],
+  [
+    "授权验证失败",
+    "License verification failed"
+  ],
+  [
+    "授权已验证。",
+    "License verified."
+  ],
+  [
+    "当前离线，授权将在 {0} 天后需要联网验证。",
+    "Offline — verification required in {0} days."
+  ],
+  [
+    "当前无法验证授权，请联网后重试。",
+    "License could not be verified. Connect to the internet and try again."
+  ],
+  [
+    "发现新版本",
+    "New version available"
+  ],
+  [
+    "Wendaflow",
+    "Wendaflow"
+  ],
+  [
+    "已复制 {0} 个卡片，可在画布空白处按 Ctrl+V 粘贴。",
+    "Copied {0} cards. Press Ctrl+V on the canvas to paste."
+  ],
+  [
+    "剪贴板中没有 Wendaflow 卡片。",
+    "No Wendaflow cards in clipboard"
+  ],
+  [
+    "已粘贴 {0} 个卡片。",
+    "Pasted {0} cards"
+  ],
+  [
+    "不能把节点继承到自己的后代。",
+    "Cannot inherit from a descendant"
+  ],
+  [
+    "已建立合并关系。",
+    "Merge link created"
+  ],
+  [
+    "已建立引用关系。",
+    "Reference link created"
+  ],
+  [
+    "已建立继承关系。",
+    "Inheritance link created"
+  ],
+  [
+    "已移除 {0} 条连线。",
+    "Removed {0} links"
+  ],
+  [
+    "新画布 {0}",
+    "New canvas {0}"
+  ],
+  [
+    "正在读取本地存档…",
+    "Loading local archives…"
+  ],
+  [
+    "无法读取本地存档：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "打开失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "删除失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "选择目录失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "请理解并描述我上传的图片或文件。",
+    "Please interpret the uploaded images or files."
+  ],
+  [
+    "你",
+    "You"
+  ],
+  [
+    "执行代理",
+    "Agent"
+  ],
+  [
+    "新行动",
+    "New action"
+  ],
+  [
+    "新想法",
+    "New idea"
+  ],
+  [
+    "图片问题",
+    "Image question"
+  ],
+  [
+    "请求已排队，正在准备上下文…",
+    "Request queued…"
+  ],
+  [
+    "正在整理 {0} 条上下文并连接模型…",
+    "Preparing {0} context nodes and connecting…"
+  ],
+  [
+    "模型正在思考，等待首个输出（{0} 秒）…",
+    "Waiting for first output ({0} seconds)…"
+  ],
+  [
+    "模型正在逐字输出…",
+    "Streaming response…"
+  ],
+  [
+    "模型正在思考…",
+    "Thinking…"
+  ],
+  [
+    "尚未填写 {0} 的 API 密钥",
+    "Missing API key for {0}"
+  ],
+  [
+    "等待模型首个输出超过 90 秒；已保留上下文但主动停止。请检查模型负载或减少上下文。",
+    "No output after 90 seconds. Request stopped; check model load or reduce context."
+  ],
+  [
+    "生成已由你停止。",
+    "Generation stopped by you."
+  ],
+  [
+    "{0}。请在设置中检查对应的模型连接。",
+    "{0}. Check the model connection in Settings."
+  ],
+  [
+    "正在连接…",
+    "Connecting…"
+  ],
+  [
+    "已连接 · 检测到 {0} 个模型",
+    "Connected · {0} models detected"
+  ],
+  [
+    "已连接 · 尚未安装模型",
+    "Connected · No models installed"
+  ],
+  [
+    "图片处理失败",
+    "Image processing failed"
+  ],
+  [
+    "无法读取图片 {0}",
+    "Cannot read image {0}"
+  ],
+  [
+    "已拖放 {0} 个文件",
+    "Dropped {0} files"
+  ],
+  [
+    "手动输入",
+    "Manual input"
+  ],
+  [
+    "已拖放 {0} 个文件。可双击此卡片补充说明，或从加号继续向 AI 提问。",
+    "Dropped {0} files. Double-click to add details, or use + to ask AI."
+  ],
+  [
+    "已在画布中添加 {0} 个文件。",
+    "Added {0} files to canvas"
+  ],
+  [
+    "拖放文件失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "已添加 {0} 个附件，发送后会一并交给 AI。",
+    "Added {0} attachments. They will be sent with your message."
+  ],
+  [
+    "添加附件失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "「{0}」已加入输入框，可直接继续提问。",
+    "“{0}” added to the composer"
+  ],
+  [
+    "本地模型 {0}",
+    "Local model {0}"
+  ],
+  [
+    "新模型 {0}",
+    "New model {0}"
+  ],
+  [
+    "无法打开工作目录",
+    "Cannot open workspace"
+  ],
+  [
+    "本地 Codex",
+    "Local Codex"
+  ],
+  [
+    "项目文件已导出",
+    "Project exported"
+  ],
+  [
+    "不是有效的 Wendaflow WDF 文件",
+    "Invalid Wendaflow WDF file"
+  ],
+  [
+    "已导入 {0} 个节点",
+    "Imported {0} nodes"
+  ],
+  [
+    "导入失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "AI 正在生成候选分支…",
+    "AI is generating candidate branches…"
+  ],
+  [
+    "正在整理候选节点…",
+    "Organizing candidate nodes…"
+  ],
+  [
+    "模型没有返回可用的节点标题",
+    "No usable node titles returned"
+  ],
+  [
+    "候选分支已生成：可保留、取消选择或全部丢弃",
+    "Candidates ready: select, deselect, or discard them"
+  ],
+  [
+    "生成失败：{0}",
+    "Operation failed: {0}"
+  ],
+  [
+    "已加入 {0} 个 AI 扩展节点。",
+    "Added {0} AI nodes"
+  ],
+  [
+    "已注入 {0} 个上下文节点与 {1} 个附件。",
+    "Injected {0} context nodes and {1} attachments."
+  ],
+  [
+    "此任务从零开始，没有继承节点。",
+    "Starting from scratch, without inherited nodes."
+  ],
+  [
+    "Codex 返回 {0}",
+    "Codex returned {0}"
+  ],
+  [
+    "{0} 执行结果",
+    "{0} execution results"
+  ],
+  [
+    "{0} 执行失败：{1}",
+    "{0} execution failed: {1}"
+  ],
+  [
+    "无法读取该产物文件",
+    "Cannot read artifact file"
+  ],
+  [
+    "该产物没有可用的本地路径",
+    "Artifact has no local path"
+  ],
+  [
+    "无法打开产物",
+    "Cannot open artifact"
+  ],
+  [
+    "该产物没有可下载的数据",
+    "Artifact has no downloadable data"
+  ],
+  [
+    "无法下载产物",
+    "Cannot download artifact"
+  ],
+  [
+    "只读",
+    "Read only"
+  ],
+  [
+    "工作区可写",
+    "Workspace write"
+  ],
+  [
+    "自动审查",
+    "Auto review"
+  ],
+  [
+    "完全访问",
+    "Full access"
+  ],
+  [
+    "低",
+    "Low"
+  ],
+  [
+    "中",
+    "Medium"
+  ],
+  [
+    "高",
+    "High"
+  ],
+  [
+    "极高",
+    "XHigh"
+  ],
+  [
+    "最高",
+    "Max"
+  ],
+  [
+    "默认模型",
+    "Default model"
+  ],
+  [
+    "思考开启",
+    "Thinking on"
+  ],
+  [
+    "直接执行",
+    "Direct execution"
+  ],
+  [
+    "本次行动配置",
+    "Action settings"
+  ],
+  [
+    "模型",
+    "Model"
+  ],
+  [
+    "使用默认模型",
+    "Use default model"
+  ],
+  [
+    "推理强度",
+    "Reasoning effort"
+  ],
+  [
+    "执行模式",
+    "Execution mode"
+  ],
+  [
+    "只读分析",
+    "Read-only analysis"
+  ],
+  [
+    "自动审查并执行",
+    "Auto-review and execute"
+  ],
+  [
+    "完全访问（跳过审批与沙箱）",
+    "Full access (skip approvals and sandbox)"
+  ],
+  [
+    "配置 Profile",
+    "Configuration profile"
+  ],
+  [
+    "可选",
+    "Optional"
+  ],
+  [
+    "临时会话",
+    "Ephemeral session"
+  ],
+  [
+    "完全访问会跳过沙箱和单次审批，仅在你信任任务与工作目录时使用。",
+    "Full access skips the sandbox and per-action approvals. Use it only for trusted tasks and directories."
+  ],
+  [
+    "权限模式",
+    "Permission mode"
+  ],
+  [
+    "计划模式",
+    "Plan mode"
+  ],
+  [
+    "自动接受编辑",
+    "Accept edits automatically"
+  ],
+  [
+    "最大轮数",
+    "Maximum turns"
+  ],
+  [
+    "不限",
+    "No limit"
+  ],
+  [
+    "详细日志",
+    "Verbose logs"
+  ],
+  [
+    "配置档",
+    "Profile"
+  ],
+  [
+    "推理策略",
+    "Reasoning strategy"
+  ],
+  [
+    "要求充分思考后再执行",
+    "Require extended thinking before execution"
+  ],
+  [
+    "工作目录",
+    "Working directory"
+  ],
+  [
+    "使用 Wendaflow 默认目录",
+    "Use Wendaflow default directory"
+  ],
+  [
+    "选择文件夹",
+    "Choose folder"
+  ],
+  [
+    "使用画布目录",
+    "Use canvas directory"
+  ],
+  [
+    "点击发送即授权并立即执行",
+    "Sending authorizes immediate execution"
+  ],
+  [
+    "完成",
+    "Done"
+  ],
+  [
+    "直接回答",
+    "Direct answer"
+  ],
+  [
+    "本次对话配置",
+    "Conversation settings"
+  ],
+  [
+    "当前模型",
+    "Current model"
+  ],
+  [
+    "创造性",
+    "Creativity"
+  ],
+  [
+    "精确",
+    "Precise"
+  ],
+  [
+    "平衡",
+    "Balanced"
+  ],
+  [
+    "发散",
+    "Creative"
+  ],
+  [
+    "开启模型的深度思考（若该模型支持）",
+    "Enable extended thinking when supported"
+  ],
+  [
+    "配置会记住，并随当前模型使用",
+    "Settings are remembered for the current model"
+  ],
+  [
+    "请输入激活码。",
+    "Enter an activation code."
+  ],
+  [
+    "正在激活…",
+    "Activating…"
+  ],
+  [
+    "激活失败。",
+    "Activation failed."
+  ],
+  [
+    "激活成功，授权已绑定到这台设备。",
+    "Activated successfully and bound to this device."
+  ],
+  [
+    "已移除此设备上的授权。你可以稍后重新激活。",
+    "License removed from this device. You can activate again later."
+  ],
+  [
+    "关闭提示",
+    "Dismiss message"
+  ],
+  [
+    "版本更新",
+    "Version update"
+  ],
+  [
+    "通知详情",
+    "Notification details"
+  ],
+  [
+    "关闭",
+    "Close"
+  ],
+  [
+    "打开下载页",
+    "Open download page"
+  ],
+  [
+    "确认",
+    "Acknowledge"
+  ],
+  [
+    "让对话自由分岔",
+    "Let conversations branch freely"
+  ],
+  [
+    "画布标签栏",
+    "Canvas tabs"
+  ],
+  [
+    "未命名画布",
+    "Untitled canvas"
+  ],
+  [
+    "双击重命名",
+    "Double-click to rename"
+  ],
+  [
+    "新建画布",
+    "New canvas"
+  ],
+  [
+    "拖动窗口",
+    "Drag window"
+  ],
+  [
+    "通知",
+    "Notifications"
+  ],
+  [
+    "通知中心",
+    "Notification center"
+  ],
+  [
+    "应用内通知",
+    "In-app notifications"
+  ],
+  [
+    "目前没有通知。软件运行时会在这里接收任务结果、公告和异常提醒。",
+    "No notifications yet. While the app is running, task results, announcements, and alerts will appear here."
+  ],
+  [
+    "全部标为已读",
+    "Mark all as read"
+  ],
+  [
+    "清除全部",
+    "Clear all"
+  ],
+  [
+    "最小化",
+    "Minimize"
+  ],
+  [
+    "切换窗口大小",
+    "Toggle window size"
+  ],
+  [
+    "关闭 Wendaflow",
+    "Close Wendaflow"
+  ],
+  [
+    "主导航",
+    "Main navigation"
+  ],
+  [
+    "创建于",
+    "Created"
+  ],
+  [
+    "编辑于",
+    "Edited"
+  ],
+  [
+    "个节点",
+    "nodes"
+  ],
+  [
+    "当前",
+    "Current"
+  ],
+  [
+    "删除本地存档",
+    "Delete local archive"
+  ],
+  [
+    "还没有保存过画布。打开一个标签并点击右上角“保存”。",
+    "No saved canvases yet. Open a tab and click Save in the upper-right corner."
+  ],
+  [
+    "已选择 {0} 个节点 · 可一起拖动或删除",
+    "{0} nodes selected · Drag or delete them together"
+  ],
+  [
+    "已选 {0} 条连线",
+    "{0} connections selected"
+  ],
+  [
+    "包含继承关系；删除会解除父子继承。",
+    "Includes inheritance links; deleting removes the parent-child relationship."
+  ],
+  [
+    "可批量移除引用或合并关系。",
+    "Remove reference or merge links in a batch."
+  ],
+  [
+    "取消",
+    "Cancel"
+  ],
+  [
+    "删除连线",
+    "Delete link"
+  ],
+  [
+    "未命名节点",
+    "Untitled node"
+  ],
+  [
+    "图",
+    "IMG"
+  ],
+  [
+    "档",
+    "FILE"
+  ],
+  [
+    "卡片标题",
+    "Card title"
+  ],
+  [
+    "卡片正文",
+    "Card body"
+  ],
+  [
+    "请求正在排队…",
+    "Request queued…"
+  ],
+  [
+    "正在思考与整理上下文…",
+    "Thinking and preparing context…"
+  ],
+  [
+    "模型思考过程",
+    "Model reasoning"
+  ],
+  [
+    "用系统查看器打开",
+    "Open in system viewer"
+  ],
+  [
+    "点击下载",
+    "Click to download"
+  ],
+  [
+    "行动动态",
+    "Action activity"
+  ],
+  [
+    "{0} 条记录 · 已折叠",
+    "{0} entries · collapsed"
+  ],
+  [
+    "实时更新",
+    "Live updates"
+  ],
+  [
+    "执行记录",
+    "Execution record"
+  ],
+  [
+    "思",
+    "TH"
+  ],
+  [
+    "文",
+    "DOC"
+  ],
+  [
+    "答",
+    "RE"
+  ],
+  [
+    "正在思考",
+    "Thinking"
+  ],
+  [
+    "运行命令",
+    "Running command"
+  ],
+  [
+    "修改文件",
+    "Changing files"
+  ],
+  [
+    "阶段结果",
+    "Step result"
+  ],
+  [
+    "终端错误",
+    "Terminal error"
+  ],
+  [
+    "终端输出",
+    "Terminal output"
+  ],
+  [
+    "完整终端输出",
+    "Full terminal output"
+  ],
+  [
+    "产物",
+    "Artifacts"
+  ],
+  [
+    "项",
+    "items"
+  ],
+  [
+    "正在收集…",
+    "Collecting…"
+  ],
+  [
+    "暂无",
+    "None"
+  ],
+  [
+    "下载到指定位置",
+    "Download to a selected location"
+  ],
+  [
+    "用系统默认程序打开",
+    "Open with the default app"
+  ],
+  [
+    "停止",
+    "Stop"
+  ],
+  [
+    "调整卡片大小",
+    "Resize card"
+  ],
+  [
+    "拖出关系线",
+    "Create relation"
+  ],
+  [
+    "拖到另一个节点，选择继承、引用或合并",
+    "Drag to another node, then choose inherit, reference, or merge"
+  ],
+  [
+    "展开分支，包含 {0} 个节点",
+    "Expand branch ({0} nodes)"
+  ],
+  [
+    "折叠分支，包含 {0} 个节点",
+    "Collapse branch ({0} nodes)"
+  ],
+  [
+    "取消创建分支",
+    "Cancel branch"
+  ],
+  [
+    "从这里创建分支",
+    "Create branch from here"
+  ],
+  [
+    "已选为分叉起点",
+    "Selected as branch origin"
+  ],
+  [
+    "反驳",
+    "Counterpoints"
+  ],
+  [
+    "问题",
+    "Questions"
+  ],
+  [
+    "AI 候选 ·",
+    "AI candidate · "
+  ],
+  [
+    "创建分支",
+    "Create branch"
+  ],
+  [
+    "新分支 · 从「{0}」开始",
+    "New branch · from “{0}”"
+  ],
+  [
+    "附件",
+    "attachments"
+  ],
+  [
+    "发送前上下文检查器",
+    "Pre-send context inspector"
+  ],
+  [
+    "点击节点可临时排除",
+    "Click a node to exclude it temporarily"
+  ],
+  [
+    "当前将发送 {0} 条上下文；已排除 {1} 条。排除节点会同时移除它携带的附件，但不会删除画布上的关系。",
+    "Sending {0} context nodes; {1} excluded. Excluding a node also excludes its attachments, without deleting any links."
+  ],
+  [
+    "合并上下文",
+    "Merged context"
+  ],
+  [
+    "引用上下文",
+    "Referenced context"
+  ],
+  [
+    "想法背景",
+    "Idea background"
+  ],
+  [
+    "继承上下文",
+    "Inherited context"
+  ],
+  [
+    "{0} 个附件",
+    "{0} attachments"
+  ],
+  [
+    "继续追问",
+    "Ask further"
+  ],
+  [
+    "请沿着这里继续深入分析。",
+    "Continue analyzing this in depth."
+  ],
+  [
+    "换个角度",
+    "Another angle"
+  ],
+  [
+    "请换一个角度重新思考。",
+    "Reconsider this from another perspective."
+  ],
+  [
+    "反驳它",
+    "Challenge this"
+  ],
+  [
+    "请寻找这个观点的漏洞、反例与风险。",
+    "Find weaknesses, counterexamples, and risks in this view."
+  ],
+  [
+    "总结此处",
+    "Summarize here"
+  ],
+  [
+    "请总结以上上下文的核心结论。",
+    "Summarize the key conclusions of the context above."
+  ],
+  [
+    "变成行动",
+    "Turn into action"
+  ],
+  [
+    "请将以上内容转化为可执行步骤。",
+    "Turn the above into actionable steps."
+  ],
+  [
+    "沿着这个节点继续思考，或交给 AI 执行……",
+    "Continue from this node, or ask AI to act…"
+  ],
+  [
+    "并行",
+    "Parallel"
+  ],
+  [
+    "创建新的起点",
+    "Create a starting point"
+  ],
+  [
+    "新起点 · 不继承任何上下文",
+    "New starting point · No inherited context"
+  ],
+  [
+    "取消创建新起点",
+    "Cancel new starting point"
+  ],
+  [
+    "描述要交给{0}的任务……",
+    "Describe the task for {0}…"
+  ],
+  [
+    "松开以选择关系",
+    "Release to choose relation"
+  ],
+  [
+    "拖到另一个节点",
+    "Drag to another node"
+  ],
+  [
+    "建立到目标节点的关系",
+    "Create a relation to the target node"
+  ],
+  [
+    "继承",
+    "Inherit"
+  ],
+  [
+    "引用",
+    "Reference"
+  ],
+  [
+    "合并",
+    "Merge"
+  ],
+  [
+    "关系连线",
+    "Relation link"
+  ],
+  [
+    "分支连线",
+    "Branch link"
+  ],
+  [
+    "解除父子关系",
+    "Detach parent and child"
+  ],
+  [
+    "编辑节点",
+    "Edit node"
+  ],
+  [
+    "展开子节点",
+    "Expand children"
+  ],
+  [
+    "折叠子节点",
+    "Collapse children"
+  ],
+  [
+    "取消收藏",
+    "Remove favorite"
+  ],
+  [
+    "收藏",
+    "Favorite"
+  ],
+  [
+    "删除节点",
+    "Delete node"
+  ],
+  [
+    "正在编辑",
+    "Editing "
+  ],
+  [
+    "连线",
+    " link"
+  ],
+  [
+    "删除",
+    "Delete"
+  ],
+  [
+    "合并工作台",
+    "Merge workspace"
+  ],
+  [
+    "{0} 个节点将作为显式上下文",
+    "{0} nodes will be explicit context"
+  ],
+  [
+    "第一个选中节点为起点；其余节点只会附加到这一次新分支的上下文，不会改写原节点关系。",
+    "The first node is the starting point. Other nodes add context to this branch only; existing links stay unchanged."
+  ],
+  [
+    "请基于已合并的 {0} 个节点，{1}。",
+    "Based on the {0} merged nodes: {1}."
+  ],
+  [
+    "创建合并分支",
+    "Create merged branch"
+  ],
+  [
+    "这一轮的问题",
+    "Question in this turn"
+  ],
+  [
+    "本次继承的上下文",
+    "Inherited context"
+  ],
+  [
+    "展开 {0} 条",
+    "Expand {0}"
+  ],
+  [
+    "收起",
+    "Collapse"
+  ],
+  [
+    "已继承 {0} 个节点；需要查看或临时跳转时展开。",
+    "Inherits {0} nodes. Expand to inspect or jump temporarily."
+  ],
+  [
+    "当前节点没有继承上下文。",
+    "This node has no inherited context."
+  ],
+  [
+    "本地行动",
+    "Local action"
+  ],
+  [
+    "执行器",
+    "Runner"
+  ],
+  [
+    "正在本地工作区执行",
+    "is running in the local workspace"
+  ],
+  [
+    "执行已完成，记录和产物均已保存",
+    "Execution completed. Records and artifacts are saved."
+  ],
+  [
+    "执行失败，请检查代理连接",
+    "Execution failed. Check the agent connection."
+  ],
+  [
+    "等待执行",
+    "Waiting to run"
+  ],
+  [
+    "Wendaflow 项目目录",
+    "Wendaflow project directory"
+  ],
+  [
+    "打开 ↗",
+    "Open ↗"
+  ],
+  [
+    "允许",
+    "Allow"
+  ],
+  [
+    "执行",
+    "to run"
+  ],
+  [
+    "代理执行记录",
+    "Agent execution record"
+  ],
+  [
+    "条",
+    "items"
+  ],
+  [
+    "工作区文件变化",
+    "Workspace file changes"
+  ],
+  [
+    "查看代码差异",
+    "View code diff"
+  ],
+  [
+    "问题、模型和上下文请求记录均已保存",
+    "Question, model, and context request records are saved"
+  ],
+  [
+    "请求记录",
+    "Request record"
+  ],
+  [
+    "本次请求",
+    "This request"
+  ],
+  [
+    "次",
+    "times"
+  ],
+  [
+    "状态",
+    "Status"
+  ],
+  [
+    "耗时",
+    "Duration"
+  ],
+  [
+    "{0} 秒",
+    "{0} seconds"
+  ],
+  [
+    "进行中",
+    "In progress"
+  ],
+  [
+    "上下文",
+    "Context"
+  ],
+  [
+    "实际注入的节点",
+    "Injected nodes"
+  ],
+  [
+    "生成操作",
+    "Generation actions"
+  ],
+  [
+    "重试模型",
+    "Retry model"
+  ],
+  [
+    "修复连接后重试",
+    "Retry after fixing connection"
+  ],
+  [
+    "使用所选模型重新生成",
+    "Regenerate with selected model"
+  ],
+  [
+    "停止生成",
+    "Stop generation"
+  ],
+  [
+    "行动操作",
+    "Action controls"
+  ],
+  [
+    "停止当前任务",
+    "Stop current task"
+  ],
+  [
+    "继续这个任务：",
+    "Continue this task:"
+  ],
+  [
+    "追加指令并继续",
+    "Add instructions and continue"
+  ],
+  [
+    "节点类型",
+    "Node type"
+  ],
+  [
+    "标题",
+    "Title"
+  ],
+  [
+    "正文（Markdown）",
+    "Body (Markdown)"
+  ],
+  [
+    "标签",
+    "Tags"
+  ],
+  [
+    "研究，重要，待确认",
+    "Research, important, pending"
+  ],
+  [
+    "卡片颜色",
+    "Card color"
+  ],
+  [
+    "备注",
+    "Note"
+  ],
+  [
+    "不会发送给 AI 的私人备注",
+    "Private note not sent to AI"
+  ],
+  [
+    "保存",
+    "Save"
+  ],
+  [
+    "节点操作",
+    "Node actions"
+  ],
+  [
+    "编辑、转换类型与标签",
+    "Edit, convert type, and tags"
+  ],
+  [
+    "请使用另一个角度重新回答：{0}",
+    "Answer from another angle: {0}"
+  ],
+  [
+    "换模型重新回答",
+    "Answer again with another model"
+  ],
+  [
+    "私人备注",
+    "Private note"
+  ],
+  [
+    "父级分支",
+    "Parent branch"
+  ],
+  [
+    "继承自",
+    "Inherited from"
+  ],
+  [
+    "已删除节点",
+    "Deleted node"
+  ],
+  [
+    "解除继承",
+    "Remove inheritance"
+  ],
+  [
+    "关联与扩展",
+    "Relations and expansion"
+  ],
+  [
+    "目标节点会成为当前节点的子分支。",
+    "The target node becomes a child branch of the current node."
+  ],
+  [
+    "将目标节点加入后续分支的合并上下文。",
+    "Add the target node to the merged context for later branches."
+  ],
+  [
+    "关联但不改变树结构；后续分支会引用目标节点。",
+    "Link without changing the tree; later branches cite the target node."
+  ],
+  [
+    "取消{0}连线",
+    "Cancel {0} link"
+  ],
+  [
+    "建立{0}连线",
+    "Create {0} link"
+  ],
+  [
+    "想法",
+    "Idea"
+  ],
+  [
+    "行动",
+    "Action"
+  ],
+  [
+    "AI 扩展思维导图",
+    "AI mind-map expansion"
+  ],
+  [
+    "全部丢弃",
+    "Discard all"
+  ],
+  [
+    "接受",
+    "Accept"
+  ],
+  [
+    "正在删除…",
+    "Deleting…"
+  ],
+  [
+    "删除选中的 {0} 个节点",
+    "Delete {0} selected nodes"
+  ],
+  [
+    "根节点不能删除",
+    "The root node cannot be deleted"
+  ],
+  [
+    "删除节点及其 {0} 个后代",
+    "Delete node and {0} descendants"
+  ],
+  [
+    "★ 已收藏",
+    "★ Favorited"
+  ],
+  [
+    "☆ 收藏",
+    "☆ Favorite"
+  ],
+  [
+    "✓ 已完成",
+    "✓ Completed"
+  ],
+  [
+    "✓ 完成",
+    "✓ Complete"
+  ],
+  [
+    "分支",
+    "Branch"
+  ],
+  [
+    "已删除 {0} 个节点",
+    "{0} nodes deleted"
+  ],
+  [
+    "撤销",
+    "Undo"
+  ],
+  [
+    "图片、PDF、文本、代码及常见文件",
+    "Images, PDFs, text, code, and common files"
+  ],
+  [
+    "定位",
+    "Locate"
+  ],
+  [
+    "使用",
+    "Use"
+  ],
+  [
+    "移除",
+    "Remove"
+  ],
+  [
+    "项资料",
+    "items"
+  ],
+  [
+    "文件随当前画布保存",
+    "Files are saved with the current canvas"
+  ],
+  [
+    "授权",
+    "License"
+  ],
+  [
+    "激活码与设备授权",
+    "Activation code and device access"
+  ],
+  [
+    "运行期间的应用内提醒",
+    "In-app alerts while the app is running"
+  ],
+  [
+    "关于",
+    "About"
+  ],
+  [
+    "版本、授权与官方入口",
+    "Version, license, and official links"
+  ],
+  [
+    "管理本地模型与云端 API。修改会自动保存。",
+    "Manage local models and cloud APIs. Changes are saved automatically."
+  ],
+  [
+    "本地模型",
+    "Local models"
+  ],
+  [
+    "可以保存多个本地模型，并在输入框里直接切换。",
+    "Save multiple local models and switch between them in the composer."
+  ],
+  [
+    "尚未添加本地模型，点击 ＋ 添加。",
+    "No local models yet. Click ＋ to add one."
+  ],
+  [
+    "删除当前",
+    "Delete current"
+  ],
+  [
+    "请求只发送到你填写的本机地址。",
+    "Requests are sent only to the local address you enter."
+  ],
+  [
+    "显示名称",
+    "Display name"
+  ],
+  [
+    "服务地址",
+    "Server URL"
+  ],
+  [
+    "模型名称",
+    "Model name"
+  ],
+  [
+    "尚未测试连接",
+    "Connection not tested"
+  ],
+  [
+    "测试连接",
+    "Test connection"
+  ],
+  [
+    "云端模型库",
+    "Cloud model library"
+  ],
+  [
+    "API 配置",
+    "API configuration"
+  ],
+  [
+    "每个模型独立保存协议、地址和模型名。",
+    "Each model keeps its own protocol, endpoint, and model name."
+  ],
+  [
+    "尚未添加云端模型，点击 ＋ 添加。",
+    "No cloud models yet. Click ＋ to add one."
+  ],
+  [
+    "接口格式",
+    "API format"
+  ],
+  [
+    "接口地址",
+    "Endpoint"
+  ],
+  [
+    "API 密钥",
+    "API key"
+  ],
+  [
+    "仅保存在本次会话",
+    "Stored only for this session"
+  ],
+  [
+    "已配置，可在输入框直接选择",
+    "Configured and available in the composer"
+  ],
+  [
+    "等待配置",
+    "Not configured"
+  ],
+  [
+    "珍珠",
+    "Pearl"
+  ],
+  [
+    "夜蓝",
+    "Midnight"
+  ],
+  [
+    "墨黑",
+    "Graphite"
+  ],
+  [
+    "极昼",
+    "Daylight"
+  ],
+  [
+    "钴蓝",
+    "Cobalt"
+  ],
+  [
+    "紫曜",
+    "Plum"
+  ],
+  [
+    "背景",
+    "Background"
+  ],
+  [
+    "卡片",
+    "Cards"
+  ],
+  [
+    "文字",
+    "Text"
+  ],
+  [
+    "强调色",
+    "Accent"
+  ],
+  [
+    "网格",
+    "Grid"
+  ],
+  [
+    "仅当 Wendaflow 正在运行时接收通知；关闭软件后不会保留后台连接。",
+    "Receive notifications only while Wendaflow is running. No background connection is kept after you close the app."
+  ],
+  [
+    "接收通知",
+    "Receive notifications"
+  ],
+  [
+    "开启后，新消息会以右上角弹窗显示，并保留在通知中心。",
+    "When enabled, new messages appear as a pop-up and remain in Notification Center."
+  ],
+  [
+    "通知服务会自动同步，无需设置地址。需要确认的通知会在详情窗口中保留，直到你手动确认。",
+    "Notifications sync automatically. Address setup is not required, and confirmation-required notices remain until acknowledged."
+  ],
+  [
+    "本机设备 ID",
+    "This device ID"
+  ],
+  [
+    "授权与激活",
+    "License & activation"
+  ],
+  [
+    "激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。",
+    "An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification."
+  ],
+  [
+    "已激活",
+    "Activated"
+  ],
+  [
+    "有效至",
+    "Valid until"
+  ],
+  [
+    "永久授权",
+    "Perpetual license"
+  ],
+  [
+    "已绑定到这台设备。",
+    "Bound to this device."
+  ],
+  [
+    "移除此设备上的授权",
+    "Remove local license"
+  ],
+  [
+    "激活码",
+    "Activation code"
+  ],
+  [
+    "激活此设备",
+    "Activate this device"
+  ],
+  [
+    "备份或恢复完整画布，包括节点、附件和布局。",
+    "Back up or restore complete canvases, including nodes, attachments, and layout."
+  ],
+  [
+    "Wendaflow 画布文件",
+    "Wendaflow canvas file"
+  ],
+  [
+    "使用 .wdf 格式保存完整项目",
+    "Save the complete project in .wdf format"
+  ],
+  [
+    "导出 WDF",
+    "Export WDF"
+  ],
+  [
+    "关于 Wendaflow",
+    "About Wendaflow"
+  ],
+  [
+    "让思考不再被单一线性对话束缚。",
+    "A spatial workspace for conversations, context, and execution."
+  ],
+  [
+    "当前版本",
+    "Current version"
+  ],
+  [
+    "授权状态",
+    "License status"
+  ],
+  [
+    "未激活",
+    "Not activated"
+  ],
+  [
+    "官方网站",
+    "Official website"
+  ],
+  [
+    "通知服务",
+    "Notification service"
+  ],
+  [
+    "已开启",
+    "On"
+  ],
+  [
+    "已关闭",
+    "Off"
+  ],
+  [
+    "Wendaflow 仅在你选择的模型连接中处理请求；模型密钥与画布数据由当前设备管理。",
+    "Wendaflow sends requests only through the model connections you configure. Model keys and canvas data stay managed by this device."
+  ],
+  [
+    "拖动画布 · 右键框选 · Shift 多选 · Alt 拖动子树 · Delete 删除",
+    "Drag canvas · Right-drag to select · Shift multi-select · Alt drag subtree · Delete"
+  ],
+  [
+    "空画布",
+    "Empty canvas"
+  ],
+  [
+    "在下方输入第一句话开始",
+    "Start with your first message below"
+  ],
+  [
+    "＋ 图片 / 文件",
+    "＋ Image / File"
+  ],
+  [
+    "Enter 发送 · Shift Enter 换行",
+    "Enter to send · Shift Enter for newline"
+  ],
+  [
+    "对话",
+    "Chat"
+  ],
+  [
+    "新画布 · 从零开始",
+    "New canvas · Start from scratch"
+  ],
+  [
+    "输入一个问题，AI 将从零开始回答……",
+    "Ask a question and let AI answer from scratch…"
+  ],
+  [
+    "记录一个不需要 AI 回答的想法……",
+    "Capture an idea without an AI reply…"
+  ],
+  [
+    "松开以添加到这次对话",
+    "Release to add to this conversation"
+  ],
+  [
+    "界面语言",
+    "Interface language"
+  ],
+  [
+    "仅改变软件界面文字；卡片内容与 AI 回复不会被自动翻译。",
+    "Changes app controls only. Cards and AI responses are not translated."
+  ],
+  [
+    "保存中…",
+    "Saving…"
+  ],
+  [
+    "已保存",
+    "Saved"
+  ],
+  [
+    "保存失败",
+    "Save failed"
+  ],
+  [
+    "适应画布",
+    "Fit canvas"
+  ],
+  [
+    "自动整理",
+    "Auto arrange"
+  ],
+  [
+    "小地图",
+    "Minimap"
+  ],
+  [
+    "专注路径",
+    "Focus path"
+  ],
+  [
+    "所有画布",
+    "All canvases"
+  ],
+  [
+    "搜索",
+    "Search"
+  ],
+  [
+    "资料库",
+    "Library"
+  ],
+  [
+    "设置",
+    "Settings"
+  ],
+  [
+    "本地 WDF 存档",
+    "Local WDF archives"
+  ],
+  [
+    "已保存的画布",
+    "Saved canvases"
+  ],
+  [
+    "导入 WDF",
+    "Import WDF"
+  ],
+  [
+    "创建新画布",
+    "Create canvas"
+  ],
+  [
+    "从一个空白输入框开始",
+    "Start with an empty composer"
+  ],
+  [
+    "外观",
+    "Appearance"
+  ],
+  [
+    "选择适合环境的界面，画布内容不会改变。",
+    "Choose an interface for your environment. Canvas content will not change."
+  ],
+  [
+    "模型连接",
+    "Model connections"
+  ],
+  [
+    "本地与云端 API",
+    "Local and cloud APIs"
+  ],
+  [
+    "项目数据",
+    "Project data"
+  ],
+  [
+    "导入与导出",
+    "Import and export"
+  ],
+  [
+    "主题与显示",
+    "Theme and display"
+  ],
+  [
+    "界面主题",
+    "Interface theme"
+  ],
+  [
+    "基础主题与高对比度主题，后者优先保证读写清晰。",
+    "Standard and high-contrast themes for clear reading and writing."
+  ],
+  [
+    "缩放预览",
+    "Zoom preview"
+  ],
+  [
+    "缩小画布时仅显示标题；关闭后卡片始终保持完整内容。",
+    "Show only titles when zoomed out. Turn this off to keep full card content at every zoom level."
+  ],
+  [
+    "自定义",
+    "Custom theme"
+  ],
+  [
+    "颜色会立即应用，并保存在当前设备。",
+    "Colors apply instantly and are saved in this browser."
+  ],
+  [
+    "恢复默认颜色",
+    "Restore default colors"
+  ],
+  [
+    "当前节点",
+    "Current node"
+  ],
+  [
+    "个节点已选择",
+    "nodes selected"
+  ],
+  [
+    "概览",
+    "Overview"
+  ],
+  [
+    "操作",
+    "Actions"
+  ],
+  [
+    "换模型重试",
+    "Retry with another model"
+  ],
+  [
+    "搜索标题、问题、回答或模型…",
+    "Search titles, questions, answers, or models…"
+  ],
+  [
+    "没有匹配的节点",
+    "No matching nodes"
+  ],
+  [
+    "项结果",
+    "results"
+  ],
+  [
+    "当前画布",
+    "Current canvas"
+  ],
+  [
+    "＋ 上传到当前输入",
+    "＋ Upload to current input"
+  ],
+  [
+    "还没有文件。可以在此上传，或从任意输入框添加文件。",
+    "No files yet. Upload here or add files from any composer."
+  ],
+  [
+    "导航",
+    "Navigate"
+  ],
+  [
+    "Ollama 返回 {0}",
+    "Service returned {0}"
+  ],
+  [
+    "Ollama 没有返回有效内容",
+    "No valid model response"
+  ],
+  [
+    "浏览器无法读取流式响应",
+    "Cannot read streaming response"
+  ],
+  [
+    "云端接口返回 {0}",
+    "Service returned {0}"
+  ],
+  [
+    "云端流式请求失败",
+    "Model request failed"
+  ],
+  [
+    "API 返回 {0}",
+    "Service returned {0}"
+  ],
+  [
+    "Claude API 请求失败",
+    "Model request failed"
+  ],
+  [
+    "代理请求失败",
+    "Model request failed"
+  ],
+  [
+    "无法连接 Ollama（{0}）",
+    "Service returned {0}"
+  ]
+]

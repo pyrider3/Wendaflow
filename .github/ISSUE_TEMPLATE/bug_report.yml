@@ -1,0 +1,46 @@
+name: Bug 报告
+description: 报告可以稳定复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: 感谢反馈。请勿在公开 Issue 中提交密钥、激活码或私人数据。
+  - type: input
+    id: version
+    attributes:
+      label: Wendaflow 版本
+      placeholder: 例如 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options: [Windows, macOS Apple Silicon, macOS Intel, Linux, 其他]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: 请按顺序描述操作步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图、日志或补充信息
+

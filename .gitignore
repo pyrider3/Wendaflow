@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+release/
+**/release/
+*-unpacked/
+*.AppImage
+*.deb
+*.dmg
+*.exe
+*.blockmap
+*.asar
+
+# Runtime data and local configuration
+data/
+**/data/
+.env
+.env.*
+!.env.example
+*.local
+
+# Credentials and signing materials
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
+
+# Logs and caches
+*.log
+npm-debug.log*
+.cache/
+.vite/
+coverage/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+

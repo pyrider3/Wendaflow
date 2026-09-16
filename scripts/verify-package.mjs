@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { extractFile } from '@electron/asar';
+const archive='dist/win-unpacked/resources/app.asar';
+const html=extractFile(archive,'dist/index.html').toString();
+const asset=html.match(/src="([^"]+\.js)"/)[1].replace(/^\.\//,'');
+const packed=extractFile(archive,path.join('dist',asset));
+if(!packed.equals(fs.readFileSync('dist/'+asset)))throw Error('Packaged UI does not match latest build');
+const installer='dist/Wendaflow Setup 0.1.0.exe';
+const data=fs.readFileSync(installer);
+if(data.readUInt16LE(0)!==0x5a4d||data.length<50000000)throw Error('Invalid or incomplete installer');
+console.log(JSON.stringify({installer,bytes:data.length,sha256:crypto.createHash('sha256').update(data).digest('hex'),packagedAsset:asset,modified:fs.statSync(installer).mtime.toISOString()},null,2));

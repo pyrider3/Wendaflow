@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="500" viewBox="0 0 1800 500" role="img" aria-labelledby="title desc">
+  <title id="title">Wendaflow</title>
+  <desc id="desc">Wendaflow wordmark on transparent background</desc>
+  <rect x="42" y="42" width="336" height="336" rx="72" fill="#151b18"/>
+  <g fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M115 142v110c0 70 116 70 116 0V142"/>
+    <path d="M231 142v110c0 70 116 70 116 0V142"/>
+  </g>
+  <g fill="#fff"><circle cx="115" cy="113" r="15"/><circle cx="231" cy="113" r="15"/><circle cx="347" cy="113" r="15"/></g>
+  <text x="432" y="208" fill="#14211c" font-family="Arial, Helvetica, sans-serif" font-size="112" font-weight="800" letter-spacing="-4">Wendaflow</text>
+  <text x="438" y="302" fill="#829087" font-family="Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="56" font-weight="500" letter-spacing="4">让对话自由分岔</text>
+</svg>
