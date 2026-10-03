@@ -10,14 +10,28 @@ walk(parse(source,{sourceType:'module',plugins:['jsx']}),node => {
   if (node.type === 'VariableDeclarator' && ['UI_COPY','PHRASE_PACKS','COMPLETE_UI_PACKS'].includes(node.id.name)) objects[node.id.name] = vm.runInNewContext('(' + source.slice(node.init.start,node.init.end) + ')',Object.create(null),{timeout:1000});
 });
 const catalog = buildCatalog(objects.UI_COPY,objects.PHRASE_PACKS,objects.COMPLETE_UI_PACKS);
-const scan = inventory();
+const uiFiles=[];
+function scanFiles(directory) {
+  for(const entry of fs.readdirSync(new URL(directory,root),{withFileTypes:true})) {
+    const file=`${directory}/${entry.name}`;
+    if(entry.isDirectory())scanFiles(file);
+    else if(/\.(jsx|js)$/.test(entry.name))uiFiles.push(file);
+  }
+}
+scanFiles('src');
+const scan={calls:[],literals:[]};
+for(const file of uiFiles) {
+  const result=inventory(file),content=fs.readFileSync(new URL(file,root),'utf8');
+  scan.calls.push(...result.calls.map(call=>({...call,file,expression:content.slice(call.start,call.end)})));
+  scan.literals.push(...result.literals.map(literal=>({...literal,file})));
+}
 const required = new Set([...scan.calls.filter(call => call.en !== null).map(call => call.en),...Object.values(objects.UI_COPY.en),...sourceIndex.map(([,en])=>en)]);
 const placeholders = value => [...String(value).matchAll(/\{(\d+)\}/g)].map(m=>m[1]).sort().join(',');
 let failures = 0;
 const css = fs.readFileSync(new URL('src/styles.css',root),'utf8');
 if (/content\s*:\s*['"][^'"\n]*\p{Script=Han}/u.test(css)) { console.error('Hardcoded translated text in CSS'); failures++; }
 // The keyed dispatcher is the only intentional dynamic translation call.
-for (const call of scan.calls.filter(c=>c.en===null)) if (source.slice(call.start,call.end)!=="tr(UI_COPY['zh-CN'][key],english)") { console.error('Unverifiable translation call',call.line);failures++; }
+for (const call of scan.calls.filter(c=>c.en===null)) if (call.expression!=="tr(UI_COPY['zh-CN'][key],english)") { console.error('Unverifiable translation call',call.line);failures++; }
 for (const literal of scan.literals.filter(l=>l.type==='JSXText')) { console.error('Untranslated visible text',literal.line,literal.value);failures++; }
 for (const locale of locales) {
   const missing = [...required].filter(key => !Object.hasOwn(catalog[locale],key));

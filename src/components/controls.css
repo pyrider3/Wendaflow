@@ -1,0 +1,60 @@
+/* Shared focus and secondary text stay readable in light and dark controls. */
+:root {
+  --ui-focus: #247b56;
+  --ui-muted: #65736b;
+}
+:root:is(
+  [data-theme="midnight"],
+  [data-theme="graphite"],
+  [data-theme="contrast-black"],
+  [data-theme="contrast-blue"],
+  [data-theme="contrast-amber"],
+  [data-theme="contrast-plum"]
+) {
+  --ui-focus: #84b9e8;
+  --ui-muted: #aab6b0;
+}
+:root[data-theme="custom"] {
+  --ui-focus: var(--custom-accent);
+  --ui-muted: var(--custom-text);
+}
+:where(button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+.theme-presets {
+  gap: 8px;
+}
+.theme-presets button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.theme-presets button[aria-pressed="true"] {
+  font-weight: 650;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="contrast-blue"],
+    [data-theme="contrast-amber"],
+    [data-theme="contrast-plum"]
+  )
+  :is(
+    .quick-thought-editor textarea,
+    .settings-card input,
+    .composer textarea
+  )::placeholder {
+  color: var(--ui-muted);
+  opacity: 1;
+}
+.quick-thought-context button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.quick-thought-context small {
+  color: var(--ui-muted);
+  opacity: 1;
+}

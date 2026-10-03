@@ -1,3 +1,5 @@
+import { LOCAL_PROXY_URL } from './localProxy.js';
+
 function imagePayloads(attachments = []) {
   return attachments.filter((item) => item.dataUrl?.startsWith('data:image/')).map((item) => ({ name: item.name, dataUrl: item.dataUrl }));
 }
@@ -256,7 +258,7 @@ export async function streamGemini({ endpoint, apiKey, model, messages, chatOpti
 }
 
 async function streamLocalProxy(config) {
-  const response = await fetch('http://127.0.0.1:4318/stream', {
+  const response = await fetch(`${LOCAL_PROXY_URL}/stream`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint: config.endpoint, format: config.format, apiKey: config.apiKey, model: config.model, messages: config.messages, chatOptions: config.chatOptions }), signal: config.signal,
   });

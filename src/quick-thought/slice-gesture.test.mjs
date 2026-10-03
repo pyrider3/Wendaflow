@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {parse} from '@babel/parser';
+import {flattenCubic,createSliceIndex} from './slice.js';
+
+test('actual move handler caches geometry, batches frames and keeps complete long trails with bounded live chunks',()=>{
+ const source=fs.readFileSync(new URL('./useQuickSlice.js',import.meta.url),'utf8');
+ const ast=parse(source,{sourceType:'module',plugins:['jsx']});
+ const app=ast.program.body.find(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.id?.name==='useQuickSlice');
+ const names=['buildQuickSliceGeometry','updateQuickSlice','clearQuickSlicePreview'];
+ const functions=app.declaration.body.body.filter(n=>n.type==='FunctionDeclaration'&&names.includes(n.id.name)).map(n=>source.slice(n.start,n.end));
+ let cardReads=0,matrixReads=0,frameRequests=0;const frames=new Map();
+ const element=(id,rect)=>({dataset:{nodeId:id},attributes:{},getBoundingClientRect(){cardReads++;return rect;},setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];}});
+ const cards=[element('a',{left:100,top:100,right:200,bottom:200}),element('b',{left:300,top:100,right:400,bottom:200})];
+ const classes=new Set();const path={dataset:{sourceId:'a',targetId:'b',connectionKey:'r',connectionKind:'relation',connectionType:'reference'},getAttribute(){return 'M 200 150 C 230 150, 270 150, 300 150';},classList:{add:k=>classes.add(k),remove:k=>classes.delete(k)}};
+ const polyline=()=>({setAttribute(k,v){this[k]=v;}});
+ const live=polyline();const trail={style:{display:'none'},firstChild:live,children:[live],appendChild(el){this.children.push(el);},replaceChildren(el){this.children=[el];}};
+ const stroke={geometry:null,x:0,y:150,last:{x:0,y:150},points:[{x:0,y:150}],pendingChunks:[],ids:new Set(),connections:new Map(),previewIds:new Set(),previewKeys:new Set(),moved:false};
+ const context={document:{createElementNS:polyline},flattenCubic,createSliceIndex,nodes:[{id:'a',type:'thought'},{id:'b',type:'thought'}],quickBlankClick:{current:stroke},quickSliceFrameRef:{current:null},quickSliceTrailRef:{current:trail},worldRef:{current:{querySelectorAll:()=>cards}},canvasRef:{current:{getBoundingClientRect:()=>({left:0,top:0,right:1200,bottom:700}),querySelectorAll:()=>cards.filter(c=>c.attributes['data-slice-target'])}},connectionsRef:{current:{getScreenCTM(){matrixReads++;return {a:1,b:0,c:0,d:1,e:0,f:0};},querySelectorAll:selector=>selector==='.slice-target'?(classes.has('slice-target')?[path]:[]):[path]}},requestAnimationFrame:fn=>{frames.set(++frameRequests,fn);return frameRequests;},cancelAnimationFrame:id=>frames.delete(id)};
+ const api=vm.runInNewContext(functions.join('\n')+'\n({updateQuickSlice,clearQuickSlicePreview})',context);
+ for(let x=5;x<=500;x+=5)api.updateQuickSlice({clientX:x,clientY:150});
+ assert.equal(cardReads,2);assert.equal(matrixReads,1);assert.equal(frameRequests,1);assert.ok(stroke.points.length<=80);
+ assert.deepEqual([...stroke.ids],['a','b']);assert.ok(stroke.connections.has('r'));
+ frames.get(1)();assert.equal(trail.style.display,'block');assert.equal(cards[0].attributes['data-slice-target'],'true');assert.ok(classes.has('slice-target'));
+ assert.equal(trail.children.length,2);assert.ok(trail.children[1].points.startsWith('0,150 '));
+ const firstChunk=trail.children[1].points;
+ for(let x=505;x<=2000;x+=5)api.updateQuickSlice({clientX:x,clientY:150});
+ frames.get(2)();assert.equal(trail.children[1].points,firstChunk);assert.ok(trail.children.length>4);
+ assert.equal(cardReads,2);assert.equal(matrixReads,1);assert.ok(live.points.endsWith('2000,150'));
+ const chunks=trail.children.slice(1).map(c=>c.points.split(' '));chunks.push(live.points.split(' '));
+ for(let i=1;i<chunks.length;i++)assert.equal(chunks[i-1].at(-1),chunks[i][0]);
+ assert.equal(chunks.reduce((n,c,i)=>n+c.length-(i?1:0),0),400);
+ api.clearQuickSlicePreview();assert.equal(trail.children.length,1);assert.equal(live.points,'');assert.equal(trail.style.display,'none');assert.equal(cards[0].attributes['data-slice-target'],undefined);assert.ok(!classes.has('slice-target'));
+});

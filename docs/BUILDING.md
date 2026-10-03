@@ -2,14 +2,15 @@
 
 ## 环境
 
-- Node.js 20 或更高版本
+- Node.js 20.19+ 或 22.12+（满足当前 Vite 要求）
 - npm
 - 对应目标平台的构建环境
 
 安装依赖并验证：
 
 ```bash
-npm install
+npm ci
+npm run test:quick-thought
 npm run build
 ```
 
@@ -29,7 +30,10 @@ npm run dist:win
 
 ```bash
 npm run dist:linux
+npm run verify:linux
 ```
+
+产物位于 `release/`，包含 AppImage、deb 和 `linux-unpacked/`。校验命令检查打包资源、生产代理地址、版本与许可证，并生成安装包 SHA-256 校验值。
 
 ## macOS
 
@@ -55,4 +59,3 @@ npm run dist:mac:x64
 - `notification-manager/`：服务端管理桌面应用及 PostgreSQL 部署文件。
 
 部署前复制 `.env.example` 并生成新的随机密钥。不要使用示例值，也不要把 `.env` 提交到仓库。
-

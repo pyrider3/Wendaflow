@@ -1,20 +1,14 @@
 {
   "name": "wendaflow",
   "private": true,
-  "version": "0.1.0",
-  "description": "A branching AI conversation canvas with visible context and local actions.",
+  "version": "0.2.8",
   "license": "AGPL-3.0-only",
+  "description": "AI conversations on a branching canvas",
   "homepage": "https://cn.qnjyxh.xyz",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/pyrider3/Wendaflow.git"
-  },
-  "bugs": {
-    "url": "https://github.com/pyrider3/Wendaflow/issues"
-  },
   "type": "module",
   "main": "electron-main.mjs",
   "scripts": {
+    "verify:linux": "node scripts/verify-linux-package.mjs",
     "dev": "vite",
     "proxy": "node server.mjs",
     "app": "concurrently -k \"npm:dev\" \"npm:proxy\"",
@@ -28,10 +22,11 @@
     "dist:win": "npm run make-icon && npm run build && electron-builder --win nsis",
     "dist:linux": "npm run make-icon && npm run build && electron-builder --linux AppImage deb",
     "dist:linux:deb": "npm run make-icon && npm run build && electron-builder --linux deb",
-    "dist:linux:portable": "npm run make-icon && npm run build && electron-builder --linux tar.gz"
-    ,"dist:mac": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64 --arm64",
+    "dist:linux:portable": "npm run make-icon && npm run build && electron-builder --linux tar.gz",
+    "dist:mac": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64 --arm64",
     "dist:mac:arm64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --arm64",
-    "dist:mac:x64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64"
+    "dist:mac:x64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64",
+    "test:quick-thought": "node --test src/quick-thought/*.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -52,6 +47,9 @@
   "build": {
     "appId": "com.wonderful.canvas",
     "productName": "Wendaflow",
+    "directories": {
+      "output": "release"
+    },
     "asar": true,
     "files": [
       "dist/**/*",
@@ -60,7 +58,8 @@
       "package.json",
       "build/icon.ico",
       "build/icon.png",
-      "build/icon.icns"
+      "build/icon.icns",
+      "LICENSE"
     ],
     "extraResources": [
       "server.mjs"
@@ -77,6 +76,7 @@
         "deb"
       ],
       "category": "Utility",
+      "maintainer": "pyrider3",
       "icon": "build/icon.png"
     },
     "mac": {
@@ -91,5 +91,12 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pyrider3/Wendaflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pyrider3/Wendaflow/issues"
   }
 }

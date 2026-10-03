@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { fork } from 'node:child_process';
-import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,7 +50,7 @@ app.commandLine.appendSwitch('enable-zero-copy');
 
 // Keep portable WDF archives and the default Agent workspace in Documents,
 // rather than inside Codex's project directory or AppData.
-app.setPath('userData', path.join(app.getPath('documents'), 'Wonderful'));
+app.setPath('userData', process.env.WENDAFLOW_USER_DATA_DIR || path.join(app.getPath('documents'), 'Wonderful'));
 
 function backendEntry() {
   return app.isPackaged ? path.join(process.resourcesPath, 'server.mjs') : path.join(here, 'server.mjs');
@@ -87,7 +87,8 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await mkdir(app.getPath('userData'), { recursive: true });
   startBackend();
   ipcMain.handle('wonderful:pick-directory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] });
