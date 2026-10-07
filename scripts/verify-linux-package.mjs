@@ -19,6 +19,7 @@ assert.ok(css.equals(fs.readFileSync(`dist/${cssAsset}`)), 'Packaged stylesheet 
 assert.ok(css.toString().includes('contrast-black'), 'Black theme styles missing');
 const js = extractFile(archive, `dist/${asset}`).toString();
 assert.ok(js.includes('contrast-black'), 'Black theme option missing');
+assert.ok(js.includes('starlight') && css.toString().includes('--dark-control'), 'Star theme or readable dark controls missing');
 assert.ok(!js.includes('graph-surface'), 'Removed node graph leaked into release');
 assert.ok(!js.includes('graph-mode'), 'Removed node graph mode leaked into release');
 assert.ok(js.includes('quick-thought-toggle') && js.includes('quick-thought-editor'), 'Quick thinking controls missing');

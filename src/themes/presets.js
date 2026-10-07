@@ -7,6 +7,7 @@ export function themePresets(tr, customLabel) {
     ["graphite", tr("墨黑", "Graphite")],
     ["contrast-light", tr("极昼", "Daylight")],
     ["contrast-black", tr("极夜", "Nightfall")],
+    ["starlight", tr("星夜", "Starlight")],
     ["contrast-blue", tr("钴蓝", "Cobalt")],
     ["contrast-amber", tr("琥珀", "Amber")],
     ["contrast-plum", tr("紫曜", "Plum")],

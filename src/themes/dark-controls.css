@@ -1,0 +1,280 @@
+/* Shared dark surfaces: explicit foregrounds prevent pale native button faces
+   and light-only control styles from washing out the inspector. */
+:root:is(
+  [data-theme="midnight"],
+  [data-theme="graphite"],
+  [data-theme="contrast-black"],
+  [data-theme="starlight"]
+) {
+  color-scheme: dark;
+  --dark-panel: #171c24;
+  --dark-control: #252c38;
+  --dark-border: #536074;
+  --dark-text: #edf2fc;
+  --dark-muted: #b7c2d4;
+  --dark-active: #33486a;
+  --dark-accent: #aed1ff;
+}
+:root[data-theme="contrast-black"] {
+  --dark-panel: #151515;
+  --dark-control: #262626;
+  --dark-border: #5a5a5a;
+  --dark-active: #26394f;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .inspector,
+    .composer,
+    .settings-panel,
+    .settings-card,
+    .search-panel,
+    .library-panel,
+    .canvas-overview,
+    .agent-config-popover,
+    .context-menu,
+    .relation-menu,
+    .node-editor-card,
+    .notification-center,
+    .notification-detail-card,
+    .model-picker-menu,
+    .quick-thought-editor
+  ) {
+  background: var(--dark-panel);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .quiet-button,
+    .rail-button,
+    .canvas-tabs button,
+    .window-controls button,
+    .open-inspector,
+    .wide-action,
+    .inspector-footer button,
+    .relation-types button,
+    .mindmap-mode-row button,
+    .inspector-tabs,
+    .segmented,
+    .theme-presets button,
+    .profile-tab,
+    .attach-button,
+    .agent-summary-button
+  ) {
+  background: var(--dark-control);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+  box-shadow: none;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(.inspector-tabs button, .segmented button) {
+  background: transparent;
+  color: var(--dark-muted);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .inspector-tabs button.active,
+    .relation-types button.active,
+    .mindmap-mode-row button.active,
+    .wide-action.active,
+    .inspector-footer button.active,
+    .canvas-tabs button.active,
+    .settings-nav button.active,
+    .theme-presets button.active
+  ) {
+  background: var(--dark-active);
+  color: var(--dark-text);
+  border-color: var(--dark-accent);
+  box-shadow: inset 0 0 0 1px var(--dark-accent);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  .segmented::before {
+  background: var(--dark-active);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  .segmented
+  button.selected {
+  color: var(--dark-text);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .project-block span,
+    .canvas-hint,
+    .node-kind,
+    .node-model,
+    .inspector-head span,
+    .inspector-section h3,
+    .inspector-section p,
+    .settings-section p,
+    .settings-pane p,
+    .appearance-setting span,
+    .workspace-setting span,
+    .context-path small,
+    .file-attachment small,
+    .shortcut
+  ) {
+  color: var(--dark-muted);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(.project-block strong, .inspector h2, .settings-section h3) {
+  color: var(--dark-text);
+  text-shadow: none;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .meta-row span,
+    .image-attachment,
+    .file-attachment,
+    .code-attachment,
+    .node-meta span,
+    .node-meta i,
+    .inspector-meta span,
+    .inspector-tags span,
+    .path-item,
+    .appearance-setting,
+    .workspace-setting,
+    .settings-project-row,
+    .custom-theme-editor,
+    .action-live-feed article,
+    .thinking-output,
+    .action-terminal
+  ) {
+  background: var(--dark-control);
+  color: var(--dark-text);
+  border-color: var(--dark-border);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(input, select, textarea) {
+  background-color: var(--dark-panel);
+  color: var(--dark-text);
+  border-color: var(--dark-border);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(input, textarea)::placeholder {
+  color: var(--dark-muted);
+  opacity: 1;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(
+    .quick-thought-toggle,
+    .quick-thought-editor textarea,
+    .composer textarea
+  ) {
+  background: transparent;
+  color: var(--dark-text);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  .inspector-footer
+  button.branch {
+  background: #286447;
+  color: #fff;
+  border-color: #86c5a1;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  .danger-outline {
+  color: #ffb5ba;
+  border-color: #be7780;
+}
+
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(.node h2, .node p, .markdown-content, .markdown-content strong) {
+  color: var(--dark-text);
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  :is(.node.colored, article.node[style*="--node-tint"]) {
+  background: color-mix(
+    in srgb,
+    var(--node-tint) 18%,
+    var(--dark-panel)
+  ) !important;
+}
+:root:is(
+    [data-theme="midnight"],
+    [data-theme="graphite"],
+    [data-theme="contrast-black"],
+    [data-theme="starlight"]
+  )
+  .node-colors
+  > span {
+  color: var(--dark-muted);
+}

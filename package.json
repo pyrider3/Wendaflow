@@ -1,7 +1,7 @@
 {
   "name": "wendaflow",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.13",
   "license": "AGPL-3.0-only",
   "description": "AI conversations on a branching canvas",
   "homepage": "https://cn.qnjyxh.xyz",

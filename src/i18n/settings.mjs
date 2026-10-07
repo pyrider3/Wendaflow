@@ -1,4 +1,5 @@
 export default `
+Starlight|星夜|星夜|별빛|Noche estrellada|Nuit étoilée|Sternennacht|Noite estrelada|Звёздная ночь|ليلة مرصعة بالنجوم
 Nightfall|極夜|極夜|극야|Noche|Nuit|Polarnacht|Noite|Полярная ночь|الليل القطبي
 License verified.|授權已驗證。|ライセンスを確認しました。|라이선스가 확인되었습니다.|Licencia verificada.|Licence vérifiée.|Lizenz verifiziert.|Licença verificada.|Лицензия проверена.|تم التحقق من الترخيص.
 Offline — verification required in {0} days.|目前離線，需於 {0} 天內連線驗證。|オフラインです。{0} 日以内にオンライン確認が必要です。|오프라인입니다. {0}일 이내에 온라인 확인이 필요합니다.|Sin conexión: verifica la licencia en {0} días.|Hors ligne : vérification requise sous {0} jours.|Offline – Prüfung innerhalb von {0} Tagen erforderlich.|Offline: verificação necessária em {0} dias.|Нет сети. Проверка потребуется через {0} дней.|غير متصل — يلزم التحقق خلال {0} أيام.

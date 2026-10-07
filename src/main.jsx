@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThoughtEditor, quickThoughtCopy } from './quick-thought/QuickThought.jsx';
-import { thoughtIds, boxThoughtIds, newThought, deletionBackups, removeNodeRecords } from './quick-thought/ideas.js';
+import { thoughtIds, boxThoughtIds, completeThoughtMarquee, attachThoughtChild, newThought, deletionBackups, removeNodeRecords } from './quick-thought/ideas.js';
 import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
 import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL } from './localProxy.js';
@@ -14,6 +14,8 @@ import './styles.css';
 import './themes/presets.css';
 import './components/controls.css';
 import './themes/contrast-black.css';
+import './themes/starlight.css';
+import './themes/dark-controls.css';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
 
@@ -22,7 +24,7 @@ const CANVAS_DB_NAME = 'wonderful-canvas-store';
 const CANVAS_DB_VERSION = 1;
 const CANVAS_STORE = 'canvases';
 const OFFICIAL_NOTIFICATION_SERVER = 'https://api.qnjyxh.xyz';
-const APP_VERSION = '0.2.8';
+const APP_VERSION = '0.2.13';
 const LICENSE_OFFLINE_GRACE_DAYS = 7;
 
 function isNewerVersion(candidate, current) {
@@ -916,6 +918,15 @@ function App() {
   }
 
   function clearSelection() {
+    if (quickThought) {
+      if (inspectorTimerRef.current) window.clearTimeout(inspectorTimerRef.current);
+      inspectorTimerRef.current = null;
+      closeBranch();
+      setSelectedId(null); setSelectedIds(new Set());
+      setSelectedConnections([]); setLineSelectionMenu(null); setLinkingFrom(null);
+      setDeleteConfirm(false); setInspectorOpen(false); setInspectorClosing(false);
+      return;
+    }
     if (!selectedId || inspectorClosing) return;
     closeBranch();
     setSelectedConnections([]);
@@ -1160,7 +1171,7 @@ function App() {
     if(quickEditor){if(quickEditor.value.trim())saveQuickIdea();else cancelQuickIdea();}
     const sources=[...thoughtIds(nodes,new Set(sourceIds))];
     const node={...newThought(point,quickCopy.newIdea,sources[0],`thought-${crypto.randomUUID()}`),author:tr('你','You')};
-    setNodes(items=>[...items.map(n=>sources.slice(1).includes(n.id)?{...n,relations:[...(n.relations||[]),{id:crypto.randomUUID(),targetId:node.id,type:'reference'}]}:n),node]);
+    setNodes(items=>[...items,node]);
     setCollapsedIds(current=>new Set([...current].filter(id=>!sources.includes(id))));
     setRootComposerOpen(false);setBranchingFrom(null);setInspectorOpen(false);setSelectedId(node.id);setSelectedIds(new Set([node.id]));setQuickEditor({id:node.id,value:'',created:true});
   }
@@ -1389,8 +1400,12 @@ function App() {
         suppressContextMenuUntilRef.current=Date.now()+300;
         if(event.type==='pointerup') {
           if(!finalRelationDrag.moved)openQuickMenu(event,finalRelationDrag.sourceId);
-          else if(finalRelationDrag.targetId)setNodes(items=>items.map(n=>finalRelationDrag.sourceIds.includes(n.id)&&n.id!==finalRelationDrag.targetId?{...n,relations:[...(n.relations||[]).filter(r=>!(r.targetId===finalRelationDrag.targetId&&(r.type||'reference')==='reference')),{id:crypto.randomUUID(),targetId:finalRelationDrag.targetId,type:'reference'}]}:n));
-          else if(!document.elementsFromPoint(event.clientX,event.clientY).some(el=>el.closest?.('.node,.composer,.inspector,.quick-thought-editor')))createQuickIdea(clientWorld(event),finalRelationDrag.sourceIds);
+          else if(finalRelationDrag.targetId) {
+            const next = attachThoughtChild(nodes, finalRelationDrag.sourceId, finalRelationDrag.targetId);
+            if (next === nodes) setStorageWarning(tr('不能把节点继承到自己的后代。',"Cannot inherit from a descendant"));
+            else { setNodes(next); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
+          }
+          else if(!document.elementsFromPoint(event.clientX,event.clientY).some(el=>el.closest?.('.node,.composer,.inspector,.quick-thought-editor')))createQuickIdea(clientWorld(event),[finalRelationDrag.sourceId]);
         }
       } else if(finalRelationDrag.targetId)setRelationMenu({sourceId:finalRelationDrag.sourceId,targetId:finalRelationDrag.targetId,x:finalRelationDrag.x,y:finalRelationDrag.y});
     }
@@ -1398,6 +1413,13 @@ function App() {
       targetViewportRef.current = viewportRef.current;
       commitViewport(viewportRef.current, true);
       if (!panning.moved) { clearSelection(); closeRootComposer(); }
+    }
+    if (marquee && quickThought) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const box = {...marquee, x:event.clientX-rect.left, y:event.clientY-rect.top};
+      const hits = event.type === 'pointerup' ? completeThoughtMarquee(visibleNodes,nodeSizes,viewportRef.current,box) : [];
+      if (!hits.length) clearSelection();
+      else { setSelectedIds(new Set(hits)); setSelectedId(hits.at(-1)); setInspectorOpen(false); }
     }
     if (marquee) {
       suppressContextMenuUntilRef.current = Date.now() + 260;

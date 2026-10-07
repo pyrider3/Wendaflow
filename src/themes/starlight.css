@@ -1,0 +1,56 @@
+/* Static CSS layers keep the star field inexpensive while panning cards. */
+:root[data-theme="starlight"] {
+  color-scheme: dark;
+}
+:root[data-theme="starlight"] .app-shell {
+  background: #080b14;
+  color: #edf2fc;
+}
+:root[data-theme="starlight"] .canvas {
+  background-color: #080b14;
+  background-image:
+    radial-gradient(circle, #a9b9dd88 0.7px, transparent 1px),
+    radial-gradient(circle, #cedcff70 0.9px, transparent 1.2px),
+    radial-gradient(ellipse at 65% 68%, #263f6638, transparent 52%),
+    radial-gradient(ellipse at 18% 24%, #4431582b, transparent 45%);
+  background-size:
+    23px 23px,
+    79px 83px,
+    100% 100%,
+    100% 100%;
+  background-position:
+    0 0,
+    13px 31px,
+    0 0,
+    0 0;
+}
+:root[data-theme="starlight"] .node {
+  background: #1b202ddf;
+  border-color: #65728d;
+  color: #edf2fc;
+  box-shadow:
+    inset 0 1px 0 #ffffff18,
+    0 5px 0 #0005;
+}
+:root[data-theme="starlight"] .node.selected {
+  border-color: #9cbcff;
+  background: #222f48;
+  box-shadow:
+    0 0 0 2px #9cbcff,
+    0 6px 0 #0005;
+}
+:root[data-theme="starlight"] :is(.node h2, .node p, .markdown-content) {
+  color: #edf2fc;
+}
+:root[data-theme="starlight"] .connection {
+  stroke: #9eabc5;
+}
+:root[data-theme="starlight"] .quick-thinking .node[data-slice-target] {
+  background: #431d2a;
+  outline-color: #ff8297;
+}
+.theme-presets i[data-swatch="starlight"] {
+  background:
+    radial-gradient(circle at 32% 30%, #d9e5ff 1px, transparent 2px),
+    linear-gradient(135deg, #080b14, #30456e);
+}
