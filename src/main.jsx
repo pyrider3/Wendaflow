@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,7 +7,8 @@ import { thoughtIds, boxThoughtIds, completeThoughtMarquee, attachThoughtChild, 
 import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
 import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL } from './localProxy.js';
-import {CardContent} from './cards/CardContent.jsx';
+import {CanvasCard} from './cards/CanvasCard.jsx';
+import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs';
 import {CanvasLibraryGroups} from './components/CanvasLibraryGroups.jsx';
 import {AppearancePanel} from './components/AppearancePanel.jsx';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
@@ -20,6 +21,8 @@ import './themes/dark-controls.css';
 import './cards/thought-text.css';
 import './quick-thought/motion.css';
 import { normalizeWdf, remapNodes } from './canvas/document.mjs';
+import {createGraphIndex} from './canvas/graph-index.mjs';
+import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,LatestFrame,advanceViewport} from './canvas/camera.mjs';
 import {useCanvasNodes} from './canvas/useCanvasNodes.js';
 import {crossedDragThreshold,combineSelection,connectionIntent,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
 import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
@@ -33,7 +36,7 @@ const CANVAS_DB_NAME = 'wonderful-canvas-store';
 const CANVAS_DB_VERSION = 1;
 const CANVAS_STORE = 'canvases';
 const OFFICIAL_NOTIFICATION_SERVER = 'https://api.qnjyxh.xyz';
-const APP_VERSION = '0.2.14';
+const APP_VERSION = '0.2.15';
 const LICENSE_OFFLINE_GRACE_DAYS = 7;
 
 function isNewerVersion(candidate, current) {
@@ -344,7 +347,7 @@ function App() {
   const quickSpace=useRef(false);
   const quickCopy=quickThoughtCopy(uiLanguage);
   useEffect(()=>{localStorage.setItem('wendaflow-quick-thought',quickThought?'1':'0');},[quickThought]);
-  useEffect(()=>{if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
+  useEffect(()=>{panFramesRef.current?.clear();panInputRef.current=null;cameraGestureRef.current=false;if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
   useEffect(()=>{
     const down=e=>{if(e.key===' '&&!e.target.closest?.('input,textarea,select,button,[contenteditable="true"]')){quickSpace.current=true;canvasRef.current?.classList.add('space-panning');e.preventDefault();}};
     const up=e=>{if(e.key===' '){quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');}};const blur=()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');};
@@ -528,8 +531,28 @@ function App() {
   const undoTimerRef = useRef(null);
   const worldRef = useRef(null);
   const connectionsRef = useRef(null);
-  const viewportRenderTimeRef = useRef(0);
+  const viewportSnapshotRef=useRef(viewport);
+  const viewportSizeRef=useRef({width:window.innerWidth,height:window.innerHeight});
+  const cameraGestureRef=useRef(false);
+  const panInputRef=useRef(null);
+  const panFramesRef=useRef(null);
+  const panCommitRef=useRef(null);
+  if(!panFramesRef.current)panFramesRef.current=new LatestFrame(next=>panCommitRef.current(next,false));
+  useLayoutEffect(()=>{panCommitRef.current=commitViewport;});
+  const sizePublishTimerRef=useRef(null);
+  const graphRef=useRef(null);
+  const geometryRef=useRef(null);
   const viewportAnimatingRef = useRef(false);
+  const zoomTimeRef=useRef(null);
+  const wheelRectRef=useRef(null);
+  useLayoutEffect(()=>{
+    viewportSnapshotRef.current=viewport;
+    // A concurrent scene render can finish after the camera has moved on.
+    // Keep the live transform authoritative before the browser paints.
+    const transform=viewportTransform(viewportRef.current);
+    if(worldRef.current){worldRef.current.style.transform=transform;worldRef.current.style.setProperty('--semantic',semanticPreviewRef.current);}
+    if(connectionsRef.current)connectionsRef.current.style.transform=transform;
+  },[viewport]);
   const attachmentRef = useRef(null);
   const relationDragRef = useRef(null);
   const nodeClipboardRef = useRef([]);
@@ -540,49 +563,34 @@ function App() {
   const canvasHydratedRef = useRef(false);
   const canvasWriteQueueRef = useRef(new Map());
 
-  const selected = nodes.find((node) => node.id === selectedId) || null;
-  const branchSource = nodes.find((node) => node.id === branchingFrom) || null;
+  const graph=useMemo(()=>createGraphIndex(nodes),[nodes]);
+  graphRef.current=graph;
+  if(!geometryRef.current)geometryRef.current=new ConnectionGeometry({getNode:id=>graphRef.current.byId.get(id),getSize:id=>nodeSizesRef.current.get(id)});
+  const selected = graph.byId.get(selectedId) || null;
+  const branchSource = graph.byId.get(branchingFrom) || null;
   const {quickBlankClick,quickSliceTrailRef,beginQuickSlice,updateQuickSlice,clearQuickSlicePreview}=useQuickSlice({canvasRef,worldRef,connectionsRef,nodes});
-  const activePath = useMemo(() => ancestors(nodes, selected?.id), [nodes, selected?.id]);
-  const branchPath = useMemo(() => branchSource ? ancestors(nodes, branchSource.id) : [], [nodes, branchSource]);
+  const activePath = useMemo(() => graph.ancestors(selected?.id), [graph, selected?.id]);
+  const branchPath = useMemo(() => branchSource ? graph.ancestors(branchSource.id) : [], [graph, branchSource]);
   const includedBranchPath = useMemo(() => branchPath.filter((node) => !excludedContextIds.has(node.id)), [branchPath, excludedContextIds]);
-  const activeIds = useMemo(() => new Set([...selectedIds].flatMap((id) => ancestors(nodes, id).map((node) => node.id))), [nodes, selectedIds]);
-  const visibleNodes = useMemo(() => nodes.filter((node) => {
-    let cursor = node;
-    const map = new Map(nodes.map((item) => [item.id, item]));
-    while (cursor?.parentId) {
-      // During the short folding animation descendants stay mounted.  Removing
-      // them at its first frame made cards and their lines pop out abruptly.
-      if (collapsedIds.has(cursor.parentId)) return false;
-      cursor = map.get(cursor.parentId);
+  const activeIds = useMemo(() => graph.ancestorIds(selectedIds), [graph, selectedIds]);
+  const visibleNodes = useMemo(() => graph.visibleNodes(collapsedIds),[graph,collapsedIds]);
+  const renderedNodes = useMemo(() => cardsInView(visibleNodes,nodeSizes,
+    cameraBounds(viewport,viewportSizeRef.current),
+    new Set([...selectedIds,selectedId,branchingFrom,editingNode,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,...restoringIds,...deletingIds,...(dragging?.ids||[]),relationDrag?.sourceId,relationDrag?.targetId,relationDrag?.invalidTargetId].filter(Boolean))),
+    [visibleNodes,nodeSizes,viewport,selectedIds,selectedId,branchingFrom,editingNode,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,restoringIds,deletingIds,dragging,relationDrag]);
+  const renderedConnections=useMemo(()=>{
+    const bounds=cameraBounds(viewport,viewportSizeRef.current),parents=[],relations=[];
+    const size=node=>nodeSizes.get(node.id)||{width:node.manualWidth||224,height:node.manualHeight||110};
+    for(const node of visibleNodes){
+      const parent=graph.byId.get(node.parentId);
+      if(parent&&connectionInView('parent',parent,node,size(parent),size(node),bounds))parents.push(node);
+      const links=[...(node.links||[]).map(targetId=>({targetId,type:'reference'})),...(node.relations||[])];
+      links.forEach((link,index)=>{const target=graph.byId.get(link.targetId);if(target&&connectionInView('relation',node,target,size(node),size(target),bounds))relations.push({source:node,target,type:link.type||'reference',relationId:link.id,index});});
     }
-    return true;
-  }), [nodes, collapsedIds]);
-  const renderedNodes = useMemo(() => {
-    if (visibleNodes.length <= 36) return visibleNodes;
-    const zoom = Math.max(.08, viewport.zoom);
-    const margin = 520 / zoom;
-    const canvasWidth = canvasRef.current?.clientWidth || window.innerWidth;
-    const canvasHeight = canvasRef.current?.clientHeight || window.innerHeight;
-    const bounds = {
-      left: -viewport.x / zoom - margin,
-      top: -viewport.y / zoom - margin,
-      right: (canvasWidth - viewport.x) / zoom + margin,
-      bottom: (canvasHeight - viewport.y) / zoom + margin,
-    };
-    const keep = new Set();
-    const visibleMap = new Map(visibleNodes.map((node) => [node.id, node]));
-    for (const node of visibleNodes) {
-      const size = nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 };
-      if (node.x <= bounds.right && node.x + size.width >= bounds.left && node.y <= bounds.bottom && node.y + size.height >= bounds.top) keep.add(node.id);
-    }
-    for (const id of [...keep, ...selectedIds, selectedId, branchingFrom, ...(dragging?.ids || [])].filter(Boolean)) {
-      let cursor = visibleMap.get(id);
-      while (cursor) { keep.add(cursor.id); cursor = cursor.parentId ? visibleMap.get(cursor.parentId) : null; }
-    }
-    for (const node of visibleNodes) if (node.parentId && keep.has(node.parentId)) keep.add(node.id);
-    return visibleNodes.filter((node) => keep.has(node.id));
-  }, [visibleNodes, viewport, nodeSizes, selectedIds, selectedId, branchingFrom, dragging]);
+    return {parents,relations};
+  },[visibleNodes,graph,nodeSizes,viewport]);
+  const renderedEdgeKey=renderedConnections.parents.map(n=>'p:'+n.id).concat(renderedConnections.relations.map(e=>'r:'+e.source.id+':'+e.target.id+':'+e.type+':'+e.index)).join('|');
+  const renderedNodeKey=renderedNodes.map(node=>node.id).join('|');
   const deletionIds = useMemo(() => {
     if(quickThought)return thoughtIds(nodes,selectedIds);
     return new Set(selectedIds);
@@ -822,35 +830,38 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [searchOpen, saveCanvas]);
 
-  useEffect(() => {
-    if (!worldRef.current) return undefined;
-    const observer = new ResizeObserver((entries) => {
-      if (viewportAnimatingRef.current) return;
-      setNodeSizes((current) => {
-        const next = new Map(current);
-        let changed = false;
-        for (const entry of entries) {
-          const id = entry.target.dataset.nodeId;
-          // The drag itself already owns manual dimensions. Feeding each
-          // intermediate observer measurement back into graph geometry makes
-          // long action cards visibly bounce while their content reflows.
-          if (id && resizingRef.current === id) continue;
-          const height = entry.borderBoxSize?.[0]?.blockSize || entry.contentRect.height;
-          const width = entry.borderBoxSize?.[0]?.inlineSize || entry.contentRect.width;
-          const previous = next.get(id);
-          if (id && (!previous || Math.abs(previous.height - height) > .5 || Math.abs(previous.width - width) > .5)) { next.set(id, { width, height }); changed = true; }
-        }
-        if (changed) nodeSizesRef.current = next;
-        return changed ? next : current;
-      });
+  useLayoutEffect(()=>{
+    if(!worldRef.current)return;
+    const canvasId=activeCanvasId;
+    const observer=new ResizeObserver(entries=>{
+      if(activeCanvasIdRef.current!==canvasId)return;
+      const changed=[];
+      for(const entry of entries){const id=entry.target.dataset.nodeId;if(!id || !entry.target.isConnected)continue;
+        const width=entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+        const height=entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+        const old=nodeSizesRef.current.get(id);
+        if(!old || Math.abs(old.width-width)>.5 || Math.abs(old.height-height)>.5){nodeSizesRef.current.set(id,{width,height});changed.push(id);}
+      }
+      if(changed.length){geometryRef.current.invalidate(changed);publishNodeSizes();}
     });
-    worldRef.current.querySelectorAll('.node').forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-    // A canvas can be switched to another one with exactly the same number of
-    // cards.  Watching only the length left the observer attached to the old
-    // DOM cards, which in turn left stale measurements feeding the preview
-    // transition.  The identity list makes measurement ownership explicit.
-  }, [activeCanvasId, visibleNodes.map((node) => node.id).join('|')]);
+    worldRef.current.querySelectorAll('.node').forEach(node=>observer.observe(node));
+    return()=>observer.disconnect();
+  },[activeCanvasId,renderedNodeKey]);
+
+  useLayoutEffect(()=>{
+    let pruned=false;for(const id of nodeSizesRef.current.keys())if(!graph.byId.has(id)){nodeSizesRef.current.delete(id);pruned=true;}
+    geometryRef.current.bind(connectionsRef.current);if(pruned)publishNodeSizes();
+    return()=>geometryRef.current.cancel();
+  },[activeCanvasId,graph,renderedNodeKey,renderedEdgeKey,nodeSizes]);
+
+  useEffect(()=>{
+    const observer=new ResizeObserver(entries=>{const box=entries[0]?.contentRect;if(!box)return;
+      const previous=viewportSizeRef.current;if(Math.abs(previous.width-box.width)<.5&&Math.abs(previous.height-box.height)<.5)return;
+      wheelRectRef.current=null;viewportSizeRef.current={width:box.width,height:box.height};viewportSnapshotRef.current=viewportRef.current;setViewport({...viewportRef.current});
+    });
+    if(canvasRef.current)observer.observe(canvasRef.current);
+    return()=>observer.disconnect();
+  },[]);
 
   useEffect(() => {
     if (!branchingFrom) return undefined;
@@ -862,6 +873,9 @@ function App() {
   }, [branchingFrom]);
 
   useEffect(() => () => {
+    if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);
+    geometryRef.current?.cancel();
+    panFramesRef.current?.clear();
     if (zoomFrameRef.current) cancelAnimationFrame(zoomFrameRef.current);
     if (connectionFrameRef.current) cancelAnimationFrame(connectionFrameRef.current);
     if (canvasTransitionTimerRef.current) clearTimeout(canvasTransitionTimerRef.current);
@@ -1074,102 +1088,65 @@ function App() {
     }, 150);
   }
 
-  function syncConnectionGeometry() {
-    if (!worldRef.current || !connectionsRef.current) return;
-    const cards = new Map([...worldRef.current.querySelectorAll('.node')].map((element) => [element.dataset.nodeId, element]));
-    connectionsRef.current.querySelectorAll('.connection[data-parent-id][data-child-id]').forEach((path) => {
-      const parent = cards.get(path.dataset.parentId);
-      const child = cards.get(path.dataset.childId);
-      if (!parent || !child) return;
-      const parentX = Number(parent.dataset.nodeX);
-      const parentY = Number(parent.dataset.nodeY);
-      const childX = Number(child.dataset.nodeX);
-      const childY = Number(child.dataset.nodeY);
-      const parentStyle = getComputedStyle(parent);
-      const childStyle = getComputedStyle(child);
-      const parentWidth = Number.parseFloat(parentStyle.width) || parent.offsetWidth;
-      const parentHeight = Number.parseFloat(parentStyle.height) || parent.offsetHeight;
-      const childHeight = Number.parseFloat(childStyle.height) || child.offsetHeight;
-      const x1 = parentX + parentWidth;
-      const y1 = parentY + parentHeight / 2;
-      const x2 = childX;
-      const y2 = childY + childHeight / 2;
-      const mid = (x1 + x2) / 2;
-      path.setAttribute('d', `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`);
-    });
-  }
+  function syncConnectionGeometry() { geometryRef.current?.invalidate(resizingRef.current?[resizingRef.current]:undefined); }
 
-  function finishConnectionTransition(start = performance.now()) {
-    if (connectionFrameRef.current) cancelAnimationFrame(connectionFrameRef.current);
-    const tick = () => {
-      syncConnectionGeometry();
-      if (performance.now() - start < 500) connectionFrameRef.current = requestAnimationFrame(tick);
-      else connectionFrameRef.current = null;
+  function publishNodeSizes() {
+    if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);
+    const canvasId=activeCanvasIdRef.current;
+    const publish=()=>{
+      if(canvasId!==activeCanvasIdRef.current)return;
+      if(viewportAnimatingRef.current || cameraGestureRef.current){sizePublishTimerRef.current=setTimeout(publish,80);return;}
+      sizePublishTimerRef.current=null;
+      const next=nodeSizesRef.current;
+      setNodeSizes(previous=>previous.size===next.size && [...next].every(([id,size])=>previous.get(id)?.width===size.width && previous.get(id)?.height===size.height)?previous:new Map(next));
     };
-    connectionFrameRef.current = requestAnimationFrame(tick);
+    sizePublishTimerRef.current=setTimeout(publish,70);
   }
 
   function commitViewport(next, forceRender = true) {
     viewportRef.current = next;
-    const transform = `translate3d(${next.x}px, ${next.y}px, 0) scale(${next.zoom})`;
+    const transform = viewportTransform(next);
     const semantic = previewEnabled ? semanticPreview(next.zoom) : 0;
-    const previewChanged = semantic !== semanticPreviewRef.current;
+    const semanticChanged=semanticPreviewRef.current!==semantic;
     semanticPreviewRef.current = semantic;
-    if (previewChanged) {
-      if (previewLayoutTimerRef.current) clearTimeout(previewLayoutTimerRef.current);
-      if (previewContentTimerRef.current) clearTimeout(previewContentTimerRef.current);
-      // Classic preview: the same card simply shows / hides its detail.  It
-      // intentionally has no second "reserved" layout, so neither action
-      // feeds nor Markdown can create a half-expanded intermediate card.
-      setPreviewLayoutActive(false);
-      setPreviewContentPhase('full');
-      setPreviewFullSizes(new Map());
-    }
-    if (worldRef.current) worldRef.current.style.transform = transform;
-    if (worldRef.current) worldRef.current.style.setProperty('--semantic', semantic);
-    if (connectionsRef.current) connectionsRef.current.style.transform = transform;
-    // World and SVG share the same transform, so ordinary pan/zoom does not
-    // need costly layout reads. Geometry is refreshed only for the semantic
-    // card-size transition below.
-    if (previewChanged) finishConnectionTransition();
-    const now = performance.now();
-    if (forceRender || now - viewportRenderTimeRef.current >= 48) {
-      viewportRenderTimeRef.current = now;
-      setViewport(next);
+    if (worldRef.current) {worldRef.current.style.transform=transform;if(semanticChanged)worldRef.current.style.setProperty('--semantic',semantic);}
+    if (connectionsRef.current) connectionsRef.current.style.transform=transform;
+    // Camera motion changes transforms, not graph data. Publish only for an
+    // explicit final snapshot or when the existing overscan/preview boundary needs it.
+    if(forceRender || needsViewportSnapshot(viewportSnapshotRef.current,next,viewportSizeRef.current,previewEnabled)){
+      const publish=()=>{
+        setPreviewLayoutActive(false);setPreviewContentPhase('full');
+        setPreviewFullSizes(previous=>previous.size?new Map():previous);
+        setViewport(next);
+      };
+      if(forceRender){viewportSnapshotRef.current=next;publish();}
+      else startTransition(publish);
     }
   }
 
   function stopZoomAnimation() {
     if (zoomFrameRef.current) cancelAnimationFrame(zoomFrameRef.current);
     zoomFrameRef.current = null;
+    zoomTimeRef.current=null;wheelRectRef.current=null;
     viewportAnimatingRef.current = false;
     canvasRef.current?.classList.remove('viewport-animating');
     targetViewportRef.current = viewportRef.current;
   }
 
-  function animateViewport() {
-    viewportAnimatingRef.current = true;
-    canvasRef.current?.classList.add('viewport-animating');
+  function animateViewport(timestamp) {
+    if(!viewportAnimatingRef.current){viewportAnimatingRef.current=true;canvasRef.current?.classList.add('viewport-animating');}
     const current = viewportRef.current;
     const target = targetViewportRef.current;
-    const next = {
-      x: current.x + (target.x - current.x) * 0.2,
-      y: current.y + (target.y - current.y) * 0.2,
-      zoom: current.zoom + (target.zoom - current.zoom) * 0.2,
-    };
+    const elapsed=zoomTimeRef.current==null||!Number.isFinite(timestamp)?1000/60:timestamp-zoomTimeRef.current;
+    zoomTimeRef.current=Number.isFinite(timestamp)?timestamp:null;
+    const next=advanceViewport(current,target,elapsed);
     const settled = Math.abs(next.x - target.x) < 0.12 && Math.abs(next.y - target.y) < 0.12 && Math.abs(next.zoom - target.zoom) < 0.001;
     if (settled) {
       commitViewport(target, true);
-      finishConnectionTransition();
       zoomFrameRef.current = null;
+      zoomTimeRef.current=null;wheelRectRef.current=null;
       viewportAnimatingRef.current = false;
       canvasRef.current?.classList.remove('viewport-animating');
-      window.requestAnimationFrame(() => {
-        if (!worldRef.current) return;
-        const measured = new Map([...worldRef.current.querySelectorAll('.node')].map((element) => [element.dataset.nodeId, { width: element.offsetWidth, height: element.offsetHeight }]));
-        nodeSizesRef.current = measured;
-        setNodeSizes(measured);
-      });
       return;
     }
     commitViewport(next, false);
@@ -1181,6 +1158,8 @@ function App() {
     return {x:(event.clientX-rect.left-v.x)/v.zoom,y:(event.clientY-rect.top-v.y)/v.zoom};
   }
   function toggleQuickThought() {
+    panFramesRef.current.flush();panInputRef.current=null;
+    cameraGestureRef.current=false;
     if(editingNode && saveNodeEdit()===false)return;
     if(quickEditor){saveQuickIdea();}
     if(!quickThought){previousNodeType.current=nodeType;setNodeType('thought');}else setNodeType(previousNodeType.current);
@@ -1235,6 +1214,7 @@ function App() {
   }
 
   function beginNodeDrag(event, node) {
+    if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(quickThought && event.button===2 && node.type==='thought' && !event.target.closest('input,textarea,select,a')) {
       event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture?.(event.pointerId);
       const ids=selectedIds.has(node.id)?[...thoughtIds(nodes,selectedIds)]:[node.id];
@@ -1274,6 +1254,7 @@ function App() {
   }
 
   function beginRelationDrag(event, node) {
+    if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if (event.button !== 0 || (quickThought && node.type!=='thought')) return;
     event.preventDefault(); event.stopPropagation();
     setRelationMenu(null);
@@ -1300,6 +1281,7 @@ function App() {
   }
 
   function beginResize(event, node) {
+    if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     beginHistory();
     if (event.button !== 0) return;
     event.preventDefault();
@@ -1339,6 +1321,7 @@ function App() {
   }
 
   function beginPan(event,fromNode=false) {
+    if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(editingNode && !event.target.closest('.inline-node-editor,.inspector') && saveNodeEdit()===false)return;
     if(quickThought&&quickEditor&&!event.target.closest('.quick-thought-editor')){saveQuickIdea();}
     if(quickThought && event.button===2 && !event.target.closest('.node,button,textarea,select,.composer')) {
@@ -1374,7 +1357,9 @@ function App() {
     // Starting from the state snapshot made the first pan frame jump back,
     // then catch up. The ref is updated on every compositor commit.
     const current = viewportRef.current;
-    setPanning({ startX: event.clientX, startY: event.clientY, x: current.x, y: current.y, moved: false });
+    cameraGestureRef.current=true;
+    panInputRef.current={startX:event.clientX,startY:event.clientY,x:current.x,y:current.y,moved:false};
+    setPanning(true);
   }
 
   function finishQuickSlice(stroke) {
@@ -1403,8 +1388,8 @@ function App() {
         setRelationDrag(next);
       }
     } else if (resizing) {
-      const width = Math.max(210, Math.min(720, resizing.width + (event.clientX - resizing.startX) / viewport.zoom));
-      const height = Math.max(110, Math.min(720, resizing.height + (event.clientY - resizing.startY) / viewport.zoom));
+      const width = Math.max(210, Math.min(720, resizing.width + (event.clientX - resizing.startX) / viewportRef.current.zoom));
+      const height = Math.max(110, Math.min(720, resizing.height + (event.clientY - resizing.startY) / viewportRef.current.zoom));
       setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
       window.requestAnimationFrame(syncConnectionGeometry);
     } else if (marquee) {
@@ -1414,9 +1399,9 @@ function App() {
       const left = Math.min(next.startX, next.x), right = Math.max(next.startX, next.x);
       const top = Math.min(next.startY, next.y), bottom = Math.max(next.startY, next.y);
       const hits = quickThought ? boxThoughtIds(visibleNodes,nodeSizes,viewportRef.current,next) : visibleNodes.filter((node) => {
-        const nodeLeft = viewport.x + node.x * viewport.zoom, nodeTop = viewport.y + node.y * viewport.zoom;
+        const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
         const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
-        return nodeLeft + size.width * viewport.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewport.zoom >= top && nodeTop <= bottom;
+        return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
       }).map((node) => node.id);
       const selection=combineSelection(next.base,hits,next.mode);
       setSelectedIds(selection);
@@ -1425,18 +1410,18 @@ function App() {
     } else if (dragging) {
       if(!crossedDragThreshold(dragging,event))return;
       if(!dragging.started)setDragging({...dragging,started:true});
-      const dx = (event.clientX - dragging.startX) / viewport.zoom;
-      const dy = (event.clientY - dragging.startY) / viewport.zoom;
+      const dx = (event.clientX - dragging.startX) / viewportRef.current.zoom;
+      const dy = (event.clientY - dragging.startY) / viewportRef.current.zoom;
       setNodes((items) => items.map((node) => {
         const origin = dragging.positions.get(node.id);
         return origin ? { ...node, x: origin.x + dx, y: origin.y + dy } : node;
       }));
-    } else if (panning) {
-      const moved = panning.moved || Math.hypot(event.clientX - panning.startX, event.clientY - panning.startY) > 4;
-      if (moved !== panning.moved) setPanning({ ...panning, moved });
-      const nextViewport = { ...viewportRef.current, x: panning.x + event.clientX - panning.startX, y: panning.y + event.clientY - panning.startY };
-      targetViewportRef.current = nextViewport;
-      commitViewport(nextViewport, false);
+    } else if (panInputRef.current) {
+      const pan=panInputRef.current;
+      pan.moved ||= Math.hypot(event.clientX-pan.startX,event.clientY-pan.startY)>4;
+      const nextViewport={...viewportRef.current,x:pan.x+event.clientX-pan.startX,y:pan.y+event.clientY-pan.startY};
+      targetViewportRef.current=nextViewport;
+      panFramesRef.current.enqueue(nextViewport);
     }
   }
 
@@ -1466,10 +1451,17 @@ function App() {
         }
       } else if(finalRelationDrag.targetId)setRelationMenu({sourceId:finalRelationDrag.sourceId,targetId:finalRelationDrag.targetId,x:finalRelationDrag.x,y:finalRelationDrag.y});
     }
-    if (panning) {
+    if (panInputRef.current) {
+      const pan=panInputRef.current;
+      if(event.type==='pointerup'){
+        pan.moved ||= Math.hypot(event.clientX-pan.startX,event.clientY-pan.startY)>4;
+        panFramesRef.current.enqueue({...viewportRef.current,x:pan.x+event.clientX-pan.startX,y:pan.y+event.clientY-pan.startY});
+      }
+      panFramesRef.current.flush();panInputRef.current=null;
+      cameraGestureRef.current=false;
       targetViewportRef.current = viewportRef.current;
       commitViewport(viewportRef.current, true);
-      if (!panning.moved) { clearSelection(); closeRootComposer(); }
+      if (!pan.moved) { clearSelection(); closeRootComposer(); }
     }
     if (marquee && quickThought) {
       const rect = canvasRef.current.getBoundingClientRect();
@@ -1485,9 +1477,9 @@ function App() {
       const left = Math.min(finalMarquee.startX, finalMarquee.x), right = Math.max(finalMarquee.startX, finalMarquee.x);
       const top = Math.min(finalMarquee.startY, finalMarquee.y), bottom = Math.max(finalMarquee.startY, finalMarquee.y);
       const nodeHits = visibleNodes.filter((node) => {
-        const nodeLeft = viewport.x + node.x * viewport.zoom, nodeTop = viewport.y + node.y * viewport.zoom;
+        const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
         const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
-        return nodeLeft + size.width * viewport.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewport.zoom >= top && nodeTop <= bottom;
+        return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
       });
       if(!quickThought){const hits=event.type==='pointercancel'?new Set(marquee.base||[]):combineSelection(marquee.base,nodeHits.map(n=>n.id),marquee.mode);setSelectedIds(hits);setSelectedId([...hits].at(-1)||null);}
       if (!quickThought && (!marquee.mode||marquee.mode==='replace') && !nodeHits.length && connectionsRef.current && canvasRef.current) {
@@ -1513,7 +1505,7 @@ function App() {
   function zoomCanvas(event) {
     event.preventDefault();
     if(quickBlankClick.current)return;
-    const rect = canvasRef.current.getBoundingClientRect();
+    const rect=wheelRectRef.current||(wheelRectRef.current=canvasRef.current.getBoundingClientRect());
     const pointerX = event.clientX - rect.left;
     const pointerY = event.clientY - rect.top;
     const base = targetViewportRef.current;
@@ -2623,9 +2615,19 @@ function App() {
   };
   const deactivateLicense = () => { setLicense(null); setLicenseStatus(tr('已移除此设备上的授权。你可以稍后重新激活。','License removed from this device. You can activate again later.')); };
 
+  const cardRuntime=useRef(null);
+  const liveCardActions=useRef(null);
   const cardActions={setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
     toggleActivity:node=>setNodes(items=>items.map(item=>item.id===node.id?{...item,execution:{...(item.execution||{}),activityCollapsed:!(item.execution?.activityCollapsed!==false)}}:item))};
-  const cardHelpers={statusLabel,outputAssets,actionArtifacts,shouldShowNodeThinking};
+  if(!liveCardActions.current)liveCardActions.current=Object.fromEntries(Object.keys(cardActions).map(key=>[key,(...args)=>cardRuntime.current.actions[key](...args)]));
+  useLayoutEffect(()=>{cardRuntime.current={actions:cardActions,
+    pointerDown:beginNodeDrag,click:event=>{event.stopPropagation();closeBranch();},
+    doubleClick:(event,node)=>{event.preventDefault();event.stopPropagation();if(quickThought&&node.type==='thought'){editQuickIdea(node);return;}selectNode(node.id);startEditingNode(node);},
+    contextMenu:(event,node)=>{event.preventDefault();event.stopPropagation();if(Date.now()<suppressContextMenuUntilRef.current)return;if(quickThought){if(!relationDragRef.current)openQuickMenu(event,node.id);return;}selectNode(node.id);setContextMenu({kind:'node',nodeId:node.id,x:event.clientX,y:event.clientY});}
+  };});
+  // Render-time data is read only when a card's explicit visual props change.
+  const cardRenderData=useMemo(()=>({helpers:{statusLabel,outputAssets,actionArtifacts},copy,tr,systemText,actions:liveCardActions.current}),[uiLanguage]);
+
 
   return (
     <div className="app-shell">
@@ -2710,7 +2712,7 @@ function App() {
             </marker>
           </defs>
           {relationDrag?.quick && (() => {
-            const source = nodes.find(n => n.id === relationDrag.sourceId);
+            const source = graph.byId.get(relationDrag.sourceId);
             if (!source) return null;
             const size = nodeSizes.get(source.id) || {width: 95, height: 47};
             const rect = canvasRef.current.getBoundingClientRect();
@@ -2720,10 +2722,7 @@ function App() {
             const bend = Math.max(32, Math.abs(x2 - x1) * .45);
             return <path className={`thought-drag-line ${relationDrag.invalidTargetId ? 'invalid' : ''}`} d={`M ${x1} ${y1} C ${x1+bend} ${y1}, ${x2-bend} ${y2}, ${x2} ${y2}`} />;
           })()}
-          {renderedNodes.flatMap((source) => [
-            ...(source.links || []).map((targetId) => ({ source, target: nodes.find((item) => item.id === targetId), type: 'reference' })),
-            ...(source.relations || []).map((relation) => ({ source, target: nodes.find((item) => item.id === relation.targetId), type: relation.type || 'reference', relationId: relation.id })),
-          ]).map(({ source, target, type, relationId }, index) => {
+          {renderedConnections.relations.map(({source,target,type,relationId,index}) => {
             if (!target) return null;
             const sourceSize = nodeSizes.get(source.id) || { width: 224, height: 110 };
             const targetSize = nodeSizes.get(target.id) || { width: 224, height: 110 };
@@ -2734,8 +2733,8 @@ function App() {
             const connectionKey = `relation:${source.id}:${target.id}:${type}`;
             return <path key={relationId || `link-${source.id}-${target.id}-${type}-${index}`} data-connection-key={connectionKey} data-connection-kind="relation" data-source-id={source.id} data-target-id={target.id} data-connection-type={type} markerEnd="url(#connection-arrow)" className={`connection relation-connection ${type} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${deletingRelation ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`} onClick={(event) => { event.stopPropagation(); setRelationEditorClosing(false); setEditingRelation({ sourceId: source.id, targetId: target.id, type }); }} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'relation', sourceId: source.id, targetId: target.id, type, x: event.clientX, y: event.clientY }); }} />;
           })}
-          {renderedNodes.filter((node) => node.parentId).map((node) => {
-            const parent = nodes.find((item) => item.id === node.parentId);
+          {renderedConnections.parents.map((node) => {
+            const parent = graph.byId.get(node.parentId);
             if (!parent) return null;
             const parentSize = nodeSizes.get(parent.id) || { width: 224, height: 110 };
             const nodeSize = nodeSizes.get(node.id) || { width: 224, height: 110 };
@@ -2745,8 +2744,8 @@ function App() {
             const y2 = node.y + nodeSize.height / 2;
             const mid = (x1 + x2) / 2;
             const active = activeIds.has(parent.id) && activeIds.has(node.id);
-            const folding = foldingId && isDescendant(nodes, node.id, foldingId);
-            const revealing = (revealingId && isDescendant(nodes, node.id, revealingId)) || restoringIds.has(node.id);
+            const folding = foldingId && graph.isDescendant(node.id,foldingId);
+            const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
             const deleting = deletingIds.has(node.id) || deletingIds.has(parent.id);
             const connectionKey = `parent:${parent.id}:${node.id}`;
             return <path key={node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, x: event.clientX, y: event.clientY }); }} />;
@@ -2754,7 +2753,7 @@ function App() {
         </svg>
         {lineSelectionMenu && selectedConnections.length > 0 && <section className="line-selection-menu" onPointerDown={(event) => event.stopPropagation()}><span>{tr(`已选 ${selectedConnections.length} 条连线`,`${selectedConnections.length} connections selected`)}</span><small>{selectedConnections.some((item) => item.kind === 'parent') ? tr('包含继承关系；删除会解除父子继承。','Includes inheritance links; deleting removes the parent-child relationship.') : tr('可批量移除引用或合并关系。','Remove reference or merge links in a batch.')}</small><div><button onClick={() => { setSelectedConnections([]); setLineSelectionMenu(null); }}>{tr('取消','Cancel')}</button><button className="danger" onClick={() => removeConnections()}>{tr('删除连线','Delete links')}</button></div></section>}
         <div ref={worldRef} className="world" style={{ transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`, '--semantic': previewEnabled ? semanticPreview(viewport.zoom) : 0 }}>
-          {quickThought && quickEditor && nodes.find(n=>n.id===quickEditor.id) && <ThoughtEditor hints={editorHints} say={say} editor={quickEditor} node={nodes.find(n=>n.id===quickEditor.id)} labels={quickCopy} onChange={value=>setQuickEditor(e=>({...e,value}))} onDone={saveQuickIdea} onCancel={cancelQuickIdea} />}
+          {quickThought && quickEditor && graph.byId.get(quickEditor.id) && <ThoughtEditor hints={editorHints} say={say} editor={quickEditor} node={graph.byId.get(quickEditor.id)} labels={quickCopy} onChange={value=>setQuickEditor(e=>({...e,value}))} onDone={saveQuickIdea} onCancel={cancelQuickIdea} />}
           {renderedNodes.map((node) => {
             const selectedNode = selectedIds.has(node.id) && !inspectorClosing;
             const muted = focusMode && !activeIds.has(node.id);
@@ -2778,28 +2777,17 @@ function App() {
             const previewTitleLines = Math.min(4, Math.max(1, Math.ceil([...displayTitle].length / Math.max(7, Math.floor((previewWidth - 30) / 22)))));
             const previewHeight = longPreviewTitle ? Math.min(224, 84 + previewTitleLines * 32) : 110;
             const previewFullHeight = previewFullSizes.get(node.id)?.height || (node.content.length > 650 ? 390 : node.content.length > 220 ? 285 : 180);
-            const childCount = nodes.filter((item) => item.parentId === node.id).length;
-            const hiddenCount = nodes.filter((item) => isDescendant(nodes, item.id, node.id)).length;
-            const folding = foldingId && isDescendant(nodes, node.id, foldingId);
-            const revealing = (revealingId && isDescendant(nodes, node.id, revealingId)) || restoringIds.has(node.id);
+            const childCount = graph.children.get(node.id)?.length || 0;
+            const hiddenCount = graph.descendantCount.get(node.id) || 0;
+            const folding = foldingId && graph.isDescendant(node.id,foldingId);
+            const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
             return (
-              <article
-                key={node.id}
-                tabIndex={node.id===selectedId?0:-1}
-                aria-label={displayTitle}
-                data-node-id={node.id}
-                data-node-x={node.x}
-                data-node-y={node.y}
+              <CanvasCard key={node.id} node={node} runtime={cardRuntime} renderData={cardRenderData} uiLanguage={uiLanguage}
+                showThinking={shouldShowNodeThinking(node)} tabIndex={node.id===selectedId?0:-1}
                 className={`node ${node.type} ${readingSize} ${textThought ? 'text-thought' : ''} ${quickThought && quickEditor?.id === node.id ? 'quick-editing' : ''} ${relationDrag?.targetId === node.id ? 'connection-target' : ''} ${relationDrag?.invalidTargetId === node.id ? 'connection-invalid' : ''} ${previewLayoutActive && !node.manualWidth && !textThought ? 'preview-reserve' : ''} ${node.color ? 'colored' : ''} ${longPreviewTitle ? 'preview-long-title' : ''} ${selectedNode ? 'selected' : ''} ${node.id === selectedId && selectedIds.size > 1 ? 'primary-selected' : ''} ${muted ? 'muted' : ''} ${dragging?.started && dragging.ids.includes(node.id) ? 'dragging' : ''} ${resizing?.id === node.id ? 'resizing' : ''} ${editingNode === node.id ? 'inline-editing' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deletingIds.has(node.id) ? 'deleting' : ''} ${detailLevel}`}
                 style={{ transform: `translate(${node.x}px, ${node.y}px)`, '--full-width': `${fullWidth}px`, '--preview-width': `${previewWidth}px`, '--preview-height': `${previewHeight}px`, '--preview-title-height': `${previewTitleLines * 1.2}em`, '--full-card-height': `${Math.max(previewHeight, previewFullHeight)}px`, '--preview-content-top': `${longPreviewTitle ? 96 : 69}px`, ...(node.color ? { '--node-tint': node.color } : {}), ...(node.manualWidth ? { '--full-height': `${node.manualHeight || 110}px`, '--full-read-height': `${Math.max(0, (node.manualHeight || 110) - 82)}px` } : {}), ...(editingNode === node.id && inlineEditSize ? { '--edit-width': `${inlineEditSize.width}px`, '--edit-height': `${inlineEditSize.height}px` } : {}) }}
-                onPointerDown={(event) => beginNodeDrag(event, node)}
-                onClick={(event) => { event.stopPropagation(); closeBranch(); }}
-                onDoubleClick={event=>{event.preventDefault();event.stopPropagation();if(quickThought&&node.type==='thought'){editQuickIdea(node);return;}selectNode(node.id);startEditingNode(node);}}
-                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if (Date.now() < suppressContextMenuUntilRef.current) return;if(quickThought){if(!relationDragRef.current)openQuickMenu(event,node.id);return;} selectNode(node.id); setContextMenu({ kind: 'node', nodeId: node.id, x: event.clientX, y: event.clientY }); }}
-              >
-                <CardContent node={node} view={{dragHint:say('拖动标题或边框移动；空格拖动平移画布','Drag title or border to move; Space-drag to pan'),editing:editingNode===node.id,editDraft,previewContentPhase,displayTitle,childCount,hiddenCount,collapsed:collapsedIds.has(node.id),branching:branchingFrom===node.id}}
-                  actions={cardActions} helpers={cardHelpers} copy={copy} tr={tr} systemText={systemText} uiLanguage={uiLanguage} />
-              </article>
+                view={{dragHint:say('拖动标题或边框移动；空格拖动平移画布','Drag title or border to move; Space-drag to pan'),editing:editingNode===node.id,editDraft:editingNode===node.id?editDraft:null,previewContentPhase,displayTitle,childCount,hiddenCount,collapsed:collapsedIds.has(node.id),branching:branchingFrom===node.id}}
+              />
             );
           })}
           {mindMapState.nodeId && mindMapState.suggestions.map((title, index) => {

@@ -202,7 +202,9 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .connection.deleting { animation: line-delete .24s cubic-bezier(.55,.05,.8,.45) both; }
 
 .node { position: absolute; width: 224px; min-height: 110px; padding: 14px 15px; border: 1px solid rgba(255,255,255,.52); border-radius: 15px; background: var(--node-tint, rgba(255, 255, 255, .66)); box-shadow: 0 5px 18px rgba(29, 48, 39, .045); backdrop-filter: blur(9px) saturate(118%); cursor: pointer; transform-origin: 0 0; interpolate-size: allow-keywords; transition: transform .42s cubic-bezier(.18,.82,.25,1), width .34s cubic-bezier(.2,.8,.25,1), min-height .34s cubic-bezier(.2,.8,.25,1), height .34s cubic-bezier(.2,.8,.25,1), opacity .16s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease; user-select: none; }
-.canvas.viewport-animating .node { backdrop-filter: none; }
+/* Match the existing zoom fast path during direct panning too. The card
+   animations and static glass styling are retained. */
+.canvas:is(.viewport-animating, .panning) .node { backdrop-filter: none; }
 .node.medium-answer { width: 290px; --read-height: 210px; }
 .node.long-answer { width: 380px; --read-height: 320px; }
 .node.short-answer { --read-height: 110px; }

@@ -25,3 +25,8 @@
 .storage-warning .warning-retry { width:auto; padding:0 8px; white-space:nowrap; flex-shrink:0; }
 
 .archive-trash svg {width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* Quick thinking uses right-drag gestures instead of circular card handles. */
+.canvas.quick-thinking .node > :is(.fork-button, .relation-handle) {
+  display: none !important;
+}

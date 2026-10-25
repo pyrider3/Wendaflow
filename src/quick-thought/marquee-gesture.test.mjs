@@ -36,7 +36,7 @@ function finish(box, event, initialId = "a") {
     endHistory:noop,
     quickThought: true,
     marquee: box,
-    panning: null,
+    panning: null, panInputRef:{current:null},
     relationDragRef: { current: null },
     quickBlankClick: { current: null },
     canvasRef: {
