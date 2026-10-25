@@ -42,6 +42,8 @@ export function CardContent({
   } = actions;
   const { statusLabel, outputAssets, actionArtifacts, shouldShowNodeThinking } =
     helpers;
+  const ideaIsBody = node.type === "thought" && !!node.content &&
+    node.content.trim().replace(/\s+/g, " ") === displayTitle.trim().replace(/\s+/g, " ");
   const assets = outputAssets(node.content);
   const artifacts = node.type === "action" ? actionArtifacts(node) : [];
   const liveEvents =
@@ -50,7 +52,7 @@ export function CardContent({
   const showNodeThinking = shouldShowNodeThinking(node);
   return (
     <>
-      <div className="node-topline">
+      {node.type !== "thought" && <div className="node-topline">
         <span className="node-kind">
           {node.type === "action"
             ? copy.action
@@ -75,7 +77,7 @@ export function CardContent({
             {statusLabel(node.status, uiLanguage)}
           </span>
         )}
-      </div>
+      </div>}
       {!!assets.length && (
         <div className="output-assets">
           {assets.map((asset) => (
@@ -142,7 +144,7 @@ export function CardContent({
           </div>
         </div>
       ) : (
-        <h2>{displayTitle}</h2>
+        <h2 className="node-drag-title" title={view.dragHint}>{ideaIsBody ? node.content : displayTitle}</h2>
       )}
       {node.type === "conversation" &&
         ["queued", "thinking", "streaming"].includes(node.status) && (
@@ -167,12 +169,12 @@ export function CardContent({
           ))}
         </div>
       )}
-      {!editing && previewContentPhase !== "hidden" && (
+      {!editing && (node.type === "thought" || previewContentPhase !== "hidden") && (
         <div
-          className={`markdown-content preview-content-${previewContentPhase}`}
+          className={`markdown-content preview-content-${node.type === "thought" ? "visible" : previewContentPhase}`}
           onWheel={handleContentWheel}
         >
-          {(node.type !== "thought" || node.content !== displayTitle) && (
+          {!ideaIsBody && (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{

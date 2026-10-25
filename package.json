@@ -1,7 +1,7 @@
 {
   "name": "wendaflow",
   "private": true,
-  "version": "0.2.13",
+  "version": "0.2.14",
   "license": "AGPL-3.0-only",
   "description": "AI conversations on a branching canvas",
   "homepage": "https://cn.qnjyxh.xyz",
@@ -26,7 +26,9 @@
     "dist:mac": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64 --arm64",
     "dist:mac:arm64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --arm64",
     "dist:mac:x64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64",
-    "test:quick-thought": "node --test src/quick-thought/*.test.mjs"
+    "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
+    "test:canvas": "node --test src/canvas/*.test.mjs",
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -62,7 +64,8 @@
       "LICENSE"
     ],
     "extraResources": [
-      "server.mjs"
+      "server.mjs",
+      "canvas-storage.mjs"
     ],
     "icon": "build/icon.ico",
     "win": {

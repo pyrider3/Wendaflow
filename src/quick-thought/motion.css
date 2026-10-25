@@ -1,0 +1,27 @@
+/* Fast attack, soft release. No position/scale easing on a pointer-driven node. */
+.node.thought { --thought-accent: var(--accent, #416f5a); }
+.node.thought.selected::after,
+.thought-feedback {
+  content: ''; position: absolute; inset: -4px; border: 1.5px solid var(--thought-accent, var(--accent, #416f5a));
+  border-radius: inherit; pointer-events: none; transform-origin: center;
+}
+.node.thought.selected::after { animation: thought-select 180ms cubic-bezier(.16,1,.3,1) both; }
+@keyframes thought-select { from { opacity: .65; scale: .97; } to { opacity: 0; scale: 1.09; } }
+.node.thought.connection-target { outline: 2px solid var(--thought-accent); outline-offset: 3px; }
+.node.thought.connection-target::before { content: ''; position: absolute; inset: -7px; border: 1px solid var(--thought-accent); border-radius: inherit; pointer-events: none; animation: thought-target 160ms ease-out both; }
+@keyframes thought-target { from { opacity: 0; scale: 1.06; } to { opacity: .35; scale: 1; } }
+.thought-drag-line { fill: none; stroke: var(--accent, #416f5a); stroke-width: 2; opacity: .8; pointer-events: none; }
+.quick-thought-editor { transform-origin: left center; animation: thought-editor-enter 150ms cubic-bezier(.16,1,.3,1) both; }
+@keyframes thought-editor-enter { from { opacity: .3; scale: .96; } to { opacity: 1; scale: 1; } }
+.node.thought.newborn, .node.thought.revealing { animation: thought-appear 180ms cubic-bezier(.16,1,.3,1) both; }
+@keyframes thought-appear { from { opacity: 0; scale: .95; } to { opacity: 1; scale: 1; } }
+.node.thought.dragging { animation: none; transition: none; }
+.slice-ghost, .slice-line-ghost { pointer-events: none !important; transform-origin: center; z-index: 7; }
+.slice-line-ghost { transform-box: fill-box; }
+.slice-ghost { outline: 1.5px solid #e34e56; }
+.quick-thinking .node[data-slice-target] { animation: thought-cut 100ms ease-out; }
+@keyframes thought-cut { from { outline-offset: 5px; } to { outline-offset: 0; } }
+.quick-slice-trail polyline { stroke-width: 3; }
+@media (prefers-reduced-motion: reduce) {
+  .quick-thought-editor, .node.thought, .node.thought::before, .node.thought::after { animation: none !important; transition: none !important; }
+}

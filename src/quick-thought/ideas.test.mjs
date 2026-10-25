@@ -20,7 +20,7 @@ test('left box selection excludes conversation and action cards at any zoom',()=
  assert.deepEqual(boxThoughtIds(nodes,sizes,{x:20,y:20,zoom:.5},{startX:150,startY:100,x:0,y:0}),['idea']);
 });
 test('fast creation only produces manual ideas with no pending model or action',()=>{
- const n=newThought({x:-100,y:40},'new','idea','test-id');assert.equal(n.type,'thought');assert.equal(n.status,'done');assert.equal(n.model,null);assert.equal(n.prompt,null);assert.equal(n.parentId,'idea');assert.equal(n.x,-212);assert.equal(n.y,-15);assert.equal(n.execution,undefined);assert.equal(n.modelValue,undefined);
+ const n=newThought({x:-100,y:40},'new','idea','test-id');assert.equal(n.type,'thought');assert.equal(n.status,'done');assert.equal(n.model,null);assert.equal(n.prompt,null);assert.equal(n.parentId,'idea');assert.equal(n.x,-114);assert.equal(n.y,30);assert.equal(n.execution,undefined);assert.equal(n.modelValue,undefined);
 });
 test('quick-thinking controls have complete copy in all 11 locales',()=>{
  assert.equal(quickThoughtLocales.length,11);

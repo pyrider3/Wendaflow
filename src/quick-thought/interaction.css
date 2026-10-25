@@ -1,0 +1,27 @@
+.canvas.space-panning, .canvas.space-panning .node, .canvas.space-panning .markdown-content { cursor: grab; }
+.node .node-drag-title { cursor: grab; }
+.node.dragging .node-drag-title { cursor: grabbing; }
+.node.thought.text-thought:not(:hover):not(:focus-visible):not(:has(>button:focus-visible)) > :is(.fork-button,.relation-handle,.collapse-button:not(.collapsed)) { opacity: 0; visibility: hidden; pointer-events: none; }
+.node.thought.text-thought:focus-visible > :is(.fork-button,.relation-handle,.collapse-button) { opacity: 1; }
+.node:focus-visible { outline: 2px solid var(--accent,#416f5a); outline-offset: 4px; }
+.node.connection-invalid { outline: 2px solid #ca4d57; outline-offset: 3px; cursor: not-allowed; }
+.thought-drag-line.invalid { stroke: #ca4d57; }
+.connection.reparent-preview { opacity: .15 !important; }
+.quick-edit-hint { position: absolute; top: calc(100% + 8px); left: 0; width: max-content; max-width: 440px; color: var(--text,#42534a); background: var(--surface,#fff); border-radius: 4px; padding: 3px 5px; font: 10px/1.5 system-ui; opacity: .7; pointer-events: none; animation: editor-hint-life 5s forwards; }
+@keyframes editor-hint-life { 0%,75% {opacity:.7;} 100% {opacity:0;} }
+.interaction-feedback { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 110; max-width: min(520px,85vw); padding: 9px 14px; border-radius: 9px; background: var(--surface,#fff); color: var(--text,#213c2e); border: 1px solid var(--accent,#416f5a); box-shadow: 0 3px 14px #0001; font-size: 12px; pointer-events: none; }
+.shortcut-backdrop {position:absolute;inset:0;z-index:150;background:#0005;display:grid;place-items:center;padding:24px;}
+.shortcut-help {width:min(620px,100%);max-height:85vh;overflow:auto;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#213c2e);border:1px solid #83958b;border-radius:12px;padding:20px;box-shadow:0 12px 40px #0003;}
+.shortcut-help header {display:flex;align-items:center;justify-content:space-between;gap:20px;}.shortcut-help h2 {font-size:18px;margin:0;}.shortcut-help header button {width:30px;height:30px;background:transparent;color:inherit;border:0;font-size:22px;cursor:pointer;}
+.shortcut-help dl>div {display:grid;grid-template-columns:190px 1fr;gap:16px;padding:8px 0;border-bottom:1px solid #88978e30;font-size:12px;line-height:1.5;}.shortcut-help dt {font-weight:600;}.shortcut-help dd {margin:0;}.shortcut-help label {display:flex;align-items:center;gap:8px;font-size:12px;}
+.canvas-library-groups {max-height: min(65vh,640px); overflow:auto;}
+.canvas-library-group h3 {display:flex;align-items:center;gap:8px;margin:16px 0 6px;font-size:12px;}.canvas-library-group h3 small {opacity:.6;font-size:10px;font-weight:400;}.canvas-library-group>p {margin:7px 0;opacity:.65;font-size:11px;}
+.canvas-entry {display:flex;align-items:center;border-radius:7px;}.canvas-entry:hover {background:#718c7c14;}.canvas-entry.current {background:#4e947b15;}
+.canvas-entry-open {flex:1;min-width:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;padding:9px 8px;}.canvas-entry-open strong {display:flex;gap:8px;flex-wrap:wrap;font-size:12px;overflow-wrap:anywhere;}.canvas-entry-open small {display:block;margin-top:4px;font-size:10px;opacity:.65;}.canvas-entry-open em {font-size:9px;font-style:normal;opacity:.7;font-weight:400;}
+.archive-trash {flex-shrink:0;width:30px;height:30px;border:0;background:transparent;color:inherit;opacity:.55;cursor:pointer;font-size:20px;}.archive-trash:hover {color:#ca4d57;opacity:1;}
+:root:is([data-theme="contrast-black"],[data-theme="midnight"],[data-theme="graphite"],[data-theme="starlight"]) :is(.shortcut-help,.interaction-feedback,.quick-edit-hint) {background:#202523;color:#edf1ef;}
+@media (prefers-reduced-motion:reduce) {.quick-edit-hint {animation:none;}}
+
+.storage-warning .warning-retry { width:auto; padding:0 8px; white-space:nowrap; flex-shrink:0; }
+
+.archive-trash svg {width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}

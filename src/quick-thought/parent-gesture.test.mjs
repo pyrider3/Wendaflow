@@ -12,7 +12,7 @@ test('actual right-drag release creates a parent link from the pressed card, wit
  let result;
  const nodes=[{id:'other',type:'thought'},{id:'parent',type:'thought',relations:[{id:'keep',targetId:'other',type:'reference'}]},{id:'child',type:'thought'}];
  const noop=()=>{};
- const context={nodes,attachThoughtChild,event:{type:'pointerup'},relationDragRef:{current:{quick:true,moved:true,sourceId:'parent',sourceIds:['other','parent'],targetId:'child'}},quickBlankClick:{current:null},suppressContextMenuUntilRef:{current:0},panning:null,marquee:null,resizingRef:{current:null},setNodes:next=>{result=next;},setCollapsedIds:noop,setRelationDrag:noop,setDragging:noop,setPanning:noop,setMarquee:noop,setResizing:noop};
+ const context={endHistory:noop,worldRef:{current:null},pulseThought:noop,nodes,attachThoughtChild,event:{type:'pointerup'},relationDragRef:{current:{quick:true,moved:true,sourceId:'parent',sourceIds:['other','parent'],targetId:'child'}},quickBlankClick:{current:null},suppressContextMenuUntilRef:{current:0},panning:null,marquee:null,resizingRef:{current:null},setNodes:next=>{result=next;},setCollapsedIds:noop,setRelationDrag:noop,setDragging:noop,setPanning:noop,setMarquee:noop,setResizing:noop};
  vm.runInNewContext(source.slice(handler.start,handler.end)+'\nendPointer(event)',context);
  assert.equal(result[2].parentId,'parent');
  assert.equal(result[0].relations,undefined);

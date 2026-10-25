@@ -1,0 +1,85 @@
+/* Text ideas size to their content, independently of answer-card previews. */
+.node.thought.text-thought:not(.inline-editing) {
+  box-sizing: border-box;
+  display: block;
+  width: max-content;
+  max-width: 480px;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  overflow: visible;
+}
+.node.thought.text-thought > h2 {
+  position: static;
+  margin: 0;
+  max-height: none;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-wrap: initial;
+  transform: none;
+  -webkit-line-clamp: unset;
+}
+.node.thought.text-thought > .markdown-content {
+  position: static;
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: 6px 0 0;
+  opacity: 1;
+  transform: none;
+  overflow-wrap: anywhere;
+}
+.node.thought.text-thought > .markdown-content:empty { display: none; }
+.node.thought.text-thought > .resize-handle { display: none; }
+/* Keep controls outside the text rather than reserving empty space for them. */
+.node.thought.text-thought > .collapse-button { left: -12px; }
+.node.thought.text-thought > .relation-handle { left: -12px; bottom: -12px; }
+.node.thought.text-thought > .fork-button { right: -12px; }
+.node.thought.text-thought > .node-tags { margin: 6px 0 0; }
+
+/* A single compact surface while typing; no duplicate card or exposed handles. */
+.node.quick-editing { visibility: hidden; pointer-events: none; }
+.quick-thought-editor {
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 480px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0000000a;
+}
+.quick-thought-editor textarea,
+.quick-thought-editor .quick-thought-measure {
+  box-sizing: border-box;
+  min-width: 24px;
+  max-width: 450px;
+  padding: 0;
+  font: 500 16px/24px system-ui;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.quick-thought-editor .quick-thought-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  width: max-content;
+}
+.quick-thought-editor textarea {
+  min-height: 24px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+}
+.quick-thought-editor textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+.quick-thought-editor textarea::placeholder { color: inherit; opacity: .45; }

@@ -28,6 +28,9 @@ assert.ok(js.includes('quick-switch-track') && js.includes('aria-checked'), 'Qui
 assert.ok(js.includes('http://127.0.0.1:4318'), 'Production proxy origin missing');
 assert.ok(!js.includes('http://127.0.0.1:4319'), 'Test proxy leaked into release');
 assert.ok(fs.readFileSync(path.join(output, 'linux-unpacked/resources/server.mjs')).equals(fs.readFileSync('server.mjs')));
+assert.ok(fs.readFileSync(path.join(output, 'linux-unpacked/resources/canvas-storage.mjs')).equals(fs.readFileSync('canvas-storage.mjs')), 'Atomic storage module missing or stale');
+assert.ok(js.includes('canvas-library-group') && js.includes('shortcut-help'), 'Interaction improvements missing');
+assert.ok(!/http:\/\/127\.0\.0\.1:(?:439[0-9]|518[0-9])/.test(js), 'Test service origin leaked into release');
 const packedPackage = JSON.parse(extractFile(archive, 'package.json').toString());
 assert.equal(packedPackage.version, pkg.version);
 assert.equal(packedPackage.license, 'AGPL-3.0-only');

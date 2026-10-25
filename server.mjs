@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
@@ -8,6 +9,7 @@ const HOST = '127.0.0.1';
 const PORT = Number(process.env.WONDERFUL_PORT || 4318);
 const DATA_ROOT = process.env.WONDERFUL_DATA_DIR || process.cwd();
 const CANVAS_DIR = path.join(DATA_ROOT, 'data', 'canvases');
+const canvasFiles = canvasStorage(DATA_ROOT);
 const DSH_BIN = process.env.DSH_CLI || path.join(os.homedir(), 'Documents', 'Codex', '2026-08-21', 'new-chat', 'work', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js');
 const agentJobs = new Map();
 const HARNESS_WEB_PORT = Number(process.env.WONDERFUL_HARNESS_PORT || 43178);
@@ -561,7 +563,7 @@ const server = http.createServer(async (req, res) => {
       for (const file of files) {
         try {
           const item = JSON.parse(await readFile(path.join(CANVAS_DIR, file), 'utf8'));
-          canvases.push({ id: item.canvas?.id || file.slice(0, -4), name: item.canvas?.name || '未命名画布', createdAt: item.canvas?.createdAt, updatedAt: item.canvas?.updatedAt, nodeCount: item.nodes?.length || 0 });
+          canvases.push({ id: item.canvas?.id || file.slice(0, -4), name: item.canvas?.name || '未命名画布', createdAt: item.canvas?.createdAt, updatedAt: item.canvas?.updatedAt, nodeCount: item.nodes?.length || 0, restoredAt:item.canvas?.restoredAt,restoredFrom:item.canvas?.restoredFrom });
         } catch {}
       }
       canvases.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -590,9 +592,8 @@ const server = http.createServer(async (req, res) => {
       // WDF is deliberately self-contained so moving one file between devices
       // preserves nodes, layout and every attachment. IndexedDB is only the
       // browser's working cache and is not part of the portable file format.
-      await writeFile(path.join(CANVAS_DIR, `${id}.wdf`), JSON.stringify(payload, null, 2), 'utf8');
-      // Migrate the short-lived split-asset format back into a single archive.
-      await rm(path.join(CANVAS_DIR, `${id}.assets`), { recursive: true, force: true });
+      await canvasFiles.save(payload);
+      // Preserve legacy split assets referenced by historical versions.
       reply(res, 200, { ok: true });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -601,11 +602,16 @@ const server = http.createServer(async (req, res) => {
     try {
       const { id } = await readJson(req);
       if (!/^[a-zA-Z0-9_-]+$/.test(id || '')) throw new Error('画布 ID 无效');
-      await unlink(path.join(CANVAS_DIR, `${id}.wdf`));
-      await rm(path.join(CANVAS_DIR, `${id}.assets`), { recursive: true, force: true });
-      reply(res, 200, { ok: true });
+      const token = await canvasFiles.trash(id,payload=>hydrateCanvasAttachments(payload,id));
+      reply(res, 200, { ok: true, token });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
+  }
+  if (req.method === 'GET' && req.url === '/canvases/trash') {
+    try { reply(res,200,{canvases:await canvasFiles.listTrash()}); } catch(error) { reply(res,500,{error:error.message}); } return;
+  }
+  if (req.method === 'POST' && req.url === '/canvases/restore') {
+    try { const {token}=await readJson(req);reply(res,200,{canvas:await canvasFiles.restore(token)}); } catch(error) {reply(res,400,{error:error.message});} return;
   }
   if (req.method === 'POST' && req.url === '/pick-directory') {
     if (!['win32', 'darwin'].includes(process.platform)) { reply(res, 400, { error: '当前目录选择器仅支持桌面版 Windows 或 macOS' }); return; }

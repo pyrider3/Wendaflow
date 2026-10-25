@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { parse } from "@babel/parser";
+import {combineSelection} from './interactions.mjs';
 import { completeThoughtMarquee } from "./ideas.js";
 
 const source = fs.readFileSync(new URL("../main.jsx", import.meta.url), "utf8");
@@ -32,6 +33,7 @@ function finish(box, event, initialId = "a") {
   ];
   const noop = () => {};
   const context = {
+    endHistory:noop,
     quickThought: true,
     marquee: box,
     panning: null,
@@ -44,7 +46,7 @@ function finish(box, event, initialId = "a") {
     nodeSizes: new Map(),
     viewport: { x: 0, y: 0, zoom: 1 },
     viewportRef: { current: { x: 0, y: 0, zoom: 1 } },
-    completeThoughtMarquee,
+    completeThoughtMarquee,combineSelection,
     selectedId: initialId,
     inspectorClosing: false,
     inspectorTimerRef: { current: 42 },

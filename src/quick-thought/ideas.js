@@ -13,7 +13,7 @@ export function boxThoughtIds(nodes, sizes, viewport, box) {
   }).map(node=>node.id);
 }
 export function newThought(point,title,parentId,id) {
-  return {id,type:'thought',author:'',model:null,title,content:'',prompt:null,parentId:parentId||null,x:point.x-112,y:point.y-55,status:'done',attachments:[]};
+  return {id,type:'thought',author:'',model:null,title,content:'',prompt:null,parentId:parentId||null,x:point.x-14,y:point.y-10,status:'done',attachments:[]};
 }
 
 export function deletionBackups(nodes,ids) {

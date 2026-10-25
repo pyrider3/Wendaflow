@@ -2,18 +2,20 @@
 
 > 让对话自由分岔。
 
-## 最新版本：0.2.13
+## 最新版本：0.2.14
 
-[下载 Linux 版（AppImage / deb）](https://github.com/pyrider3/Wendaflow/releases/tag/v0.2.13)。本次提供 Linux x64 安装包；其他平台旧版见历史 Releases。
+[下载 Linux 版（AppImage / deb）](https://github.com/pyrider3/Wendaflow/releases/tag/v0.2.14)。本次提供 Linux x64 安装包；其他平台旧版见历史 Releases。
 
-- 快速模式右键从 A 拖到 B：A 是父节点，B 成为其子节点；拖到空白处创建 A 的子节点。保存和切换模式后仍为父子关系，引用关系继续用虚线。
-- 左键框选碰到卡片即可选中，点击空白处立即取消选择。
-- 外观新增「星夜」，并改善夜蓝、墨黑、极夜和星夜的按钮、标签与正文可读性。
-- 16 项快速思维测试、524 条翻译审计和 Linux 安装包校验通过。
+- 想法卡片贴合文字，新建与输入框随内容收紧；选中、连接和切除有即时动效反馈。
+- 导入 WDF 默认打开新画布并保留原内容，兼容旧格式；本地保存增加历史版本，删除存档可从回收区恢复。
+- 支持按画布撤销、重做，覆盖编辑、移动、连线、删除与自动整理。Shift 框选追加，Alt 框选减选。
+- Ctrl/⌘+Enter 连续创建同级想法，Tab 创建子想法，方向键导航、F2 编辑；侧栏「?」提供快捷键帮助。
+- 连线前提示无效目标与移动分支；存档列表区分已打开、本地存档、最近关闭与回收区。
+- 45 项回归测试和现有 524 项翻译审计通过，Linux 安装包单独校验。
 
-![星夜主题与侧栏](docs/screenshots/starlight-0.2.9.png)
+![画布与存档分组](docs/screenshots/interaction-library-0.2.14.png)
 
-详见 [快速思维](QUICK_THINKING.md)、[父子连接修复](PARENT_LINKS_0.2.13.md) 和 [界面反馈修复](ISSUES_0.2.9.md)。
+详见 [0.2.14 更新说明](RELEASE_0.2.14.md)、[操作逻辑修复](LOGIC_FIXES_2026-10-21.md)、[交互优化](INTERACTION_UPDATES_2026-10-21.md) 和 [快速思维](QUICK_THINKING.md)。
 
 人类的真实思考是网状和跳跃的，而目前的 AI 交互被迫变成了单向的线性流。
 

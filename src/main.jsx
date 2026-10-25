@@ -8,6 +8,7 @@ import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
 import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL } from './localProxy.js';
 import {CardContent} from './cards/CardContent.jsx';
+import {CanvasLibraryGroups} from './components/CanvasLibraryGroups.jsx';
 import {AppearancePanel} from './components/AppearancePanel.jsx';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
 import './styles.css';
@@ -16,6 +17,14 @@ import './components/controls.css';
 import './themes/contrast-black.css';
 import './themes/starlight.css';
 import './themes/dark-controls.css';
+import './cards/thought-text.css';
+import './quick-thought/motion.css';
+import { normalizeWdf, remapNodes } from './canvas/document.mjs';
+import {useCanvasNodes} from './canvas/useCanvasNodes.js';
+import {crossedDragThreshold,combineSelection,connectionIntent,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
+import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
+import './quick-thought/interaction.css';
+import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
 
@@ -24,7 +33,7 @@ const CANVAS_DB_NAME = 'wonderful-canvas-store';
 const CANVAS_DB_VERSION = 1;
 const CANVAS_STORE = 'canvases';
 const OFFICIAL_NOTIFICATION_SERVER = 'https://api.qnjyxh.xyz';
-const APP_VERSION = '0.2.13';
+const APP_VERSION = '0.2.14';
 const LICENSE_OFFLINE_GRACE_DAYS = 7;
 
 function isNewerVersion(candidate, current) {
@@ -57,7 +66,7 @@ async function readCanvasState(id) {
   const db = await openCanvasDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(CANVAS_STORE, 'readonly').objectStore(CANVAS_STORE).get(id);
-    request.onsuccess = () => { db.close(); resolve(request.result || null); };
+    request.onsuccess = () => {db.close();try{const saved=request.result;resolve(saved?normalizeWdf({...saved,format:saved.format||'branchspace-wdf'}):null);}catch(error){reject(error);}};
     request.onerror = () => { db.close(); reject(request.error); };
   });
 }
@@ -184,7 +193,7 @@ function loadState(canvasId) {
   try {
     if (canvasId) {
       const canvasValue = JSON.parse(localStorage.getItem(`branchspace-canvas-${canvasId}`));
-      if (Array.isArray(canvasValue?.nodes)) return canvasValue;
+      if (Array.isArray(canvasValue?.nodes)) return normalizeWdf({...canvasValue,format:canvasValue.format||'branchspace-wdf'});
     }
   } catch {}
   return { nodes: [], selectedId: null, collapsedIds: [], viewport: { x: 20, y: 20, zoom: .9 } };
@@ -208,7 +217,9 @@ function ancestors(nodes, id) {
   const map = new Map(nodes.map((node) => [node.id, node]));
   const result = [];
   let cursor = map.get(id);
-  while (cursor) {
+  const seen = new Set();
+  while (cursor && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
     result.unshift(cursor);
     cursor = cursor.parentId ? map.get(cursor.parentId) : null;
   }
@@ -252,7 +263,9 @@ function findBranchPosition(nodes, parent, nodeSizes) {
 function isDescendant(nodes, nodeId, ancestorId) {
   const map = new Map(nodes.map((node) => [node.id, node]));
   let cursor = map.get(nodeId);
-  while (cursor?.parentId) {
+  const seen = new Set();
+  while (cursor?.parentId && !seen.has(cursor.id)) {
+    seen.add(cursor.id);
     if (cursor.parentId === ancestorId) return true;
     cursor = map.get(cursor.parentId);
   }
@@ -315,6 +328,12 @@ function App() {
   const [saveStatus, setSaveStatus] = useState('');
   const saveCanvasRef = useRef(null);
   const [savedCanvases, setSavedCanvases] = useState([]);
+  const [trashCanvases,setTrashCanvases]=useState([]);
+  const transitionRequestRef=useRef(0);
+  const archiveTombstones=useRef((()=>{try{return new Set(JSON.parse(localStorage.getItem('wendaflow-removed-archives')||'[]'));}catch{return new Set();}})());
+  const [closedCanvases,setClosedCanvases]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('wendaflow-closed-canvases')||'[]');return Array.isArray(saved)?saved.filter(c=>c&&typeof c.id==='string').slice(0,20):[];}catch{return [];}});
+  useEffect(()=>{localStorage.setItem('wendaflow-closed-canvases',JSON.stringify(closedCanvases));},[closedCanvases]);
+  const say=(zh,en)=>uiLanguage.startsWith('zh')?zh:en;
   const [canvasLibraryStatus, setCanvasLibraryStatus] = useState('');
   const [canvasTransition, setCanvasTransition] = useState('');
   const [theme, setTheme] = useState(() => localStorage.getItem('wonderful-theme') || 'contrast-light');
@@ -325,13 +344,12 @@ function App() {
   const quickSpace=useRef(false);
   const quickCopy=quickThoughtCopy(uiLanguage);
   useEffect(()=>{localStorage.setItem('wendaflow-quick-thought',quickThought?'1':'0');},[quickThought]);
-  useEffect(()=>{setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
+  useEffect(()=>{if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
   useEffect(()=>{
-    if(!quickThought)return;
-    const down=e=>{if(e.key===' '&&!e.target.closest?.('input,textarea,select,button,[contenteditable="true"]')){quickSpace.current=true;e.preventDefault();}};
-    const up=e=>{if(e.key===' ')quickSpace.current=false;};const blur=()=>{quickSpace.current=false;};
+    const down=e=>{if(e.key===' '&&!e.target.closest?.('input,textarea,select,button,[contenteditable="true"]')){quickSpace.current=true;canvasRef.current?.classList.add('space-panning');e.preventDefault();}};
+    const up=e=>{if(e.key===' '){quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');}};const blur=()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');};
     window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);
-    return()=>{quickSpace.current=false;window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);};
+    return()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);};
   },[quickThought]);
 
   const tr = (chinese, english) => translate(TRANSLATIONS, uiLanguage, chinese, english);
@@ -372,7 +390,7 @@ function App() {
   const [rootComposerClosing, setRootComposerClosing] = useState(false);
   const [rootPosition, setRootPosition] = useState({ x: 220, y: 220 });
   const initial = useMemo(() => loadState(canvasBoot.activeId), []);
-  const [nodes, setNodes] = useState(initial.nodes);
+  const {nodes,setNodes,setNodesBackground,replaceNodes,currentNodes,beginHistory,endHistory,undoNodes,redoNodes,canUndo,canRedo} = useCanvasNodes(initial.nodes,activeCanvasId);
   const [selectedId, setSelectedId] = useState(initial.selectedId);
   const [selectedIds, setSelectedIds] = useState(new Set(initial.selectedId ? [initial.selectedId] : []));
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -479,6 +497,13 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [storageWarning, setStorageWarning] = useState('');
+  const [feedback,setFeedback]=useState(null);
+  const [shortcutHelp,setShortcutHelp]=useState(false);
+  const [editorHints,setEditorHints]=useState(()=>localStorage.getItem('wendaflow-editor-hints')!=='0');
+  useEffect(()=>localStorage.setItem('wendaflow-editor-hints',editorHints?'1':'0'),[editorHints]);
+  const [cacheWarning,setCacheWarning]=useState('');
+  useEffect(()=>{if(!feedback)return;const timer=setTimeout(()=>setFeedback(null),2400);return()=>clearTimeout(timer);},[feedback]);
+  function notify(message){setFeedback({message,key:Date.now()});}
   const [parallelMode, setParallelMode] = useState(false);
   const [parallelModels, setParallelModels] = useState(new Set());
   const [minimapOpen, setMinimapOpen] = useState(() => localStorage.getItem('branchspace-minimap') === 'true');
@@ -560,8 +585,7 @@ function App() {
   }, [visibleNodes, viewport, nodeSizes, selectedIds, selectedId, branchingFrom, dragging]);
   const deletionIds = useMemo(() => {
     if(quickThought)return thoughtIds(nodes,selectedIds);
-    const roots = [...selectedIds].filter((id) => id !== 'root');
-    return new Set(nodes.filter((node) => roots.includes(node.id) || roots.some((rootId) => isDescendant(nodes, node.id, rootId))).map((node) => node.id));
+    return new Set(selectedIds);
   }, [nodes, selectedIds, quickThought]);
   const activeCloud = cloudProfiles.find((profile) => profile.id === activeCloudId) || cloudProfiles[0] || DEFAULT_CLOUD;
   const activeCanvas = canvases.find((canvas) => canvas.id === activeCanvasId) || canvases[0];
@@ -600,7 +624,7 @@ function App() {
         const stored = await readCanvasState(activeCanvasId);
         if (cancelled) return;
         if (stored?.nodes) {
-          setNodes(stored.nodes);
+          replaceNodes(stored.nodes,activeCanvasId);
           setSelectedId(stored.selectedId || null);
           setSelectedIds(new Set(stored.selectedId ? [stored.selectedId] : []));
           setCollapsedIds(new Set(stored.collapsedIds || []));
@@ -611,11 +635,11 @@ function App() {
           await writeCanvasState(activeCanvasId, { nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current });
         }
         canvasHydratedRef.current = true;
-        setStorageWarning('');
+        setCacheWarning('');
       } catch (error) {
         console.error('Wonderful IndexedDB hydration failed', error);
         canvasHydratedRef.current = true;
-        setStorageWarning(tr('浏览器画布数据库不可用；仍可点击“保存”写入本地 WDF。',"Local cache unavailable. Use Save to write a WDF file."));
+        setCacheWarning(tr('浏览器画布数据库不可用；仍可点击“保存”写入本地 WDF。',"Local cache unavailable. Use Save to write a WDF file."));
       }
     };
     hydrate();
@@ -624,12 +648,13 @@ function App() {
 
   useEffect(() => {
     if (!canvasHydratedRef.current) return;
+    setSaveStatus(current=>['保存失败','保存中…'].includes(current)?current:say('有未保存的更改','Unsaved changes'));
     const timer = window.setTimeout(() => {
       writeCanvasState(activeCanvasId, { nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current })
-        .then(() => setStorageWarning(''))
+        .then(() => setCacheWarning(''))
         .catch((error) => {
           console.error('Wonderful IndexedDB persistence failed', error);
-          setStorageWarning(tr('自动缓存失败；请点击“保存”写入本地 WDF。',"Local cache unavailable. Use Save to write a WDF file."));
+          setCacheWarning(tr('自动缓存失败；请点击“保存”写入本地 WDF。',"Local cache unavailable. Use Save to write a WDF file."));
         });
     }, 180);
     return () => window.clearTimeout(timer);
@@ -777,14 +802,15 @@ function App() {
   useEffect(() => {
     const handler = (event) => {
       const editing = event.target instanceof Element && event.target.closest('textarea, input, [contenteditable="true"]');
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !editing) {
+      if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !editing) {
         event.preventDefault();
-        undoDelete();
+        if(event.shiftKey || event.key.toLowerCase()==='y')applyCanvasHistory(true);else undoDelete();
+        setDeleteUndo(null);setSelectedId(null);setSelectedIds(new Set());
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [deleteUndo]);
+  }, [nodes,activeCanvasId]);
 
   useEffect(() => {
     const handler = (event) => {
@@ -861,10 +887,22 @@ function App() {
     if (branchingFrom) return undefined;
     const clearOnEscape = (event) => {
       if (event.key === 'Escape') {
+        if(shortcutHelp){setShortcutHelp(false);return;}
         relationDragRef.current=null;quickBlankClick.current=null;clearQuickSlicePreview();
         setRelationDrag(null);setMarquee(null);clearSelection();
       }
       const isEditing = event.target instanceof Element && event.target.closest('textarea, input, select, [contenteditable="true"]');
+      const onCanvas=!event.target.closest?.('button,a,.inspector,.settings-panel,.canvas-overview,.canvas-context-menu,[role="dialog"]');
+      if(!isEditing && event.key==='?'){event.preventDefault();setShortcutHelp(value=>!value);return;}
+      if(!isEditing && quickThought && onCanvas && selected?.type==='thought') {
+        if(event.key==='F2'){event.preventDefault();editQuickIdea(selected);return;}
+        if(event.key==='Enter' || (event.key==='Tab' && !event.shiftKey)){event.preventDefault();createRelativeIdea(event.key==='Tab'?'child':'sibling');return;}
+        if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){
+          event.preventDefault();const next=directionalNeighbor(selected,event.key,visibleNodes.filter(n=>n.type==='thought'),nodeSizes);
+          if(next){selectNode(next.id);setInspectorOpen(false);requestAnimationFrame(()=>worldRef.current?.querySelector(`[data-node-id="${CSS.escape(next.id)}"]`)?.focus({preventScroll:true}));}return;
+        }
+      }
+
       if (!isEditing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         // A selectable Markdown answer is real document text. Do not hijack
         // its native copy shortcut merely because its enclosing card is also
@@ -881,7 +919,7 @@ function App() {
     };
     window.addEventListener('keydown', clearOnEscape);
     return () => window.removeEventListener('keydown', clearOnEscape);
-  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought]);
+  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought,shortcutHelp,visibleNodes,nodeSizes]);
 
   function selectNode(id, options = {}) {
     if (inspectorTimerRef.current) clearTimeout(inspectorTimerRef.current);
@@ -895,6 +933,7 @@ function App() {
       setInspectorTitleExpanded(false);
     }
     if (editingNode && editingNode !== id) {
+      if(saveNodeEdit()===false)return;
       setEditingNode(null);
       setInlineEditSize(null);
     }
@@ -948,7 +987,7 @@ function App() {
     nodeClipboardRef.current = copied;
     const payload = JSON.stringify({ type: 'wonderful-nodes', nodes: copied });
     try { await navigator.clipboard?.writeText(payload); } catch {}
-    setStorageWarning(tr(`已复制 ${copied.length} 个卡片，可在画布空白处按 Ctrl+V 粘贴。`,`Copied ${copied.length} cards. Press Ctrl+V on the canvas to paste.`));
+    notify(tr(`已复制 ${copied.length} 个卡片，可在画布空白处按 Ctrl+V 粘贴。`,`Copied ${copied.length} cards. Press Ctrl+V on the canvas to paste.`));
   }
 
   async function pasteCopiedNodes() {
@@ -965,59 +1004,42 @@ function App() {
     const minX = Math.min(...copied.map((node) => node.x));
     const minY = Math.min(...copied.map((node) => node.y));
     const idMap = new Map(copied.map((node, index) => [node.id, `node-${Date.now()}-${index}`]));
-    const clones = copied.map((node, index) => ({ ...node, id: idMap.get(node.id), parentId: idMap.get(node.parentId) || null, relations: (node.relations || []).filter((relation) => idMap.has(relation.targetId)).map((relation) => ({ ...relation, id: `relation-${Date.now()}-${index}-${relation.id}`, targetId: idMap.get(relation.targetId) })), x: Math.round(anchor.x + node.x - minX + 24), y: Math.round(anchor.y + node.y - minY + 24), status: node.type === 'conversation' ? 'done' : node.status }));
+    const clones = remapNodes(copied,idMap).map(node=>({...node,x:Math.round(anchor.x+node.x-minX+24),y:Math.round(anchor.y+node.y-minY+24),status:node.type==='conversation'?'done':node.status}));
     setNodes((items) => [...items, ...clones]);
     setSelectedIds(new Set(clones.map((node) => node.id)));
     setSelectedId(clones[0].id);
     setInspectorOpen(false);
-    setStorageWarning(tr(`已粘贴 ${clones.length} 个卡片。`,`Pasted ${clones.length} cards`));
+    notify(tr(`已粘贴 ${clones.length} 个卡片。`,`Pasted ${clones.length} cards`));
   }
 
   function deleteSelection(explicitIds) {
-    const candidates = explicitIds instanceof Set ? explicitIds : new Set(deletionIds);
-    const ids = quickThought ? thoughtIds(nodes,candidates) : candidates;
-    if (!ids.size || deletingIds.size) return;
-    const removedNodes = nodes.filter((node) => ids.has(node.id));
-    const relationBackups = deletionBackups(nodes,ids);
-    const removedCollapsedIds = [...collapsedIds].filter((id) => ids.has(id));
-    const primaryParent = nodes.find((node) => node.id === selectedId)?.parentId;
-    ids.forEach((id) => generationRef.current.get(id)?.abort());
-    if (branchingFrom && ids.has(branchingFrom)) closeBranch();
-    setDeletingIds(ids);
-    setInspectorClosing(true);
-    deleteTimerRef.current = window.setTimeout(() => {
-      setNodes(current=>removeNodeRecords(current,ids));
-      setCollapsedIds((current) => new Set([...current].filter((id) => !ids.has(id))));
-      setDeletingIds(new Set());
-      setInspectorClosing(false);
-      if (primaryParent && !ids.has(primaryParent)) selectNode(primaryParent);
-      else { setSelectedId(null); setSelectedIds(new Set()); }
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-      setDeleteUndo({ nodes: removedNodes, collapsedIds: removedCollapsedIds, relationBackups });
-      undoTimerRef.current = window.setTimeout(() => { setDeleteUndo(null); undoTimerRef.current = null; }, quickThought ? 30000 : 6000);
-      deleteTimerRef.current = null;
-    }, 240);
+    const candidates=explicitIds instanceof Set?explicitIds:new Set(deletionIds);
+    const ids=quickThought?thoughtIds(nodes,candidates):candidates;
+    if(!ids.size)return;
+    const removed=nodes.filter(n=>ids.has(n.id));
+    ids.forEach(id=>generationRef.current.get(id)?.abort());
+    animateSlice(worldRef.current,connectionsRef.current,ids,[]);
+    setNodes(items=>removeNodeRecords(items,ids));
+    setCollapsedIds(current=>new Set([...current].filter(id=>!ids.has(id))));
+    if(branchingFrom && ids.has(branchingFrom))closeBranch();
+    setSelectedId(null);setSelectedIds(new Set());setInspectorOpen(false);setInspectorClosing(false);
+    setDeleteUndo({nodes:removed,atNodes:currentNodes()});
   }
 
-  function undoDelete() {
-    if (!deleteUndo) return;
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
-    const restoredIds = new Set(deleteUndo.nodes.map((node) => node.id));
-    setNodes((current) => [...current.filter((node) => !restoredIds.has(node.id)), ...deleteUndo.nodes].map((node) => {
-      const backup = deleteUndo.relationBackups?.find((item) => item.id === node.id);
-      return backup ? {...node,parentId:backup.parentId,links:backup.links,relations:backup.relations} : node;
-    }));
-    setCollapsedIds((current) => new Set([...current, ...deleteUndo.collapsedIds]));
-    const restoredRoot = deleteUndo.nodes.find((node) => !restoredIds.has(node.parentId)) || deleteUndo.nodes[0];
-    setSelectedIds(new Set(restoredRoot?[restoredRoot.id]:[]));
-    setSelectedId(restoredRoot?.id||null);
-    setRestoringIds(restoredIds);
-    setInspectorOpen(!quickThought);
-    setDeleteUndo(null);
-    undoTimerRef.current = null;
-    if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
-    nodeAnimationTimerRef.current = window.setTimeout(() => setRestoringIds(new Set()), 420);
+  function applyCanvasHistory(redo=false) {
+    const before=currentNodes();
+    if(redo)redoNodes();else undoNodes();
+    const after=currentNodes(),retained=new Set(after.map(n=>n.id)),previous=new Set(before.map(n=>n.id));
+    for(const node of before)if(!retained.has(node.id)){
+      generationRef.current.get(node.id)?.abort();
+      if(node.execution?.jobId && node.status==='running')void stopAgentJob(node).catch(error=>setStorageWarning(error.message));
+    }
+    const interrupted=new Set(after.filter(n=>!previous.has(n.id) && ['queued','thinking','streaming','running'].includes(n.status)).map(n=>n.id));
+    if(interrupted.size)setNodesBackground(items=>items.map(n=>interrupted.has(n.id)?{...n,status:'stopped',generationPhase:null}:n));
+    setDeleteUndo(null);setSelectedId(null);setSelectedIds(new Set());
   }
+
+  function undoDelete() { applyCanvasHistory(); }
 
   function toggleCollapse(nodeId) {
     if (collapsedIds.has(nodeId)) {
@@ -1031,9 +1053,11 @@ function App() {
       nodeAnimationTimerRef.current = window.setTimeout(() => setRevealingId(null), 420);
       return;
     }
+    const foldCanvasId=activeCanvasId;
     setFoldingId(nodeId);
     if (foldTimerRef.current) clearTimeout(foldTimerRef.current);
     foldTimerRef.current = window.setTimeout(() => {
+      if(activeCanvasIdRef.current!==foldCanvasId)return;
       setCollapsedIds((current) => new Set(current).add(nodeId));
       setFoldingId(null);
       foldTimerRef.current = null;
@@ -1157,7 +1181,8 @@ function App() {
     return {x:(event.clientX-rect.left-v.x)/v.zoom,y:(event.clientY-rect.top-v.y)/v.zoom};
   }
   function toggleQuickThought() {
-    if(quickEditor){if(quickEditor.value.trim())saveQuickIdea();else cancelQuickIdea();}
+    if(editingNode && saveNodeEdit()===false)return;
+    if(quickEditor){saveQuickIdea();}
     if(!quickThought){previousNodeType.current=nodeType;setNodeType('thought');}else setNodeType(previousNodeType.current);
     setQuickThought(!quickThought);setRootComposerOpen(false);setBranchingFrom(null);setComposerClosing(false);
     setSelectedId(null);setSelectedIds(new Set());setInspectorOpen(false);setContextMenu(null);setEditingNode(null);
@@ -1165,24 +1190,43 @@ function App() {
   }
   function editQuickIdea(node,created=false) {
     if(node.type!=='thought')return;
-    selectNode(node.id);setInspectorOpen(false);setQuickEditor({id:node.id,value:created?'':node.content||node.title||'',created});
+    beginHistory();selectNode(node.id);setInspectorOpen(false);setQuickEditor({id:node.id,value:created?'':node.content||node.title||'',created,preserveTitle:!!node.content && questionTitle(node.content)!==questionTitle(node.title)});
   }
-  function createQuickIdea(point,sourceIds=[]) {
-    if(quickEditor){if(quickEditor.value.trim())saveQuickIdea();else cancelQuickIdea();}
+  function createQuickIdea(point,sourceIds=[],skipCurrent=false) {
+    if(!skipCurrent && quickEditor){saveQuickIdea();}
+    beginHistory();
     const sources=[...thoughtIds(nodes,new Set(sourceIds))];
     const node={...newThought(point,quickCopy.newIdea,sources[0],`thought-${crypto.randomUUID()}`),author:tr('你','You')};
     setNodes(items=>[...items,node]);
     setCollapsedIds(current=>new Set([...current].filter(id=>!sources.includes(id))));
     setRootComposerOpen(false);setBranchingFrom(null);setInspectorOpen(false);setSelectedId(node.id);setSelectedIds(new Set([node.id]));setQuickEditor({id:node.id,value:'',created:true});
   }
-  function saveQuickIdea() {
+  function saveQuickIdea(nextMode) {
     if(!quickEditor)return;
-    if(!quickEditor.value.trim()){cancelQuickIdea();return;}
-    const value=quickEditor.value.trim();setNodes(items=>items.map(n=>n.id===quickEditor.id&&n.type==='thought'?{...n,title:questionTitle(value,quickCopy.newIdea),content:value}:n));setQuickEditor(null);
+    const original=nodes.find(n=>n.id===quickEditor.id);
+    const value=quickEditor.value.trim();
+    if(!value && quickEditor.created){cancelQuickIdea();return;}
+    const updated={...original,title:quickEditor.preserveTitle?original.title:value,content:value};
+    setNodes(items=>items.map(n=>n.id===quickEditor.id&&n.type==='thought'?updated:n));
+    endHistory();setQuickEditor(null);pulseThought(worldRef.current,quickEditor.id);
+    if(!value)notify(say('文字已清空；卡片仍保留，选中后可按 Delete 删除。','Text cleared. Card kept; select it and press Delete to remove it.'));
+    if(['sibling','child'].includes(nextMode))createRelativeIdea(nextMode,updated,true);
   }
+  function createRelativeIdea(kind,node=selected,skipCurrent=false) {
+    if(!node || node.type!=='thought')return;
+    const sizes=new Map(nodeSizes);
+    const editor=quickEditor?.id===node.id?worldRef.current?.querySelector('.quick-thought-editor'):null;
+    const card=[...(worldRef.current?.querySelectorAll('.node')||[])].find(el=>el.dataset.nodeId===node.id);
+    const measured=editor||card;
+    if(measured)sizes.set(node.id,{width:measured.offsetWidth,height:measured.offsetHeight});
+    const point=relativeIdeaPoint(node,kind,nodes,sizes);
+    const parentId=kind==='child'?node.id:node.parentId;
+    createQuickIdea(point,parentId?[parentId]:[],skipCurrent);
+  }
+
   function cancelQuickIdea() {
     if(quickEditor?.created){const id=quickEditor.id;setNodes(items=>items.filter(n=>n.id!==id).map(n=>({...n,relations:(n.relations||[]).filter(r=>r.targetId!==id)})));setSelectedId(null);setSelectedIds(new Set());}
-    setQuickEditor(null);
+    endHistory();setQuickEditor(null);
   }
   function openQuickMenu(event,nodeId) {
     const ids=nodeId&&!selectedIds.has(nodeId)?thoughtIds(nodes,new Set([nodeId])):thoughtIds(nodes,selectedIds);
@@ -1197,7 +1241,7 @@ function App() {
       const next={sourceId:node.id,sourceIds:ids,x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,targetId:null,quick:true,moved:false};
       relationDragRef.current=next;setRelationDrag(next);setContextMenu(null);return;
     }
-    if(quickThought && (event.button===1 || (event.button===0&&quickSpace.current))) {beginPan(event,true);return;}
+    if(event.button===1 || (event.button===0&&quickSpace.current)) {beginPan(event,true);return;}
     if(quickThought && node.type!=='thought')return;
     if (event.button !== 0) return;
     if (event.target.closest('.markdown-content, button, input, textarea, select, a')) return;
@@ -1224,7 +1268,9 @@ function App() {
     }
     if(quickThought){dragIds=dragIds.filter(id=>nodes.find(n=>n.id===id)?.type==='thought');setInspectorOpen(false);event.currentTarget.setPointerCapture?.(event.pointerId);}
     const positions = new Map(nodes.filter((item) => dragIds.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]));
-    setDragging({ ids: dragIds, startX: event.clientX, startY: event.clientY, positions });
+    beginHistory();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDragging({ started:false, ids: dragIds, startX: event.clientX, startY: event.clientY, positions });
   }
 
   function beginRelationDrag(event, node) {
@@ -1241,8 +1287,9 @@ function App() {
     if (type === 'inherit') {
       if (isDescendant(nodes, sourceId, targetId)) { setStorageWarning(tr('不能把节点继承到自己的后代。',"Cannot inherit from a descendant")); return; }
       setNodes((items) => items.map((node) => node.id === targetId ? { ...node, parentId: sourceId } : node));
+      if(nodes.find(n=>n.id===targetId)?.parentId){notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));return;}
     } else setNodes((items) => items.map((node) => node.id === sourceId ? { ...node, relations: [...(node.relations || []).filter((relation) => relation.targetId !== targetId), { id: `relation-${Date.now()}`, targetId, type }] } : node));
-    setStorageWarning(type === 'merge' ? tr('已建立合并关系。',"Merge link created") : type === 'reference' ? tr('已建立引用关系。',"Reference link created") : tr('已建立继承关系。',"Inheritance link created"));
+    notify(type === 'merge' ? tr('已建立合并关系。',"Merge link created") : type === 'reference' ? tr('已建立引用关系。',"Reference link created") : tr('已建立继承关系。',"Inheritance link created"));
   }
 
   function handleContentWheel(event) {
@@ -1253,6 +1300,7 @@ function App() {
   }
 
   function beginResize(event, node) {
+    beginHistory();
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1277,7 +1325,7 @@ function App() {
     }));
     setSelectedConnections([]);
     setLineSelectionMenu(null);
-    setStorageWarning(tr(`已移除 ${connections.length} 条连线。`,`Removed ${connections.length} links`));
+    notify(tr(`已移除 ${connections.length} 条连线。`,`Removed ${connections.length} links`));
   }
 
   function closeRelationEditor(afterClose) {
@@ -1291,7 +1339,8 @@ function App() {
   }
 
   function beginPan(event,fromNode=false) {
-    if(quickThought&&quickEditor&&!event.target.closest('.quick-thought-editor')){if(quickEditor.value.trim())saveQuickIdea();else cancelQuickIdea();}
+    if(editingNode && !event.target.closest('.inline-node-editor,.inspector') && saveNodeEdit()===false)return;
+    if(quickThought&&quickEditor&&!event.target.closest('.quick-thought-editor')){saveQuickIdea();}
     if(quickThought && event.button===2 && !event.target.closest('.node,button,textarea,select,.composer')) {
       event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
       stopZoomAnimation();
@@ -1300,7 +1349,7 @@ function App() {
     if(quickThought && event.button===0 && !quickSpace.current && !event.target.closest('.node,button,textarea,input,select,.composer,.quick-thought-editor')) {
       event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
-      setMarquee({startX:x,startY:y,x,y});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
+      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
     if (editingRelation) closeRelationEditor();
@@ -1315,10 +1364,10 @@ function App() {
       const y = event.clientY - rect.top;
       setSelectedConnections([]);
       setLineSelectionMenu(null);
-      setMarquee({ startX: x, startY: y, x, y });
+      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});
       return;
     }
-    if ((quickThought ? !(event.button===1 || (event.button===0&&quickSpace.current)) : event.button!==0) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
+    if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
     event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture?.(event.pointerId);
     stopZoomAnimation();
     // The DOM transform can be ahead of React state during a wheel zoom.
@@ -1331,11 +1380,12 @@ function App() {
   function finishQuickSlice(stroke) {
     const ids=thoughtIds(nodes,stroke.ids),connections=[...stroke.connections.values()];
     if((!ids.size&&!connections.length)||deletingIds.size)return;
+    animateSlice(worldRef.current,connectionsRef.current,ids,connections);
     const backups=sliceBackups(nodes,ids,connections);
     setDeleteUndo({nodes:nodes.filter(n=>ids.has(n.id)),collapsedIds:[...collapsedIds].filter(id=>ids.has(id)),relationBackups:backups,sliced:true});
-    if(undoTimerRef.current)clearTimeout(undoTimerRef.current);
-    undoTimerRef.current=window.setTimeout(()=>{setDeleteUndo(null);undoTimerRef.current=null;},30000);
+
     setNodes(current=>removeSliceRecords(current,ids,connections));
+    const atNodes=currentNodes();setDeleteUndo(previous=>({...previous,atNodes}));
     setCollapsedIds(current=>new Set([...current].filter(id=>!ids.has(id))));
     setSelectedIds(new Set());setSelectedId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);
   }
@@ -1346,7 +1396,9 @@ function App() {
       const current = relationDragRef.current;
       if (current) {
         const validTarget=!current.quick || nodes.find(n=>n.id===target)?.type==='thought';
-        const next = { ...current, moved:current.moved||Math.hypot(event.clientX-current.startX,event.clientY-current.startY)>5,x: event.clientX, y: event.clientY, targetId: target === current.sourceId || !validTarget ? null : target };
+        const intent=current.quick?connectionIntent(nodes,current.sourceId,target):'connect';
+        const invalid=current.quick && ['cycle','self','invalid'].includes(intent);
+        const next = { ...current, intent, invalidTargetId:invalid?target:null, moved:current.moved||Math.hypot(event.clientX-current.startX,event.clientY-current.startY)>5,x: event.clientX, y: event.clientY, targetId: invalid || target === current.sourceId || !validTarget ? null : target };
         relationDragRef.current = next;
         setRelationDrag(next);
       }
@@ -1366,10 +1418,13 @@ function App() {
         const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
         return nodeLeft + size.width * viewport.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewport.zoom >= top && nodeTop <= bottom;
       }).map((node) => node.id);
-      setSelectedIds(new Set(hits));
-      setSelectedId(hits[hits.length - 1] || null);
+      const selection=combineSelection(next.base,hits,next.mode);
+      setSelectedIds(selection);
+      setSelectedId([...selection].at(-1)||null);
       if (hits.length) { setSelectedConnections([]); setLineSelectionMenu(null); setInspectorOpen(!quickThought); setInspectorClosing(false); }
     } else if (dragging) {
+      if(!crossedDragThreshold(dragging,event))return;
+      if(!dragging.started)setDragging({...dragging,started:true});
       const dx = (event.clientX - dragging.startX) / viewport.zoom;
       const dy = (event.clientY - dragging.startY) / viewport.zoom;
       setNodes((items) => items.map((node) => {
@@ -1386,6 +1441,7 @@ function App() {
   }
 
   function endPointer(event) {
+    endHistory();
     const finalRelationDrag = relationDragRef.current;
     if (quickBlankClick.current) {
       updateQuickSlice(event);
@@ -1401,9 +1457,10 @@ function App() {
         if(event.type==='pointerup') {
           if(!finalRelationDrag.moved)openQuickMenu(event,finalRelationDrag.sourceId);
           else if(finalRelationDrag.targetId) {
+            if(finalRelationDrag.intent==='connected'){notify(say('这两个想法已连接。','These ideas are already connected.'));return;}
             const next = attachThoughtChild(nodes, finalRelationDrag.sourceId, finalRelationDrag.targetId);
             if (next === nodes) setStorageWarning(tr('不能把节点继承到自己的后代。',"Cannot inherit from a descendant"));
-            else { setNodes(next); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
+            else { if(nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId!==finalRelationDrag.sourceId)notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));setNodes(next); pulseThought(worldRef.current,finalRelationDrag.targetId); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
           }
           else if(!document.elementsFromPoint(event.clientX,event.clientY).some(el=>el.closest?.('.node,.composer,.inspector,.quick-thought-editor')))createQuickIdea(clientWorld(event),[finalRelationDrag.sourceId]);
         }
@@ -1417,20 +1474,23 @@ function App() {
     if (marquee && quickThought) {
       const rect = canvasRef.current.getBoundingClientRect();
       const box = {...marquee, x:event.clientX-rect.left, y:event.clientY-rect.top};
-      const hits = event.type === 'pointerup' ? completeThoughtMarquee(visibleNodes,nodeSizes,viewportRef.current,box) : [];
+      const hits = event.type === 'pointerup' ? [...combineSelection(box.base,completeThoughtMarquee(visibleNodes,nodeSizes,viewportRef.current,box),box.mode)] : [...(box.base||[])];
       if (!hits.length) clearSelection();
       else { setSelectedIds(new Set(hits)); setSelectedId(hits.at(-1)); setInspectorOpen(false); }
     }
     if (marquee) {
+      const selectionRect=canvasRef.current.getBoundingClientRect();
+      const finalMarquee={...marquee,x:event.clientX-selectionRect.left,y:event.clientY-selectionRect.top};
       suppressContextMenuUntilRef.current = Date.now() + 260;
-      const left = Math.min(marquee.startX, marquee.x), right = Math.max(marquee.startX, marquee.x);
-      const top = Math.min(marquee.startY, marquee.y), bottom = Math.max(marquee.startY, marquee.y);
+      const left = Math.min(finalMarquee.startX, finalMarquee.x), right = Math.max(finalMarquee.startX, finalMarquee.x);
+      const top = Math.min(finalMarquee.startY, finalMarquee.y), bottom = Math.max(finalMarquee.startY, finalMarquee.y);
       const nodeHits = visibleNodes.filter((node) => {
         const nodeLeft = viewport.x + node.x * viewport.zoom, nodeTop = viewport.y + node.y * viewport.zoom;
         const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
         return nodeLeft + size.width * viewport.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewport.zoom >= top && nodeTop <= bottom;
       });
-      if (!quickThought && !nodeHits.length && connectionsRef.current && canvasRef.current) {
+      if(!quickThought){const hits=event.type==='pointercancel'?new Set(marquee.base||[]):combineSelection(marquee.base,nodeHits.map(n=>n.id),marquee.mode);setSelectedIds(hits);setSelectedId([...hits].at(-1)||null);}
+      if (!quickThought && (!marquee.mode||marquee.mode==='replace') && !nodeHits.length && connectionsRef.current && canvasRef.current) {
         const canvasRect = canvasRef.current.getBoundingClientRect();
         const picked = [...connectionsRef.current.querySelectorAll('.connection[data-connection-key]')].flatMap((path) => {
           const box = path.getBoundingClientRect();
@@ -1458,7 +1518,7 @@ function App() {
     const pointerY = event.clientY - rect.top;
     const base = targetViewportRef.current;
     const factor = Math.exp(-event.deltaY * 0.0012);
-    const nextZoom = Math.min(2.4, Math.max(0.22, base.zoom * factor));
+    const nextZoom = Math.min(2.4, Math.max(0.02, base.zoom * factor));
     const worldX = (pointerX - base.x) / base.zoom;
     const worldY = (pointerY - base.y) / base.zoom;
     targetViewportRef.current = { x: pointerX - worldX * nextZoom, y: pointerY - worldY * nextZoom, zoom: nextZoom };
@@ -1475,12 +1535,12 @@ function App() {
     const graphWidth = Math.max(224, maxX - minX);
     const graphHeight = Math.max(110, maxY - minY);
     const leftPadding = 86;
-    const rightPadding = selected ? 330 : 86;
+    const rightPadding = selected && inspectorOpen && !quickThought ? 330 : 86;
     const topPadding = 92;
     const bottomPadding = 70;
     const availableWidth = Math.max(240, rect.width - leftPadding - rightPadding);
     const availableHeight = Math.max(180, rect.height - topPadding - bottomPadding);
-    const zoom = Math.min(1, Math.max(0.22, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
+    const zoom = Math.min(1, Math.max(0.02, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
     const contentWidth = graphWidth * zoom;
     const contentHeight = graphHeight * zoom;
     targetViewportRef.current = {
@@ -1494,7 +1554,7 @@ function App() {
   function autoLayout() {
     const depthMap = new Map();
     const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-    const getDepth = (node) => node.parentId && nodeMap.has(node.parentId) ? getDepth(nodeMap.get(node.parentId)) + 1 : 0;
+    const getDepth = node => {let depth=0,cursor=node;const seen=new Set();while(cursor?.parentId && nodeMap.has(cursor.parentId) && !seen.has(cursor.id)){seen.add(cursor.id);depth++;cursor=nodeMap.get(cursor.parentId);}return depth;};
     visibleNodes.forEach((node) => {
       const depth = getDepth(node);
       if (!depthMap.has(depth)) depthMap.set(depth, []);
@@ -1502,7 +1562,7 @@ function App() {
     });
     const sizeFor = (node) => {
       const measured = nodeSizes.get(node.id);
-      return { width: node.manualWidth || measured?.width || 224, height: node.manualHeight || measured?.height || 110 };
+      return { width: measured?.width || node.manualWidth || 224, height: measured?.height || node.manualHeight || 110 };
     };
     const orderedDepths = [...depthMap.keys()].sort((a, b) => a - b);
     const columnX = new Map();
@@ -1528,7 +1588,7 @@ function App() {
       const maxX = Math.max(...laidOut.map((node) => node.x + sizeFor(node).width));
       const maxY = Math.max(...laidOut.map((node) => node.y + sizeFor(node).height));
       const rect = canvasRef.current.getBoundingClientRect();
-      const zoom = Math.min(1.08, Math.max(.22, Math.min((rect.width - 390) / Math.max(1, maxX - minX), (rect.height - 160) / Math.max(1, maxY - minY))));
+      const zoom = Math.min(1.08, Math.max(.02, Math.min((rect.width - (selected && inspectorOpen && !quickThought ? 416 : 172)) / Math.max(1, maxX - minX), (rect.height - 160) / Math.max(1, maxY - minY))));
       targetViewportRef.current = { x: 76 + (rect.width - 370 - (maxX - minX) * zoom) / 2 - minX * zoom, y: 90 + (rect.height - 130 - (maxY - minY) * zoom) / 2 - minY * zoom, zoom };
       if (!zoomFrameRef.current) zoomFrameRef.current = requestAnimationFrame(animateViewport);
     }
@@ -1545,12 +1605,26 @@ function App() {
     if (!zoomFrameRef.current) zoomFrameRef.current = requestAnimationFrame(animateViewport);
   }
 
+  async function persistCurrentCanvas() {
+    if(editingNode && saveNodeEdit()===false)throw new Error(say("请先完成或取消当前编辑。","Finish or cancel the current edit first."));
+    if(foldTimerRef.current)clearTimeout(foldTimerRef.current);
+    if(closeTimerRef.current)clearTimeout(closeTimerRef.current);
+    if(inspectorTimerRef.current)clearTimeout(inspectorTimerRef.current);
+    if(quickEditor){saveQuickIdea();}
+    endHistory();
+    const id=activeCanvasIdRef.current, snapshot=currentNodes();
+    await canvasWriteQueueRef.current.get(id);
+    await writeCanvasState(id,{nodes:snapshot,selectedId,collapsedIds:[...collapsedIds],viewport:targetViewportRef.current});
+  }
+
   async function switchCanvas(id) {
     if (id === activeCanvasId) { setCanvasMenuOpen(false); return; }
-    setCanvasTransition('leaving');
-    await new Promise((resolve) => window.setTimeout(resolve, 130));
-    await writeCanvasState(activeCanvasId, { nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current }).catch(console.error);
+    const token=++transitionRequestRef.current;
+    try { await persistCurrentCanvas(); } catch(error){setStorageWarning(error.message);return;}
+    await canvasWriteQueueRef.current.get(id);
     const state = await readCanvasState(id).catch(() => null) || loadState(id);
+    if(token!==transitionRequestRef.current)return;
+    setCanvasTransition('leaving');
     if (previewLayoutTimerRef.current) clearTimeout(previewLayoutTimerRef.current);
     if (previewContentTimerRef.current) clearTimeout(previewContentTimerRef.current);
     if (connectionFrameRef.current) cancelAnimationFrame(connectionFrameRef.current);
@@ -1566,7 +1640,7 @@ function App() {
     setNodeSizes(new Map());
     activeCanvasIdRef.current = id;
     setActiveCanvasId(id);
-    setNodes(state.nodes);
+    replaceNodes(state.nodes,id);
     setCollapsedIds(new Set(state.collapsedIds || []));
     const nextSelected = state.selectedId || state.nodes[0]?.id || null;
     setSelectedId(nextSelected);
@@ -1585,17 +1659,17 @@ function App() {
     let nextNumber = 1;
     while (usedNumbers.has(nextNumber)) nextNumber += 1;
     const name = tr(`新画布 ${nextNumber}`,`New canvas ${nextNumber}`);
+    const token=++transitionRequestRef.current;
+    try { await persistCurrentCanvas();await writeCanvasState(id,{nodes:[],selectedId:null,collapsedIds:[],viewport:{x:20,y:20,zoom:.9}}); }catch(error){setStorageWarning(error.message);return;}
+    if(token!==transitionRequestRef.current)return;
     setCanvasTransition('leaving');
-    await new Promise((resolve) => window.setTimeout(resolve, 130));
-    await writeCanvasState(activeCanvasId, { nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current }).catch(console.error);
-    await writeCanvasState(id, { nodes: [], selectedId: null, collapsedIds: [], viewport: { x: 20, y: 20, zoom: .9 } }).catch(console.error);
     const now = new Date().toISOString();
     setCanvases((items) => [...items, { id, name, createdAt: now, updatedAt: now }]);
     if (previewLayoutTimerRef.current) clearTimeout(previewLayoutTimerRef.current);
     if (previewContentTimerRef.current) clearTimeout(previewContentTimerRef.current);
     if (connectionFrameRef.current) cancelAnimationFrame(connectionFrameRef.current);
     semanticPreviewRef.current = 0; setPreviewLayoutActive(false); setPreviewContentPhase('full'); setPreviewFullSizes(new Map()); nodeSizesRef.current = new Map(); setNodeSizes(new Map());
-    activeCanvasIdRef.current = id; setActiveCanvasId(id); setNodes([]); setSelectedId(null); setSelectedIds(new Set()); setCollapsedIds(new Set());
+    activeCanvasIdRef.current = id; setActiveCanvasId(id); replaceNodes([],id); setSelectedId(null); setSelectedIds(new Set()); setCollapsedIds(new Set());
     setRootPosition({ x: 220, y: 220 }); setRootComposerOpen(false); setDraft(''); setAttachments([]);
     const nextViewport = { x: 20, y: 20, zoom: .9 }; stopZoomAnimation(); targetViewportRef.current = nextViewport; commitViewport(nextViewport);
     setCanvasTransition('entering');
@@ -1616,37 +1690,49 @@ function App() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       setSavedCanvases(result.canvases || []); setCanvasLibraryStatus('');
+      const trashResponse=await fetch(`${LOCAL_PROXY_URL}/canvases/trash`);
+      if(trashResponse.ok)setTrashCanvases((await trashResponse.json()).canvases||[]);
     } catch (error) { setCanvasLibraryStatus(tr(`无法读取本地存档：${error.message}`,`Operation failed: ${error.message}`)); }
   }
 
   async function saveCanvas(silent = false) {
+    if(quickEditor){saveQuickIdea();}
+    const savingId=activeCanvasId, snapshot=currentNodes(), snapshotViewport={...targetViewportRef.current};
+    if(silent && archiveTombstones.current.has(savingId))return;
     if (!silent) setSaveStatus('保存中…');
     try {
       const now = new Date().toISOString();
       const canvas = { ...activeCanvas, updatedAt: now };
-      await writeCanvasState(activeCanvasId, { nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current });
+      let cacheError=null;
+      try{await writeCanvasState(savingId, { nodes:snapshot, selectedId, collapsedIds: [...collapsedIds], viewport: snapshotViewport });setCacheWarning('');}catch(error){cacheError=error;}
       localStorage.setItem(CANVAS_INDEX_KEY, JSON.stringify({ canvases, activeId: activeCanvasId }));
-      const response = await fetch(`${LOCAL_PROXY_URL}/canvases/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'wonderful-wdf', version: 1, canvas, nodes, selectedId, collapsedIds: [...collapsedIds], viewport: targetViewportRef.current }) });
+      const response = await fetch(`${LOCAL_PROXY_URL}/canvases/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'branchspace-wdf', version: 1, canvas, nodes:snapshot, selectedId, collapsedIds: [...collapsedIds], viewport: snapshotViewport }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error);
-      setCanvases((items) => items.map((item) => item.id === activeCanvasId ? canvas : item));
+      if(archiveTombstones.current.has(savingId) && silent)return;
+      archiveTombstones.current.delete(savingId);localStorage.setItem('wendaflow-removed-archives',JSON.stringify([...archiveTombstones.current]));
+      setCanvases((items) => items.map((item) => item.id === savingId ? canvas : item));
       await refreshSavedCanvases();
       setStorageWarning('');
-      if (!silent) {
-        setSaveStatus('已保存');
-        window.setTimeout(() => setSaveStatus(''), 1600);
-      }
-    } catch (error) { if (!silent) setSaveStatus('保存失败'); setCanvasLibraryStatus(error.message); }
+      setCacheWarning(cacheError?say('本地文件已保存，但浏览器缓存失败；请保留 WDF 文件。','File saved, but browser cache failed. Keep your WDF file.'): '');
+      if(activeCanvasIdRef.current===savingId && currentNodes()!==snapshot){setSaveStatus(say('有未保存的更改','Unsaved changes'));return;}
+      if(activeCanvasIdRef.current===savingId)setSaveStatus('已保存');
+    } catch (error) {setSaveStatus('保存失败');setStorageWarning(say('本地保存失败：','Local save failed: ')+error.message);setCanvasLibraryStatus(error.message);}
   }
   saveCanvasRef.current = saveCanvas;
 
   async function openSavedCanvas(id) {
+    if(canvases.some(canvas=>canvas.id===id)){await switchCanvas(id);closeFloatingPanel('canvas',setCanvasMenuOpen);return;}
+    const token=++transitionRequestRef.current;
     try {
+      await persistCurrentCanvas();
       const response = await fetch(`${LOCAL_PROXY_URL}/canvases/open?id=${encodeURIComponent(id)}`);
-      const payload = await response.json(); if (!response.ok) throw new Error(payload.error);
+      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const payload=normalizeWdf(data);
+      if(token!==transitionRequestRef.current)return;
       const canvas = payload.canvas;
       setCanvases((items) => items.some((item) => item.id === id) ? items.map((item) => item.id === id ? canvas : item) : [...items, canvas]);
       await writeCanvasState(id, { nodes: payload.nodes || [], selectedId: payload.selectedId || null, collapsedIds: payload.collapsedIds || [], viewport: payload.viewport || { x: 20, y: 20, zoom: .9 } });
-      activeCanvasIdRef.current = id; setActiveCanvasId(id); setNodes(payload.nodes || []); setCollapsedIds(new Set(payload.collapsedIds || []));
+      activeCanvasIdRef.current = id; setActiveCanvasId(id); replaceNodes(payload.nodes || [],id); setCollapsedIds(new Set(payload.collapsedIds || []));
       setSelectedId(payload.selectedId || null); setSelectedIds(new Set(payload.selectedId ? [payload.selectedId] : []));
       const nextViewport = payload.viewport || { x: 20, y: 20, zoom: .9 }; stopZoomAnimation(); targetViewportRef.current = nextViewport; commitViewport(nextViewport);
       closeFloatingPanel('canvas', setCanvasMenuOpen);
@@ -1655,11 +1741,22 @@ function App() {
 
   async function deleteSavedCanvas(id) {
     try {
+      archiveTombstones.current.add(id);localStorage.setItem('wendaflow-removed-archives',JSON.stringify([...archiveTombstones.current]));
       const response = await fetch(`${LOCAL_PROXY_URL}/canvases/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error);
       setSavedCanvases((items) => items.filter((canvas) => canvas.id !== id));
-      await deleteCanvasState(id).catch(console.error);
-    } catch (error) { setCanvasLibraryStatus(tr(`删除失败：${error.message}`,`Operation failed: ${error.message}`)); }
+      await refreshSavedCanvases();
+      setCanvasLibraryStatus('');notify(say('已移入回收区。打开的画布仍保留，手动保存会重新创建存档。','Moved to recovery. Open canvas kept; Save creates a new archive.'));
+    } catch (error) { archiveTombstones.current.delete(id);localStorage.setItem('wendaflow-removed-archives',JSON.stringify([...archiveTombstones.current]));setCanvasLibraryStatus(tr(`删除失败：${error.message}`,`Operation failed: ${error.message}`)); }
+  }
+
+  async function restoreSavedCanvas(token) {
+    try{const response=await fetch(`${LOCAL_PROXY_URL}/canvases/restore`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});const result=await response.json();if(!response.ok)throw new Error(result.error);await refreshSavedCanvases();setCanvasLibraryStatus('');notify(say('存档已恢复，可在本地存档中打开。','Archive restored. Open it from Local archives.'));}catch(error){setCanvasLibraryStatus(error.message);}
+  }
+  async function reopenClosedCanvas(canvas) {
+    setCanvases(items=>items.some(c=>c.id===canvas.id)?items:[...items,canvas]);
+    setClosedCanvases(items=>items.filter(c=>c.id!==canvas.id));
+    await switchCanvas(canvas.id);
   }
 
   function closeFloatingPanel(name, setter) {
@@ -1697,9 +1794,11 @@ function App() {
 
   async function pickWorkspaceDirectory(forCurrentAction = false) {
     try {
-      const desktopPath = await window.wonderfulWindow?.pickDirectory?.();
-      let path = desktopPath || '';
-      if (!path) {
+      let path='';
+      if(typeof window.wonderfulWindow?.pickDirectory==='function'){
+        path=await window.wonderfulWindow.pickDirectory();
+        if(!path)return;
+      } else {
         const response = await fetch(`${LOCAL_PROXY_URL}/pick-directory`, { method: 'POST' });
         const result = await response.json(); if (!response.ok) throw new Error(result.error);
         path = result.path || '';
@@ -1760,16 +1859,23 @@ function App() {
   async function closeCanvas(id, event) {
     event?.stopPropagation();
     if (canvases.length <= 1) return;
+    const token=++transitionRequestRef.current;
+    try{await persistCurrentCanvas();}catch(error){setStorageWarning(error.message);return;}
+    const closing=canvases.find(c=>c.id===id);
     const index = canvases.findIndex((canvas) => canvas.id === id);
     const remaining = canvases.filter((canvas) => canvas.id !== id);
     if (id === activeCanvasId) {
       const nextCanvas = remaining[Math.min(index, remaining.length - 1)];
+      await canvasWriteQueueRef.current.get(nextCanvas.id);
       const state = await readCanvasState(nextCanvas.id).catch(() => null) || loadState(nextCanvas.id);
-      activeCanvasIdRef.current = nextCanvas.id; setActiveCanvasId(nextCanvas.id); setNodes(state.nodes); setCollapsedIds(new Set(state.collapsedIds || []));
+      if(token!==transitionRequestRef.current)return;
+      activeCanvasIdRef.current = nextCanvas.id; setActiveCanvasId(nextCanvas.id); replaceNodes(state.nodes,nextCanvas.id); setCollapsedIds(new Set(state.collapsedIds || []));
       const nextSelected = state.selectedId || state.nodes[0]?.id || null;
       setSelectedId(nextSelected); setSelectedIds(new Set(nextSelected ? [nextSelected] : []));
       const nextViewport = state.viewport || { x: 20, y: 20, zoom: .82 }; stopZoomAnimation(); targetViewportRef.current = nextViewport; commitViewport(nextViewport);
     }
+    if(token!==transitionRequestRef.current)return;
+    setClosedCanvases(items=>[closing,...items.filter(c=>c.id!==id)].slice(0,20));
     setCanvases(remaining);
   }
 
@@ -1868,7 +1974,7 @@ function App() {
 
   function updateTaskNode(canvasId, id, updater) {
     if (activeCanvasIdRef.current === canvasId) {
-      setNodes((items) => items.map((item) => item.id === id ? updater(item) : item));
+      setNodesBackground((items) => items.map((item) => item.id === id ? updater(item) : item));
       return;
     }
     const previous = canvasWriteQueueRef.current.get(canvasId) || Promise.resolve();
@@ -1889,6 +1995,8 @@ function App() {
     try {
       updateTaskNode(taskCanvasId, id, (item) => ({ ...item, status: 'queued', generationPhase: tr('请求已排队，正在准备上下文…',"Request queued…"), error: null }));
       await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      const live=activeCanvasIdRef.current===taskCanvasId?currentNodes():(await readCanvasState(taskCanvasId))?.nodes;
+      if(!live?.some(node=>node.id===id))return;
       const controller = new AbortController();
       generationRef.current.set(id, controller);
       const excluded = new Set(contextExclusions);
@@ -2036,7 +2144,7 @@ function App() {
       setNewNodeId(created.id);
       if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
       nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
-      setStorageWarning(tr(`已在画布中添加 ${attachmentsForNode.length} 个文件。`,`Added ${attachmentsForNode.length} files to canvas`));
+      notify(tr(`已在画布中添加 ${attachmentsForNode.length} 个文件。`,`Added ${attachmentsForNode.length} files to canvas`));
     } catch (error) {
       setStorageWarning(tr(`拖放文件失败：${error.message || '无法读取文件'}`,`Operation failed: ${error.message || '无法读取文件'}`));
     }
@@ -2072,7 +2180,7 @@ function App() {
     setComposerFileDragActive(false);
     try {
       const next = await addAttachmentFiles(event.dataTransfer?.files || []);
-      if (next?.length) setStorageWarning(tr(`已添加 ${next.length} 个附件，发送后会一并交给 AI。`,`Added ${next.length} attachments. They will be sent with your message.`));
+      if (next?.length) notify(tr(`已添加 ${next.length} 个附件，发送后会一并交给 AI。`,`Added ${next.length} attachments. They will be sent with your message.`));
     } catch (error) {
       setStorageWarning(tr(`添加附件失败：${error.message || '无法读取文件'}`,`Operation failed: ${error.message || '无法读取文件'}`));
     }
@@ -2125,7 +2233,7 @@ function App() {
     setLibraryOpen(false);
     setRootComposerClosing(false);
     setRootComposerOpen(true);
-    setStorageWarning(tr(`「${item.name}」已加入输入框，可直接继续提问。`,`“${item.name}” added to the composer`));
+    notify(tr(`「${item.name}」已加入输入框，可直接继续提问。`,`“${item.name}” added to the composer`));
   }
 
   function removeLibraryItem(item) {
@@ -2205,17 +2313,19 @@ function App() {
     if (!nodeToEdit) return;
     if (nodeToEdit.id !== selectedId) { setSelectedId(nodeToEdit.id); setSelectedIds(new Set([nodeToEdit.id])); }
     const card = worldRef.current?.querySelector(`.node[data-node-id="${CSS.escape(nodeToEdit.id)}"]`);
-    setInlineEditSize(card ? { width: card.offsetWidth, height: card.offsetHeight } : null);
+    setInlineEditSize(card ? { width: Math.max(280,card.offsetWidth), height: Math.max(240,card.offsetHeight) } : {width:280,height:240});
     setEditDraft({ title: nodeToEdit.title || '', prompt: nodeToEdit.prompt || '', content: nodeToEdit.content || '', type: nodeToEdit.type, tags: (nodeToEdit.tags || []).join('，'), note: nodeToEdit.note || '', color: nodeToEdit.color || '' });
     setEditingNode(nodeToEdit.id);
     setInspectorTab('actions');
   }
 
   function saveNodeEdit() {
-    if (!selected || !editDraft.title.trim() || !editDraft.content.trim()) return;
-    setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, title: editDraft.title.trim(), prompt: editDraft.type === 'conversation' ? editDraft.prompt.trim() || null : null, content: editDraft.content.trim(), type: editDraft.type, author: editDraft.type === 'thought' ? tr('你',"You") : editDraft.type === 'action' ? tr('执行代理',"Agent") : 'AI', model: editDraft.type === 'thought' ? null : editDraft.type === 'action' ? tr('本地 Codex',"Local Codex") : node.model || selectedLocal?.model, status: editDraft.type === 'action' && node.type !== 'action' ? 'approval' : editDraft.type === 'thought' ? 'done' : node.status, tags: editDraft.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean), note: editDraft.note.trim(), color: editDraft.color || '' } : node));
+    if (!selected) return false;
+    if(!editDraft.title.trim() && !editDraft.content.trim() && !selected.attachments?.length){setStorageWarning(say('请填写文字或添加附件。','Add text or an attachment.'));return false;}
+    setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, title: editDraft.title.trim() || questionTitle(editDraft.content), prompt: editDraft.type === 'conversation' ? editDraft.prompt.trim() || null : null, content: editDraft.content.trim(), type: editDraft.type, author: editDraft.type === 'thought' ? tr('你',"You") : editDraft.type === 'action' ? tr('执行代理',"Agent") : 'AI', model: editDraft.type === 'thought' ? null : editDraft.type === 'action' ? tr('本地 Codex',"Local Codex") : node.model || selectedLocal?.model, status: editDraft.type === 'action' && node.type !== 'action' ? 'approval' : editDraft.type === 'thought' ? 'done' : node.status, tags: editDraft.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean), note: editDraft.note.trim(), color: editDraft.color || '' } : node));
     setEditingNode(null);
     setInlineEditSize(null);
+    return true;
   }
 
   function openSettings() {
@@ -2246,24 +2356,23 @@ function App() {
   }
 
   async function importProject(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;
+    const originId=activeCanvasId, token=++transitionRequestRef.current;
     try {
-      const payload = JSON.parse(await file.text());
-      if (payload.format !== 'branchspace-wdf' || !Array.isArray(payload.nodes) || !payload.nodes.length || !payload.nodes.every((node) => node.id && Number.isFinite(node.x) && Number.isFinite(node.y))) throw new Error(tr('不是有效的 Wendaflow WDF 文件',"Invalid Wendaflow WDF file"));
-      setNodes(payload.nodes);
-      setCollapsedIds(new Set(payload.collapsedIds || []));
-      const firstId = payload.nodes[0].id;
-      setSelectedIds(new Set([firstId]));
-      setSelectedId(firstId);
-      if (payload.viewport?.zoom) {
-        stopZoomAnimation();
-        targetViewportRef.current = payload.viewport;
-        commitViewport(payload.viewport);
-      }
-      setProjectStatus(tr(`已导入 ${payload.nodes.length} 个节点`,`Imported ${payload.nodes.length} nodes`));
-    } catch (error) { setProjectStatus(tr(`导入失败：${error.message}`,`Operation failed: ${error.message}`)); }
+      const payload=normalizeWdf(JSON.parse(await file.text()));
+      if(token!==transitionRequestRef.current)return;
+      await persistCurrentCanvas();
+      const id=`canvas-${crypto.randomUUID()}`,now=new Date().toISOString();
+      const canvas={id,name:file.name.replace(/\.wdf$/i,''),createdAt:now,updatedAt:now};
+      await writeCanvasState(id,payload);
+      if(token!==transitionRequestRef.current || activeCanvasIdRef.current!==originId)return;
+      setCanvases(items=>[...items,canvas]);
+      activeCanvasIdRef.current=id;setActiveCanvasId(id);replaceNodes(payload.nodes,id);
+      setSelectedId(null);setSelectedIds(new Set());setCollapsedIds(new Set(payload.collapsedIds));
+      stopZoomAnimation();targetViewportRef.current=payload.viewport;commitViewport(payload.viewport);
+      setRootComposerOpen(false);setInspectorOpen(false);setCanvasMenuOpen(false);
+      setProjectStatus(say(`已在新画布打开 ${payload.nodes.length} 个节点；原画布已保留。`,`Opened ${payload.nodes.length} nodes in a new canvas; original preserved.`));
+    } catch(error){setProjectStatus(say('导入失败：','Import failed: ')+error.message);}
   }
 
   async function generateMindMapSuggestions(node = selected, mode = mindMapState.mode || 'questions') {
@@ -2301,7 +2410,7 @@ function App() {
     setNewNodeId(created[0]?.id || null);
     window.setTimeout(() => setNewNodeId(null), 520);
     setMindMapState({ nodeId: null, status: '', suggestions: [], selected: [], mode: 'questions' });
-    setStorageWarning(tr(`已加入 ${created.length} 个 AI 扩展节点。`,`Added ${created.length} AI nodes`));
+    notify(tr(`已加入 ${created.length} 个 AI 扩展节点。`,`Added ${created.length} AI nodes`));
   }
 
   function startBranch(node, options = {}) {
@@ -2348,7 +2457,7 @@ function App() {
     const runner = actionNode.actionRunner || 'codex';
     const runnerName = { codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' }[runner];
     const taskCanvasId = activeCanvasIdRef.current;
-    setNodes((items) => items.map((node) => node.id === actionId ? { ...node, status: 'running', model: runnerName, execution: { ...(node.execution || {}), activityCollapsed: node.execution?.activityCollapsed !== false, runner, events: [{ id: `context-${actionId}`, type: 'message', text: inherited.length ? tr(`已注入 ${inherited.length} 个上下文节点与 ${inheritedAttachments.length} 个附件。`,`Injected ${inherited.length} context nodes and ${inheritedAttachments.length} attachments.`) : tr('此任务从零开始，没有继承节点。',"Starting from scratch, without inherited nodes.") }], startedAt: new Date().toISOString() } } : node));
+    setNodesBackground((items) => items.map((node) => node.id === actionId ? { ...node, status: 'running', model: runnerName, execution: { ...(node.execution || {}), activityCollapsed: node.execution?.activityCollapsed !== false, runner, events: [{ id: `context-${actionId}`, type: 'message', text: inherited.length ? tr(`已注入 ${inherited.length} 个上下文节点与 ${inheritedAttachments.length} 个附件。`,`Injected ${inherited.length} context nodes and ${inheritedAttachments.length} attachments.`) : tr('此任务从零开始，没有继承节点。',"Starting from scratch, without inherited nodes.") }], startedAt: new Date().toISOString() } } : node));
     try {
       const taskAttachments = [...inheritedAttachments, ...(actionNode.attachments || [])].filter((item) => item.dataUrl || item.sourcePath).map((item) => ({ name: item.name, type: item.type, dataUrl: item.dataUrl, sourcePath: item.sourcePath || '' }));
       const images = taskAttachments.filter((item) => item.dataUrl?.startsWith('data:image/'));
@@ -2357,6 +2466,8 @@ function App() {
       let result = await response.json();
       if (!response.ok) throw new Error(result.error || tr(`Codex 返回 ${response.status}`,`Codex returned ${response.status}`));
       const jobId = result.id;
+      const live=activeCanvasIdRef.current===taskCanvasId?currentNodes():(await readCanvasState(taskCanvasId))?.nodes;
+      if(!live?.some(node=>node.id===actionId && node.type==='action' && node.status==='running')){await stopAgentJob({execution:{jobId}});return;}
       while (result.status === 'running') {
         updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], inheritedNodeIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '' } }));
         await new Promise((resolve) => window.setTimeout(resolve, 280));
@@ -2518,7 +2629,9 @@ function App() {
 
   return (
     <div className="app-shell">
-      {storageWarning && <div className="storage-warning" role="status">{systemText(storageWarning)}<button onClick={() => setStorageWarning('')} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
+      {shortcutHelp && <ShortcutHelp quick={quickThought} say={say} hints={editorHints} onToggleHints={()=>setEditorHints(value=>!value)} onClose={()=>setShortcutHelp(false)} />}
+      {feedback && <div className="interaction-feedback" role="status">{feedback.message}</div>}
+      {(storageWarning||cacheWarning) && <div className="storage-warning" role="alert">{systemText(storageWarning||cacheWarning)}{saveStatus==='保存失败' && <button className="warning-retry" onClick={()=>saveCanvas()}>{say('重试保存','Retry save')}</button>}<button onClick={() => {setStorageWarning('');setCacheWarning('');}} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
       {notificationDetail && <div className="modal-backdrop notification-detail-backdrop" onPointerDown={(event) => { if (!notificationDetail.requiresAcknowledgement && event.target === event.currentTarget) setNotificationDetail(null); }}><section className="notification-detail-card" role="dialog" aria-modal="true" aria-label={notificationDetail.title}><header><div><small>{notificationDetail.kind === 'update' ? tr('版本更新','Version update') : tr('通知详情','Notification details')}</small><h2>{notificationDetail.title}</h2></div>{!notificationDetail.requiresAcknowledgement && <button onClick={() => setNotificationDetail(null)} aria-label={tr('关闭','Close')}>×</button>}</header><div className="notification-detail-content"><p>{notificationDetail.body}</p><time>{new Date(notificationDetail.createdAt).toLocaleString(uiLanguage)}</time></div><footer>{notificationDetail.downloadUrl && <button onClick={() => openExternalUrl(notificationDetail.downloadUrl)}>{tr('打开下载页','Open download page')}</button>}<button className="primary" onClick={() => confirmNotification(notificationDetail)}>{notificationDetail.requiresAcknowledgement ? tr('确认','Acknowledge') : tr('完成','Done')}</button></footer></section></div>}
       <header className="topbar">
         <div className="brand-mark" aria-label="Wendaflow">
@@ -2541,12 +2654,14 @@ function App() {
               {!!notifications.length && <footer><button onClick={() => { setNotifications((items) => items.map((item) => ({ ...item, read: true }))); syncNotificationState([], 'read'); }}>{tr('全部标为已读','Mark all as read')}</button><button onClick={() => { syncNotificationState([], 'dismiss'); setNotifications([]); }}>{tr('清除全部','Clear all')}</button></footer>}
             </section>}
           </div>
-          <button className={`quiet-button save-button ${saveStatus === '保存中…' ? 'saving' : saveStatus === '已保存' ? 'saved' : saveStatus === '保存失败' ? 'failed' : ''}`} disabled={saveStatus === '保存中…'} onClick={saveCanvas}>{saveStatus === '保存中…' ? text('saving') : saveStatus === '已保存' ? text('saved') : saveStatus === '保存失败' ? text('saveFailed') : text('save')}</button>
-          <button className="quiet-button" onClick={fitView}>{text('fitCanvas')}</button>
+          <button className={`quiet-button save-button ${saveStatus === '保存中…' ? 'saving' : saveStatus === '已保存' ? 'saved' : saveStatus === '保存失败' ? 'failed' : ''}`} disabled={saveStatus === '保存中…'} onClick={()=>saveCanvas()}>{saveStatus === '保存中…' ? text('saving') : saveStatus === '已保存' ? text('saved') : saveStatus === '保存失败' ? text('saveFailed') : saveStatus ? say('保存 *','Save *') : text('save')}</button>
+          <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z">↶</button>
+        <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z">↷</button>
+        <button className="quiet-button" onClick={fitView}>{text('fitCanvas')}</button>
           <button className="quiet-button" onClick={autoLayout}>{text('autoLayout')}</button>
           <button className={minimapOpen ? 'quiet-button active' : 'quiet-button'} onClick={() => setMinimapOpen((value) => !value)}>{text('minimap')}</button>
           <button className={focusMode ? 'quiet-button active' : 'quiet-button'} onClick={() => setFocusMode((value) => !value)}>{text('focusPath')}</button>
-          <div className="window-controls"><button aria-label={tr('最小化','Minimize')} onClick={() => window.wonderfulWindow?.minimize?.()}>—</button><button aria-label={tr('切换窗口大小','Toggle window size')} onClick={() => window.wonderfulWindow?.maximize?.()}>□</button><button className="window-close" aria-label={tr('关闭 Wendaflow','Close Wendaflow')} onClick={() => window.wonderfulWindow?.close?.()}>×</button></div>
+          <div className="window-controls"><button aria-label={tr('最小化','Minimize')} onClick={() => window.wonderfulWindow?.minimize?.()}>—</button><button aria-label={tr('切换窗口大小','Toggle window size')} onClick={() => window.wonderfulWindow?.maximize?.()}>□</button><button className="window-close" aria-label={tr('关闭 Wendaflow','Close Wendaflow')} onClick={() => persistCurrentCanvas().then(()=>window.wonderfulWindow?.close?.()).catch(error=>setStorageWarning(error.message))}>×</button></div>
         </div>
       </header>
 
@@ -2554,19 +2669,16 @@ function App() {
         <button className={`rail-button ${canvasMenuOpen ? 'active' : ''}`} aria-label={text('allCanvases')} onClick={() => { if (!canvasMenuOpen) refreshSavedCanvases(); toggleFloatingPanel('canvas', canvasMenuOpen, setCanvasMenuOpen); setSearchOpen(false); setLibraryOpen(false); }}>⌘</button>
         <button className={`rail-button search-rail ${searchOpen ? 'active' : ''}`} aria-label={text('search')} onClick={() => { toggleFloatingPanel('search', searchOpen, setSearchOpen); setCanvasMenuOpen(false); setLibraryOpen(false); }}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/></svg></button>
         <button className={`rail-button ${libraryOpen ? 'active' : ''}`} aria-label={text('library')} onClick={() => { toggleFloatingPanel('library', libraryOpen, setLibraryOpen); setSearchOpen(false); setCanvasMenuOpen(false); }}>▱</button>
+        <button className="rail-button" aria-label={say('快捷键帮助','Keyboard shortcuts')} onClick={()=>setShortcutHelp(true)}>?</button>
         <div className="rail-spacer" />
         <button className="rail-button" aria-label={text('settings')} onPointerDown={(event) => { event.stopPropagation(); openSettings(); }} onClick={openSettings}>⚙</button>
       </nav>
 
       {canvasMenuOpen && <section className={`canvas-overview ${closingPanels.has('canvas') ? 'closing' : ''}`} aria-label={text('allCanvases')}>
-        <header><div><span>{text('localArchives')}</span><h2>{text('savedCanvases')}</h2></div><div className="overview-header-actions"><button onClick={() => canvasImportRef.current?.click()}>{text('importWdf')}</button><button aria-label={text('close')} onClick={() => closeFloatingPanel('canvas', setCanvasMenuOpen)}>×</button></div></header>
+        <header><div><span>{text('localArchives')}</span><h2>{text('allCanvases')}</h2></div><div className="overview-header-actions"><button onClick={() => canvasImportRef.current?.click()}>{text('importWdf')}</button><button aria-label={text('close')} onClick={() => closeFloatingPanel('canvas', setCanvasMenuOpen)}>×</button></div></header>
         <button className="create-canvas-row" onClick={createCanvas}><i>＋</i><span><strong>{text('createCanvas')}</strong><small>{text('createCanvasHint')}</small></span></button>
         {canvasLibraryStatus && <p className="canvas-library-status">{systemText(canvasLibraryStatus)}</p>}
-        <div className="canvas-overview-list">{savedCanvases.map((canvas) => <article key={canvas.id} className={canvas.id === activeCanvasId ? 'active' : ''} onClick={() => openSavedCanvas(canvas.id)}>
-          <div className="canvas-overview-icon">{canvas.name.trim().slice(0, 1) || '▱'}</div>
-          <div className="canvas-overview-info"><strong>{canvas.name}</strong><small>{tr('创建于','Created')} {formatCanvasTime(canvas.createdAt, uiLanguage)} · {tr('编辑于','Edited')} {formatCanvasTime(canvas.updatedAt, uiLanguage)} · {canvas.nodeCount} {tr('个节点','nodes')}</small></div>
-          {canvas.id === activeCanvasId && <em>{tr('当前','Current')}</em>}<button className="delete-saved-canvas" aria-label={`${tr('删除本地存档','Delete local archive')} ${canvas.name}`} title={tr('删除本地存档','Delete local archive')} onClick={(event) => { event.stopPropagation(); deleteSavedCanvas(canvas.id); }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"/></svg></button>
-        </article>)}{!canvasLibraryStatus && !savedCanvases.length && <div className="no-saved-canvases">{tr('还没有保存过画布。打开一个标签并点击右上角“保存”。','No saved canvases yet. Open a tab and click Save in the upper-right corner.')}</div>}</div>
+        <CanvasLibraryGroups open={canvases} closed={closedCanvases} saved={savedCanvases} trash={trashCanvases} activeId={activeCanvasId} onSwitch={id=>{switchCanvas(id);setCanvasMenuOpen(false);}} onOpen={openSavedCanvas} onReopen={reopenClosedCanvas} onRestore={restoreSavedCanvas} onTrash={deleteSavedCanvas} say={say} time={value=>formatCanvasTime(value,uiLanguage)} />
         <input ref={canvasImportRef} type="file" accept=".wdf,application/x-branchspace-wdf" hidden onChange={importProject} />
       </section>}
 
@@ -2586,7 +2698,7 @@ function App() {
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
       >
-        <div className="canvas-hint">{quickThought ? quickCopy.sliceHint : copy.canvasHint}</div>
+        <div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint : copy.canvasHint}</div>
         {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
         {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span></div>}
         {marquee && <div className="selection-marquee" style={{ left: Math.min(marquee.startX, marquee.x), top: Math.min(marquee.startY, marquee.y), width: Math.abs(marquee.x - marquee.startX), height: Math.abs(marquee.y - marquee.startY) }} />}
@@ -2597,6 +2709,17 @@ function App() {
               <path d="M 0 1 L 9 5 L 0 9 z" className="connection-arrowhead" />
             </marker>
           </defs>
+          {relationDrag?.quick && (() => {
+            const source = nodes.find(n => n.id === relationDrag.sourceId);
+            if (!source) return null;
+            const size = nodeSizes.get(source.id) || {width: 95, height: 47};
+            const rect = canvasRef.current.getBoundingClientRect();
+            const x1 = source.x + size.width, y1 = source.y + size.height / 2;
+            const x2 = (relationDrag.x - rect.left - viewport.x) / viewport.zoom;
+            const y2 = (relationDrag.y - rect.top - viewport.y) / viewport.zoom;
+            const bend = Math.max(32, Math.abs(x2 - x1) * .45);
+            return <path className={`thought-drag-line ${relationDrag.invalidTargetId ? 'invalid' : ''}`} d={`M ${x1} ${y1} C ${x1+bend} ${y1}, ${x2-bend} ${y2}, ${x2} ${y2}`} />;
+          })()}
           {renderedNodes.flatMap((source) => [
             ...(source.links || []).map((targetId) => ({ source, target: nodes.find((item) => item.id === targetId), type: 'reference' })),
             ...(source.relations || []).map((relation) => ({ source, target: nodes.find((item) => item.id === relation.targetId), type: relation.type || 'reference', relationId: relation.id })),
@@ -2626,21 +2749,22 @@ function App() {
             const revealing = (revealingId && isDescendant(nodes, node.id, revealingId)) || restoringIds.has(node.id);
             const deleting = deletingIds.has(node.id) || deletingIds.has(parent.id);
             const connectionKey = `parent:${parent.id}:${node.id}`;
-            return <path key={node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, x: event.clientX, y: event.clientY }); }} />;
+            return <path key={node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, x: event.clientX, y: event.clientY }); }} />;
           })}
         </svg>
         {lineSelectionMenu && selectedConnections.length > 0 && <section className="line-selection-menu" onPointerDown={(event) => event.stopPropagation()}><span>{tr(`已选 ${selectedConnections.length} 条连线`,`${selectedConnections.length} connections selected`)}</span><small>{selectedConnections.some((item) => item.kind === 'parent') ? tr('包含继承关系；删除会解除父子继承。','Includes inheritance links; deleting removes the parent-child relationship.') : tr('可批量移除引用或合并关系。','Remove reference or merge links in a batch.')}</small><div><button onClick={() => { setSelectedConnections([]); setLineSelectionMenu(null); }}>{tr('取消','Cancel')}</button><button className="danger" onClick={() => removeConnections()}>{tr('删除连线','Delete links')}</button></div></section>}
         <div ref={worldRef} className="world" style={{ transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})`, '--semantic': previewEnabled ? semanticPreview(viewport.zoom) : 0 }}>
-          {quickThought && quickEditor && nodes.find(n=>n.id===quickEditor.id) && <ThoughtEditor editor={quickEditor} node={nodes.find(n=>n.id===quickEditor.id)} labels={quickCopy} onChange={value=>setQuickEditor(e=>({...e,value}))} onDone={saveQuickIdea} onCancel={cancelQuickIdea} />}
+          {quickThought && quickEditor && nodes.find(n=>n.id===quickEditor.id) && <ThoughtEditor hints={editorHints} say={say} editor={quickEditor} node={nodes.find(n=>n.id===quickEditor.id)} labels={quickCopy} onChange={value=>setQuickEditor(e=>({...e,value}))} onDone={saveQuickIdea} onCancel={cancelQuickIdea} />}
           {renderedNodes.map((node) => {
             const selectedNode = selectedIds.has(node.id) && !inspectorClosing;
             const muted = focusMode && !activeIds.has(node.id);
             // There is one semantic preview layout. Going further out scales
             // the canvas itself, but never switches cards into a second,
             // differently shaped compact preview.
-            const detailLevel = previewEnabled && viewport.zoom < 0.54 ? 'summary' : 'full';
+            const textThought = node.type === 'thought' && !node.attachments?.length;
+            const detailLevel = !textThought && previewEnabled && viewport.zoom < 0.54 ? 'summary' : 'full';
             const readingSize = node.manualWidth ? 'manual-size' : node.content.length > 650 ? 'long-answer' : node.content.length > 220 ? 'medium-answer' : 'short-answer';
-            const displayTitle = node.title || node.prompt || node.content || tr('未命名节点', 'Untitled node');
+            const displayTitle = node.title || node.prompt || node.content || (node.type==='thought'?say('空想法','Empty idea'):tr('未命名节点', 'Untitled node'));
             const longPreviewTitle = [...(displayTitle || '')].length > 13;
             // Let CSS interpolate these dimensions from --semantic. Updating
             // a CSS variable on the world every animation frame is smoother
@@ -2661,17 +2785,19 @@ function App() {
             return (
               <article
                 key={node.id}
+                tabIndex={node.id===selectedId?0:-1}
+                aria-label={displayTitle}
                 data-node-id={node.id}
                 data-node-x={node.x}
                 data-node-y={node.y}
-                className={`node ${node.type} ${readingSize} ${previewLayoutActive && !node.manualWidth ? 'preview-reserve' : ''} ${node.color ? 'colored' : ''} ${longPreviewTitle ? 'preview-long-title' : ''} ${selectedNode ? 'selected' : ''} ${node.id === selectedId && selectedIds.size > 1 ? 'primary-selected' : ''} ${muted ? 'muted' : ''} ${dragging?.ids?.includes(node.id) ? 'dragging' : ''} ${resizing?.id === node.id ? 'resizing' : ''} ${editingNode === node.id ? 'inline-editing' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deletingIds.has(node.id) ? 'deleting' : ''} ${detailLevel}`}
+                className={`node ${node.type} ${readingSize} ${textThought ? 'text-thought' : ''} ${quickThought && quickEditor?.id === node.id ? 'quick-editing' : ''} ${relationDrag?.targetId === node.id ? 'connection-target' : ''} ${relationDrag?.invalidTargetId === node.id ? 'connection-invalid' : ''} ${previewLayoutActive && !node.manualWidth && !textThought ? 'preview-reserve' : ''} ${node.color ? 'colored' : ''} ${longPreviewTitle ? 'preview-long-title' : ''} ${selectedNode ? 'selected' : ''} ${node.id === selectedId && selectedIds.size > 1 ? 'primary-selected' : ''} ${muted ? 'muted' : ''} ${dragging?.started && dragging.ids.includes(node.id) ? 'dragging' : ''} ${resizing?.id === node.id ? 'resizing' : ''} ${editingNode === node.id ? 'inline-editing' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deletingIds.has(node.id) ? 'deleting' : ''} ${detailLevel}`}
                 style={{ transform: `translate(${node.x}px, ${node.y}px)`, '--full-width': `${fullWidth}px`, '--preview-width': `${previewWidth}px`, '--preview-height': `${previewHeight}px`, '--preview-title-height': `${previewTitleLines * 1.2}em`, '--full-card-height': `${Math.max(previewHeight, previewFullHeight)}px`, '--preview-content-top': `${longPreviewTitle ? 96 : 69}px`, ...(node.color ? { '--node-tint': node.color } : {}), ...(node.manualWidth ? { '--full-height': `${node.manualHeight || 110}px`, '--full-read-height': `${Math.max(0, (node.manualHeight || 110) - 82)}px` } : {}), ...(editingNode === node.id && inlineEditSize ? { '--edit-width': `${inlineEditSize.width}px`, '--edit-height': `${inlineEditSize.height}px` } : {}) }}
                 onPointerDown={(event) => beginNodeDrag(event, node)}
                 onClick={(event) => { event.stopPropagation(); closeBranch(); }}
                 onDoubleClick={event=>{event.preventDefault();event.stopPropagation();if(quickThought&&node.type==='thought'){editQuickIdea(node);return;}selectNode(node.id);startEditingNode(node);}}
                 onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if (Date.now() < suppressContextMenuUntilRef.current) return;if(quickThought){if(!relationDragRef.current)openQuickMenu(event,node.id);return;} selectNode(node.id); setContextMenu({ kind: 'node', nodeId: node.id, x: event.clientX, y: event.clientY }); }}
               >
-                <CardContent node={node} view={{editing:editingNode===node.id,editDraft,previewContentPhase,displayTitle,childCount,hiddenCount,collapsed:collapsedIds.has(node.id),branching:branchingFrom===node.id}}
+                <CardContent node={node} view={{dragHint:say('拖动标题或边框移动；空格拖动平移画布','Drag title or border to move; Space-drag to pan'),editing:editingNode===node.id,editDraft,previewContentPhase,displayTitle,childCount,hiddenCount,collapsed:collapsedIds.has(node.id),branching:branchingFrom===node.id}}
                   actions={cardActions} helpers={cardHelpers} copy={copy} tr={tr} systemText={systemText} uiLanguage={uiLanguage} />
               </article>
             );
@@ -2716,10 +2842,10 @@ function App() {
         {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row"><div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={nodeType === 'action' ? tr(`描述要交给${actionRunner}的任务……`,`Describe the task for ${actionRunner}…`) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); createFirstNode(); } }} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><div className="segmented">{[['conversation', copy.chat], ['thought', copy.idea], ['action', copy.action]].map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}</div>{nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}{nodeType === 'conversation' && renderConversationControls()}{nodeType === 'action' && <ModelPicker language={uiLanguage} value={actionRunner} options={[{ value: 'codex', label: 'Codex' }, { value: 'claude', label: 'Claude Code' }, { value: 'deepseek', label: 'DeepSeek Harness' }]} onChange={setActionRunner} />}{nodeType === 'action' && renderActionControls()}<button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} /><span className="shortcut">{copy.shortcut}</span><button className="send-button" onClick={createFirstNode}>↑</button></div></section>}
       </main>
 
-      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? quickCopy.connect : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
+      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?say('松开将移动分支；原父子线会解除','Release to move branch; original parent link will detach'):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
       {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
-      {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? { ...node, parentId: null } : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); window.setTimeout(() => deleteSelection(new Set(nodes.filter(n=>n.id===menuNode.id||isDescendant(nodes,n.id,menuNode.id)).map(n=>n.id))), 0); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
+      {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? { ...node, parentId: null } : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
       {editingRelation && <div className={`relation-editor-popover ${relationEditorClosing ? 'closing' : ''}`}><span>{tr('正在编辑','Editing ')}{editingRelation.type === 'merge' ? tr('合并','merge') : tr('引用','reference')}{tr('连线',' link')}</span><div>{[['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} className={editingRelation.type === type ? 'active' : ''} onClick={() => { commitRelation(editingRelation.sourceId, editingRelation.targetId, type); setEditingRelation({ ...editingRelation, type }); }}>{label}</button>)}<button className="remove" onClick={() => { const relation = { ...editingRelation }; closeRelationEditor(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除','Delete')}</button></div><button className="relation-cancel" onClick={() => closeRelationEditor()}>{tr('完成','Done')}</button></div>}
       {mergeWorkbench && selectedIds.size > 1 && <section className="merge-workbench"><header><div><small>{tr("合并工作台","Merge workspace")}</small><strong>{tr(`${selectedIds.size} 个节点将作为显式上下文`,`${selectedIds.size} nodes will be explicit context`)}</strong></div><button onClick={() => setMergeWorkbench(false)}>×</button></header><div className="merge-goals">{['综合结论','并列比较','找出冲突','制定行动'].map((goal) => <button key={goal} className={mergeGoal === goal ? 'active' : ''} onClick={() => setMergeGoal(goal)}>{mergeGoalLabel(goal)}</button>)}</div><div className="merge-items">{[...selectedIds].map((id, index) => { const node = nodes.find((item) => item.id === id); return node && <span key={id}><i>{index + 1}</i>{node.title}</span>; })}</div><footer><small>{tr("第一个选中节点为起点；其余节点只会附加到这一次新分支的上下文，不会改写原节点关系。","The first node is the starting point. Other nodes add context to this branch only; existing links stay unchanged.")}</small><button onClick={() => { const ids = [...selectedIds]; const sourceId = selectedId && ids.includes(selectedId) ? selectedId : ids[0]; const source = nodes.find((node) => node.id === sourceId); const mergeRelations = ids.filter((id) => id !== sourceId).map((targetId, index) => ({ id: `merge-${Date.now()}-${index}`, targetId, type: 'merge' })); setPendingContextRelations(mergeRelations); setMergeWorkbench(false); setNodeType('conversation'); setDraft(tr(`请基于已合并的 ${ids.length} 个节点，${mergeGoal}。`,`Based on the ${ids.length} merged nodes: ${mergeGoalLabel(mergeGoal)}.`)); if (source) startBranch(source, { preservePendingContext: true }); }}>{tr("创建合并分支","Create merged branch")}</button></footer></section>}
 
@@ -2740,12 +2866,12 @@ function App() {
           {inspectorTab === 'actions' && (editingNode ? <section className="inspector-section node-editor"><h3>{tr('编辑节点','Edit node')}</h3><label>{tr('节点类型','Node type')}<select value={editDraft.type} onChange={(event) => setEditDraft((value) => ({ ...value, type: event.target.value }))}><option value="conversation">{copy.chat}</option><option value="thought">{copy.idea}</option><option value="action">{copy.action}</option></select></label><label>{tr('标题','Title')}<input value={editDraft.title} onChange={(event) => setEditDraft((value) => ({ ...value, title: event.target.value }))} /></label>{editDraft.type === 'conversation' && <label>{tr('这一轮的问题','Question in this turn')}<textarea value={editDraft.prompt} onChange={(event) => setEditDraft((value) => ({ ...value, prompt: event.target.value }))} /></label>}<label>{tr('正文（Markdown）','Body (Markdown)')}<textarea className="content-edit" value={editDraft.content} onChange={(event) => setEditDraft((value) => ({ ...value, content: event.target.value }))} /></label><label>{tr('标签','Tags')}<input value={editDraft.tags} onChange={(event) => setEditDraft((value) => ({ ...value, tags: event.target.value }))} placeholder={tr('研究，重要，待确认','Research, important, pending')} /></label><div className="node-colors"><span>{tr('卡片颜色','Card color')}</span>{NODE_COLORS.map(([id,label,color]) => <button key={id} type="button" title={colorLabel(id)} className={editDraft.color === color ? 'active' : ''} style={{ '--swatch': color || '#ffffff' }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setEditDraft((value) => ({ ...value, color })); }} />)}</div><label>{tr('备注','Note')}<textarea value={editDraft.note} onChange={(event) => setEditDraft((value) => ({ ...value, note: event.target.value }))} placeholder={tr('不会发送给 AI 的私人备注','Private note not sent to AI')} /></label><div><button onClick={() => setEditingNode(false)}>{tr('取消','Cancel')}</button><button className="save-edit" onClick={saveNodeEdit}>{tr('保存','Save')}</button></div></section> : <section className="inspector-section"><h3>{tr('节点操作','Node actions')}</h3><div className="node-colors quick-colors"><span>{tr('卡片颜色','Card color')}</span>{NODE_COLORS.map(([id,label,color]) => <button key={id} type="button" title={colorLabel(id)} className={selected.color === color ? 'active' : ''} style={{ '--swatch': color || '#ffffff' }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, color } : node)); }} />)}</div><button className="wide-action" onClick={startEditingNode}>{tr('编辑、转换类型与标签','Edit, convert type, and tags')}</button><button className="wide-action" onClick={() => { setNodeType('conversation'); setDraft(tr(`请使用另一个角度重新回答：${selected?.content || ''}`,`Answer from another angle: ${selected?.content || ''}`)); startBranch(selected); }}>{tr('换模型重新回答','Answer again with another model')}</button>{selected.note && <div className="node-note"><strong>{tr('私人备注','Private note')}</strong><p>{selected.note}</p></div>}</section>)}
           {inspectorTab === 'context' && selected?.parentId && <section className="inspector-section inherited-link"><h3>{tr('父级分支','Parent branch')}</h3><div><span>{tr('继承自','Inherited from')} · {nodes.find((node) => node.id === selected.parentId)?.title || tr('已删除节点','Deleted node')}</span><button className="unlink-inherit" onClick={() => setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, parentId: null } : node))}>{tr('解除继承','Remove inheritance')}</button></div></section>}
           {inspectorTab === 'actions' && <section className="inspector-section relationship-tools"><h3>{tr('关联与扩展','Relations and expansion')}</h3><div className="relation-types">{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([value,label]) => <button key={value} className={linkType === value ? 'active' : ''} onClick={() => setLinkType(value)}>{label}</button>)}</div><p className="relationship-help">{linkType === 'inherit' ? tr('目标节点会成为当前节点的子分支。','The target node becomes a child branch of the current node.') : linkType === 'merge' ? tr('将目标节点加入后续分支的合并上下文。','Add the target node to the merged context for later branches.') : tr('关联但不改变树结构；后续分支会引用目标节点。','Link without changing the tree; later branches cite the target node.')}</p><button className={`wide-action ${linkingFrom === selected.id ? 'active' : ''}`} onClick={() => setLinkingFrom((current) => current === selected.id ? null : selected.id)}>{linkingFrom === selected.id ? tr(`取消${({inherit:tr('继承','Inherit'),reference:tr('引用','Reference'),merge:tr('合并','Merge')})[linkType]}连线`, `Cancel ${({inherit:tr('继承','Inherit'),reference:tr('引用','Reference'),merge:tr('合并','Merge')})[linkType]} link`) : tr(`建立${({inherit:tr('继承','Inherit'),reference:tr('引用','Reference'),merge:tr('合并','Merge')})[linkType]}连线`, `Create ${({inherit:tr('继承','Inherit'),reference:tr('引用','Reference'),merge:tr('合并','Merge')})[linkType]} link`)}</button>{(selected.relations || []).length > 0 && <div className="relation-list">{selected.relations.map((relation) => <div key={relation.id}><span>{relation.type === 'merge' ? tr('合并','Merge') : tr('引用','Reference')} · {nodes.find((node) => node.id === relation.targetId)?.title || tr('已删除节点','Deleted node')}</span><button onClick={() => setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, relations: (node.relations || []).filter((item) => item.id !== relation.id) } : node))}>{tr('删除','Delete')}</button></div>)}</div>}<div className="mindmap-mode-row">{[['questions',tr('问题','Questions')],['ideas',tr('想法','Ideas')],['counterpoints',tr('反驳','Counterpoints')],['actions',tr('行动','Actions')]].map(([value,label]) => <button key={value} className={mindMapState.mode === value ? 'active' : ''} onClick={() => setMindMapState((current) => ({ ...current, mode: value }))}>{label}</button>)}</div><button className="wide-action" onClick={() => generateMindMapSuggestions(selected, mindMapState.mode)}>{tr('AI 扩展思维导图','AI mind-map expansion')}</button>{mindMapState.nodeId === selected.id && <div className="mindmap-suggestions"><small>{systemText(mindMapState.status)}</small>{mindMapState.suggestions.map((idea, index) => <label key={`${idea}-${index}`}><input type="checkbox" checked={mindMapState.selected.includes(idea)} onChange={(event) => setMindMapState((current) => ({ ...current, selected: event.target.checked ? [...current.selected, idea] : current.selected.filter((item) => item !== idea) }))} />{idea}</label>)}{!!mindMapState.suggestions.length && <div className="mindmap-actions"><button className="wide-action" onClick={() => setMindMapState({ nodeId: null, status: '', suggestions: [], selected: [], mode: 'questions' })}>{tr('全部丢弃','Discard all')}</button><button className="primary-action" disabled={!mindMapState.selected.length} onClick={addMindMapSuggestions}>{tr('接受','Accept')} {mindMapState.selected.length} {tr('个节点','nodes')}</button></div>}</div>}</section>}
-          {inspectorTab === 'actions' && <section className="inspector-section delete-section"><h3>{tr('删除','Delete')}</h3><button className="wide-action danger-outline" disabled={!deletionIds.size || deletingIds.size} onClick={deleteSelection}>{deletingIds.size ? tr('正在删除…','Deleting…') : selectedIds.size > 1 ? tr(`删除选中的 ${selectedIds.size} 个节点`,`Delete ${selectedIds.size} selected nodes`) : !quickThought && selected?.id === 'root' ? tr('根节点不能删除','The root node cannot be deleted') : quickThought ? quickCopy.delete : tr(`删除节点及其 ${Math.max(0, deletionIds.size - 1)} 个后代`,`Delete node and ${Math.max(0, deletionIds.size - 1)} descendants`)}</button></section>}
+          {inspectorTab === 'actions' && <section className="inspector-section delete-section"><h3>{tr('删除','Delete')}</h3><button className="wide-action danger-outline" disabled={!deletionIds.size || deletingIds.size} onClick={deleteSelection}>{say(`删除选中的 ${deletionIds.size} 个卡片（保留子节点）`,`Delete ${deletionIds.size} selected cards (keep children)`)}</button></section>}
           </div>
           <footer className="inspector-footer"><button className={selected.favorite ? 'active' : ''} onClick={() => setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, favorite: !node.favorite } : node))}>{selected.favorite ? tr('★ 已收藏','★ Favorited') : tr('☆ 收藏','☆ Favorite')}</button><button className={selected.completed ? 'active' : ''} onClick={() => setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, completed: !node.completed } : node))}>{selected.completed ? tr('✓ 已完成','✓ Completed') : tr('✓ 完成','✓ Complete')}</button><button className="branch" onClick={() => startBranch(selected)}>＋ {tr('分支','Branch')}</button></footer>
         </aside>
       ) : selected && selectedIds.size === 1 ? <button className="open-inspector" onClick={() => setInspectorOpen(true)}>‹</button> : null}
-      {deleteUndo && <div className="undo-toast"><span>{deleteUndo.sliced?quickCopy.sliced:tr(`已删除 ${deleteUndo.nodes.length} 个节点`,`${deleteUndo.nodes.length} nodes deleted`)}</span><button onClick={undoDelete}>{tr('撤销','Undo')} <small>Ctrl Z</small></button></div>}
+      {deleteUndo && deleteUndo.atNodes===nodes && <div className="undo-toast"><span>{deleteUndo.sliced?quickCopy.sliced:tr(`已删除 ${deleteUndo.nodes.length} 个节点`,`${deleteUndo.nodes.length} nodes deleted`)}</span><button onClick={undoDelete}>{tr('撤销','Undo')} <small>Ctrl Z</small></button></div>}
       {searchOpen && <section className="search-panel"><div className="search-input"><span>⌕</span><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={text('searchPlaceholder')} /><small>Esc</small></div><div className="search-results">{searchResults.length ? searchResults.map((node) => <button key={node.id} onClick={() => focusSearchResult(node)}><span className={`result-dot ${node.type}`} /><div><strong>{node.title}</strong><small>{node.prompt || node.content}</small></div><em>{node.model || copy.idea}</em></button>) : <p>{text('noResults')}</p>}</div><footer>{searchResults.length} {text('results')} · Ctrl K</footer></section>}
       {libraryOpen && <section className="library-panel"><header><div><span>{text('currentCanvas')}</span><h2>{text('library')}</h2></div><button aria-label={text('close')} onClick={() => closeFloatingPanel('library', setLibraryOpen)}>×</button></header><div className="library-upload"><button onClick={() => libraryUploadRef.current?.click()}>{text('uploadCurrent')}</button><input ref={libraryUploadRef} type="file" multiple hidden onChange={(event) => { addAttachments(event); if (nodes.length && !branchSource) setRootComposerOpen(true); }} /><span>{tr('图片、PDF、文本、代码及常见文件','Images, PDFs, text, code, and common files')}</span></div><div className="library-list">{libraryItems.length ? libraryItems.map((item) => <article key={`${item.nodeId || 'draft'}-${item.id}`}><button className="library-preview" onClick={() => openLibraryItem(item)}>{item.dataUrl?.startsWith('data:image/') ? <img src={item.dataUrl} alt="" /> : <span>{item.name.split('.').pop()?.slice(0, 5).toUpperCase() || 'FILE'}</span>}</button><div><strong>{item.name}</strong><small>{item.nodeTitle} · {Math.max(1, Math.ceil((item.size || item.text?.length || 0) / 1024))} KB</small></div><div className="library-actions">{item.nodeId && <button onClick={() => { focusSearchResult(nodes.find((node) => node.id === item.nodeId)); closeFloatingPanel('library', setLibraryOpen); }}>{tr('定位','Locate')}</button>}<button onClick={() => addLibraryItemToInput(item)}>{tr('使用','Use')}</button><button className="remove" onClick={() => removeLibraryItem(item)}>{tr('移除','Remove')}</button></div></article>) : <p>{text('libraryEmpty')}</p>}</div><footer>{libraryItems.length} {tr('项资料','items')} · {tr('文件随当前画布保存','Files are saved with the current canvas')}</footer></section>}
       {minimapOpen && <section className={`minimap ${inspectorOpen && selected ? 'with-inspector' : ''}`} onPointerDown={navigateMiniMap} aria-label={text('minimap')}><div className="minimap-stage">{visibleNodes.map((node) => <i key={node.id} className={selectedIds.has(node.id) ? 'selected' : ''} style={{ left: `${((node.x - miniBounds.minX) / miniBounds.width) * 100}%`, top: `${((node.y - miniBounds.minY) / miniBounds.height) * 100}%`, width: `${Math.max(3, ((nodeSizes.get(node.id)?.width || 224) / miniBounds.width) * 100)}%`, height: `${Math.max(3, ((nodeSizes.get(node.id)?.height || 110) / miniBounds.height) * 100)}%` }} />)}</div><span>{text('navigate')}</span></section>}

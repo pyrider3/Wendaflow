@@ -22,7 +22,9 @@ export function contextPlan(nodes, parentId, excludedIds = [], extraRelations = 
   const excluded = new Set(excludedIds);
   const path = [];
   let cursor = map.get(parentId);
-  while (cursor) {
+  const visited=new Set();
+  while (cursor && !visited.has(cursor.id)) {
+    visited.add(cursor.id);
     if (cursor.type !== 'action' && !excluded.has(cursor.id)) path.unshift({ node: cursor, relation: 'inherit' });
     cursor = cursor.parentId ? map.get(cursor.parentId) : null;
   }
