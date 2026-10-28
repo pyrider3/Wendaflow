@@ -27,6 +27,8 @@ import {useCanvasNodes} from './canvas/useCanvasNodes.js';
 import {crossedDragThreshold,combineSelection,connectionIntent,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
 import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
 import './quick-thought/interaction.css';
+import './cards/selection.css';
+import './themes/black-readability.css';
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';

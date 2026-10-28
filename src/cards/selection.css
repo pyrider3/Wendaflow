@@ -1,0 +1,30 @@
+/* Persistent selection feedback belongs above theme surface overrides.
+   The short thought-select pulse remains decorative, not the selected state. */
+:root {
+  --card-selection: #1264cf;
+  --card-selection-surface: #ffffff;
+  --card-selection-gap: #ffffff;
+}
+:root[data-theme="sage"] { --card-selection: #176b48; --card-selection-surface: #f4f8f5; }
+:root[data-theme="paper"] { --card-selection: #925019; --card-selection-surface: #fffcf6; }
+:root:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="contrast-black"], [data-theme="starlight"], [data-theme="contrast-blue"], [data-theme="contrast-amber"], [data-theme="contrast-plum"]) {
+  --card-selection: #80bdff;
+  --card-selection-surface: #19232e;
+  --card-selection-gap: #10151c;
+}
+:root[data-theme="contrast-amber"] { --card-selection: #ffe38a; --card-selection-surface: #2b1d08; }
+:root[data-theme="contrast-plum"] { --card-selection: #edb9ff; --card-selection-surface: #2a103c; }
+:root[data-theme="custom"] { --card-selection-surface: var(--custom-surface, #ffffff); }
+
+:root[data-theme] .canvas .node.selected {
+  border-color: var(--card-selection);
+  background-color: color-mix(in srgb, var(--card-selection) 18%, var(--node-tint, var(--card-selection-surface)));
+  box-shadow: 0 0 0 2px var(--card-selection-gap), 0 0 0 5px var(--card-selection);
+}
+:root[data-theme] .canvas .node.selected:not(.connection-target):not([data-slice-target]) {
+  outline: 2px solid var(--card-selection);
+  outline-offset: 2px;
+}
+:root[data-theme] .canvas .node.selected.primary-selected {
+  box-shadow: 0 0 0 2px var(--card-selection-gap), 0 0 0 6px var(--card-selection);
+}

@@ -1,0 +1,122 @@
+/* Complete Nightfall / Graphite surfaces and foregrounds together. Scoped to this theme:
+   light-only gradients and inherited button text must not mix with dark UI. */
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) {
+  --black-surface: #181818;
+  --black-raised: #252525;
+  --black-border: #626262;
+  --black-text: #f2f2f2;
+  --black-muted: #c2c2c2;
+  --black-link: #a9d0ff;
+}
+:root[data-theme="graphite"] { --black-surface: #303334; --black-raised: #3b3e40; --black-border: #747c80; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .license-activation, .notification-server-setting, .plugin-coming-soon,
+  .about-hero, .about-grid article, .search-input, .library-upload,
+  .library-preview, .create-canvas-row, .canvas-library-status,
+  .cloud-settings-card, .provider-presets, .root-composer, .node-editor,
+  .notification-toast, .notification-list > button, .context-inspector,
+  .request-record, .context-summary, .permission-warning
+) {
+  background: var(--black-surface);
+  border-color: var(--black-border);
+  color: var(--black-text);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-card, .canvas-overview, .search-panel, .library-panel,
+  .notification-center, .notification-detail-card, .context-menu,
+  .relation-menu, .relation-editor, .inspector, .composer, .root-composer,
+  .node-editor-card, .cloud-settings-card, .agent-config-popover
+) :is(label, small, dt, time, legend) {
+  color: var(--black-muted);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-actions span, .cloud-state, .settings-project-row span,
+  .about-hero span, .about-grid strong, .about-note,
+  .plugin-coming-soon span, .notification-device-setting small,
+  .notification-list p, .notification-list small, .notification-center footer,
+  .notification-detail-content time, .notification-toast p,
+  .search-input small, .search-input > span, .search-results small,
+  .search-results em, .search-results > p, .search-panel footer,
+  .library-upload span, .library-list small, .library-list > p,
+  .library-panel footer, .library-panel header span,
+  .canvas-overview header span, .canvas-overview-list small,
+  .create-canvas-row small, .canvas-group-empty,
+  .inspector-meta, .context-path small, .action-live-feed strong,
+  .action-live-feed small, .branch-context, .composer-context
+) { color: var(--black-muted); }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-nav button.active small, .about-hero em, .about-grid span,
+  .plugin-coming-soon strong, .notification-device-setting > span,
+  .notification-detail-content p, .notification-toast strong,
+  .search-results strong, .library-list strong,
+  .context-menu button, .relation-menu button
+) { color: var(--black-text); }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-card, .canvas-overview, .search-panel, .library-panel,
+  .notification-center, .notification-detail-card, .context-menu,
+  .relation-menu, .relation-editor, .inspector, .composer, .root-composer,
+  .node-editor-card, .cloud-settings-card, .agent-config-popover, .provider-presets
+) button:not([style*="--swatch"]) {
+  background-color: var(--black-raised);
+  border-color: var(--black-border);
+  color: var(--black-text);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-card, .canvas-overview, .search-panel, .library-panel,
+  .notification-center, .context-menu, .relation-menu, .inspector,
+  .composer, .root-composer, .agent-config-popover
+) button:not(:disabled):not([style*="--swatch"]):hover {
+  background-color: #383838;
+  color: #fff;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-nav button.active, .theme-presets button.active,
+  .profile-tab.active, .search-results > button:focus-visible,
+  .relation-types button.active, .inspector-tabs button.active
+) { background: #26394f; color: #fff; border-color: #9bc8ff; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .license-activation button.primary, .settings-card .primary,
+  .library-upload button, .composer .send-button, .root-composer .send-button
+) { background: #245b40; color: #fff; border-color: #91c6a8; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-card a, .about-grid a, .markdown-content a,
+  .notification-detail-card a, .output-assets a
+) { color: var(--black-link); }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .settings-card, .node-editor, .root-composer, .search-input, .relation-editor
+) :is(input, select, textarea) {
+  background: #111; color: var(--black-text); border-color: var(--black-border);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(input, textarea)::placeholder {
+  color: #b5b5b5; opacity: 1;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .permission-warning, .storage-warning, .canvas-library-status,
+  .context-menu .danger, .library-actions .remove, .danger-outline
+) { color: #ffc2c6; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .node-prompt, .thinking-output, .action-live-feed article,
+  .request-record, .context-inspector, .action-terminal,
+  .markdown-content pre, .markdown-content th
+) { background: #202020; color: #e4e4e4; border-color: #606060; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
+  .node-tags span, .status, .output-assets a, .thinking-output summary,
+  .action-live-feed article > i
+) { background-color: #283a32; color: #d6f1e3; border-color: #789d89; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.status.failed, .status.stopped) {
+  background: #4b252b; color: #ffd0d5;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) ::selection { background: #265d96; color: #fff; }
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.model-picker > button i, .agent-summary-button i) {
+  color: var(--black-muted);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.context-menu .danger, .library-actions .remove):hover {
+  color: #ffc2c6;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.license-activation button.primary, .settings-card .primary, .library-upload button):not(:disabled):hover {
+  background: #326d4f;
+  color: #fff;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .pane-heading > span {
+  color: var(--black-muted);
+}
