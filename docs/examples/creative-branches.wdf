@@ -1,0 +1,109 @@
+{
+  "format": "branchspace-wdf",
+  "version": 1,
+  "name": "灵感的分岔 · 示例",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "thought",
+      "title": "一个想法，可以有很多种未来",
+      "content": "",
+      "x": 120,
+      "y": 325,
+      "parentId": null,
+      "status": "done",
+      "attachments": [],
+      "model": null
+    },
+    {
+      "id": "a",
+      "type": "conversation",
+      "title": "把灵感变成一个小产品",
+      "content": "## 从问题开始\n为每天都有灵感、却总是遗忘的人，做一个轻量的思考空间。\n\n- 捕捉：随手记下想法\n- 连接：让零散线索产生关系\n- 推进：把下一步变成行动",
+      "x": 410,
+      "y": 100,
+      "parentId": "start",
+      "status": "done",
+      "attachments": [],
+      "model": "演示内容"
+    },
+    {
+      "id": "b",
+      "type": "conversation",
+      "title": "换个方向：把它变成一篇文章",
+      "content": "## 用故事讲清楚\n以「一个想法的旅行」为主线。\n\n从一次偶然的念头出发，经过质疑、比较和重组，最终形成一条自己的路径。",
+      "x": 410,
+      "y": 460,
+      "parentId": "start",
+      "status": "done",
+      "attachments": [],
+      "model": "演示内容"
+    },
+    {
+      "id": "a1",
+      "type": "thought",
+      "title": "界面要轻，思考要自由",
+      "content": "",
+      "x": 830,
+      "y": 110,
+      "parentId": "a",
+      "status": "done",
+      "attachments": [],
+      "model": null
+    },
+    {
+      "id": "a2",
+      "type": "thought",
+      "title": "保留每一次分岔",
+      "content": "",
+      "x": 830,
+      "y": 220,
+      "parentId": "a",
+      "status": "done",
+      "attachments": [],
+      "model": null
+    },
+    {
+      "id": "a3",
+      "type": "thought",
+      "title": "先做可用的最小版本",
+      "content": "",
+      "x": 830,
+      "y": 330,
+      "parentId": "a",
+      "status": "done",
+      "attachments": [],
+      "model": null
+    },
+    {
+      "id": "b1",
+      "type": "thought",
+      "title": "开头：那个没被记下的灵感",
+      "content": "",
+      "x": 830,
+      "y": 500,
+      "parentId": "b",
+      "status": "done",
+      "attachments": [],
+      "model": null
+    },
+    {
+      "id": "b2",
+      "type": "thought",
+      "title": "结尾：从思考走向行动",
+      "content": "",
+      "x": 830,
+      "y": 610,
+      "parentId": "b",
+      "status": "done",
+      "attachments": [],
+      "model": null
+    }
+  ],
+  "viewport": {
+    "x": 25,
+    "y": 30,
+    "zoom": 1
+  },
+  "collapsedIds": []
+}
