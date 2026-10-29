@@ -120,3 +120,30 @@
 :root:is([data-theme="contrast-black"], [data-theme="graphite"]) .pane-heading > span {
   color: var(--black-muted);
 }
+
+/* Keep the composer a single surface instead of an inset black form field. */
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer {
+  background: var(--black-surface);
+  border-color: #555f5a;
+  box-shadow: 0 12px 36px rgba(0,0,0,.28);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer::before {
+  background: none;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer textarea {
+  background: transparent;
+  color: var(--black-text);
+  border: 0;
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer .composer-close {
+  background: transparent;
+  border-color: transparent;
+  color: var(--black-muted);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer .composer-close:hover {
+  background: rgba(255,255,255,.08);
+}
+:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer.branching {
+  border-color: #647f71;
+  box-shadow: 0 12px 36px rgba(0,0,0,.28);
+}

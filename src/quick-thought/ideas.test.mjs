@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {thoughtIds,boxThoughtIds,attachThoughtChild,newThought,deletionBackups,removeNodeRecords} from './ideas.js';
+import {thoughtIds,boxThoughtIds,marqueeBounds,attachThoughtChild,newThought,deletionBackups,removeNodeRecords} from './ideas.js';
 import {quickThoughtCopy,quickThoughtLocales} from './labels.js';
 const nodes=[{id:'idea',type:'thought',x:0,y:0,title:'idea',content:'idea'},{id:'chat',type:'conversation',parentId:'idea',x:300,y:0,content:'answer',attachments:[{name:'keep.txt'}],links:['idea'],relations:[{targetId:'idea',type:'reference'}]},{id:'action',type:'action',x:600,y:0,status:'done',execution:{events:['completed']}}];
 test('mixed selections can only delete ideas in quick mode',()=>{
@@ -49,4 +49,23 @@ test('right-drag attaches the drop target as a child, preserves real references 
  assert.equal(attachThoughtChild(result,'parent','parent'),result);
  assert.equal(attachThoughtChild(result,'parent','chat'),result);
  const loaded=JSON.parse(JSON.stringify(result));assert.equal(loaded[1].parentId,'parent');assert.equal(loaded[0].relations[0].type,'reference');
+});
+
+
+test('marquee uses the visible compact card border instead of stale or fallback dimensions',()=>{
+ const cards=[{id:'a',type:'thought',x:150,y:100}];
+ const bounds=new Map([['a',{left:150,top:100,right:320,bottom:174}]]);
+ const sizes=new Map([['a',{width:224,height:200}]]);
+ const viewport={x:0,y:0,zoom:1};
+ assert.deepEqual(boxThoughtIds(cards,sizes,viewport,{startX:130,startY:250,x:285,y:328,bounds}),[]);
+ assert.deepEqual(boxThoughtIds(cards,sizes,viewport,{startX:130,startY:170,x:200,y:220,bounds}),['a']);
+ assert.deepEqual(boxThoughtIds(cards,sizes,viewport,{startX:320,startY:174,x:350,y:200,bounds}),['a']);
+ assert.deepEqual(boxThoughtIds(cards,new Map(),viewport,{startX:130,startY:250,x:285,y:328,bounds}),[]);
+ assert.deepEqual(boxThoughtIds(cards,sizes,viewport,{startX:130,startY:100,x:350,y:300,bounds:new Map()}),[]);
+});
+
+test('marquee bounds subtract the canvas origin and preserve the displayed zoomed border',()=>{
+ const card={dataset:{nodeId:'a'},getBoundingClientRect:()=>({left:250,top:180,right:420,bottom:254})};
+ const bounds=marqueeBounds({querySelectorAll:()=>[card]},{left:100,top:80});
+ assert.deepEqual(bounds.get('a'),{left:150,top:100,right:320,bottom:174});
 });

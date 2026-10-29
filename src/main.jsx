@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ThoughtEditor, quickThoughtCopy } from './quick-thought/QuickThought.jsx';
-import { thoughtIds, boxThoughtIds, completeThoughtMarquee, attachThoughtChild, newThought, deletionBackups, removeNodeRecords } from './quick-thought/ideas.js';
+import { thoughtIds, boxThoughtIds, marqueeBounds, completeThoughtMarquee, attachThoughtChild, newThought, deletionBackups, removeNodeRecords } from './quick-thought/ideas.js';
 import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
 import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL } from './localProxy.js';
@@ -1333,8 +1333,9 @@ function App() {
     }
     if(quickThought && event.button===0 && !quickSpace.current && !event.target.closest('.node,button,textarea,input,select,.composer,.quick-thought-editor')) {
       event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
+      stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
-      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
+      setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
     if (editingRelation) closeRelationEditor();

@@ -1,3 +1,12 @@
+// Capture visible card borders once per gesture, outside the pointer-move loop.
+export function marqueeBounds(world, canvasRect) {
+  const bounds = new Map();
+  for (const card of world?.querySelectorAll('.node') || []) {
+    const rect = card.getBoundingClientRect();
+    bounds.set(card.dataset.nodeId, {left:rect.left-canvasRect.left, top:rect.top-canvasRect.top, right:rect.right-canvasRect.left, bottom:rect.bottom-canvasRect.top});
+  }
+  return bounds;
+}
 export function thoughtIds(nodes, ids) {
   return new Set(nodes.filter(node => node.type === 'thought' && ids.has(node.id)).map(node => node.id));
 }
@@ -6,6 +15,10 @@ export function boxThoughtIds(nodes, sizes, viewport, box) {
   const top=Math.min(box.startY,box.y), bottom=Math.max(box.startY,box.y);
   return nodes.filter(node=>{
     if(node.type!=='thought')return false;
+    if(box.bounds){
+      const rect=box.bounds.get(node.id);
+      return !!rect && rect.left<=right && rect.top<=bottom && rect.right>=left && rect.bottom>=top;
+    }
     const size=sizes.get(node.id)||{width:224,height:110};
     const x=viewport.x+node.x*viewport.zoom,y=viewport.y+node.y*viewport.zoom;
     // Inclusive intersection selects partial overlap and edge contact.
