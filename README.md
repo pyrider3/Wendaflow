@@ -22,24 +22,24 @@
 
 从任意节点继续，查看这次请求将继承的上下文，再把下一步留成一个新分支。
 
-![真实操作演示：查看上下文并创建想法分支](docs/media/branching.gif)
+![真实操作演示：查看上下文并创建想法分支](docs/media/branching-white-20261029.gif)
 
 ### 02 / 打开快速思维，让手跟上脑子
 
 双击落下一个念头，右键拖出父子关系，左键框选，再划掉不需要的方向。操作后也能撤销。
 
-![真实操作演示：快速创建、右键连线、框选、切除与撤销](docs/media/quick-thinking.gif)
+![真实操作演示：快速创建、右键连线、框选、切除与撤销](docs/media/quick-thinking-white-20261029.gif)
 
 ### 03 / 你决定 AI 看见什么
 
 发送前展开上下文检查器，确认本次分支继承哪些节点和附件。
 
-![分支输入栏与上下文检查器](docs/media/context.png)
+![分支输入栏与上下文检查器](docs/media/context-white-20261029.png)
 
 <details>
 <summary><strong>查看快速思维静态截图</strong></summary>
 
-![快速思维：紧凑文字卡片、父子连线与多选反馈](docs/media/quick-thinking.png)
+![快速思维：紧凑文字卡片、父子连线与多选反馈](docs/media/quick-thinking-white-20261029.png)
 
 </details>
 
