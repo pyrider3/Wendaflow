@@ -12,7 +12,7 @@
 
 </div>
 
-![Wendaflow 分支画布：从同一个想法展开产品与写作两个方向](docs/media/canvas-dark.png)
+![Wendaflow 分支画布：从同一个想法展开产品与写作两个方向](docs/media/canvas-light.png)
 
 > 同一个起点，可以做产品，也可以写文章。每条路径都留在画布上，随时回去继续。
 
@@ -36,14 +36,6 @@
 
 ![分支输入栏与上下文检查器](docs/media/context.png)
 
-### 04 / 白天清晰，夜里沉浸
-
-内置多种主题，画布内容不变，换一种适合此刻的工作氛围。
-
-| 极昼 | 极夜 |
-| :---: | :---: |
-| ![极昼主题](docs/media/canvas-light.png) | ![极夜主题](docs/media/canvas-dark.png) |
-
 <details>
 <summary><strong>查看快速思维静态截图</strong></summary>
 
@@ -53,7 +45,7 @@
 
 **亲手试一试：** 下载 [灵感分岔示例 WDF](docs/examples/creative-branches.wdf)，在「所有画布 → 导入 WDF」中打开。
 
-<sub>以上为当前网页版的真实界面与操作录制。画布文字为专门制作的示例内容，非实时模型生成；演示没有调用付费模型。</sub>
+<sub>以上演示统一使用极昼（白色）主题，均为当前网页版的真实界面与操作录制。画布文字为专门制作的示例内容，非实时模型生成；演示没有调用付费模型。</sub>
 
 ## 一张画布，三种工作方式
 
