@@ -36,7 +36,7 @@
   overflow-wrap: anywhere;
 }
 .node.thought.text-thought > .markdown-content:empty { display: none; }
-.node.thought.text-thought > .resize-handle { display: none; }
+
 /* Keep controls outside the text rather than reserving empty space for them. */
 .node.thought.text-thought > .collapse-button { left: -12px; }
 .node.thought.text-thought > .relation-handle { left: -12px; bottom: -12px; }
@@ -83,3 +83,21 @@
   box-shadow: none;
 }
 .quick-thought-editor textarea::placeholder { color: inherit; opacity: .45; }
+
+/* Manual sizes override automatic content sizing, including plain text cards. */
+.node.thought.text-thought.manual-size:not(.inline-editing) {width:var(--full-width);max-width:720px;height:var(--full-height);min-width:48px;min-height:44px;}
+.node.thought.text-thought.manual-size > h2 {max-height:100%;overflow:auto;overscroll-behavior:contain;}
+.node.thought.text-thought.manual-size > .markdown-content {max-height:100%;overflow:auto;}
+.node.thought .image-attachment > span[hidden],.node.thought h2[hidden] {display:none!important;}
+.media-thought-editor {max-width:720px;}
+.quick-editor-images {display:grid;gap:8px;margin-top:10px;}
+.quick-editor-images img {display:block;width:100%;max-height:360px;object-fit:contain;border-radius:6px;}
+.node.thought .image-attachment img {display:block;}
+/* Image ideas show the whole image instead of a short answer-card scrollbox. */
+.node.thought.full:not(.text-thought):not(.manual-size):not(.inline-editing) {box-sizing:border-box;width:var(--full-width,320px);min-height:0;height:auto;padding:12px;border-radius:10px;}
+.node.thought.full:not(.manual-size)>.markdown-content {height:auto;max-height:none;overflow:visible;transform:none;opacity:1;}
+.node.thought .image-attachment {border:0;background:transparent;border-radius:6px;}
+.node.thought .node-attachments img {height:auto;max-height:360px;object-fit:contain;border-radius:6px;background:transparent;}
+.node.thought:has(>h2[hidden]) .node-attachments {margin-top:0;}
+.node.thought.full:not(.text-thought)>h2 {font-size:16px;line-height:1.5;margin:0 0 8px;}
+.media-thought-editor textarea {max-width:100%;}

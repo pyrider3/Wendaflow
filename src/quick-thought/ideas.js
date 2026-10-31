@@ -14,7 +14,7 @@ export function boxThoughtIds(nodes, sizes, viewport, box) {
   const left=Math.min(box.startX,box.x), right=Math.max(box.startX,box.x);
   const top=Math.min(box.startY,box.y), bottom=Math.max(box.startY,box.y);
   return nodes.filter(node=>{
-    if(node.type!=='thought')return false;
+    if(!box.allCards && node.type!=='thought')return false;
     if(box.bounds){
       const rect=box.bounds.get(node.id);
       return !!rect && rect.left<=right && rect.top<=bottom && rect.right>=left && rect.bottom>=top;
@@ -46,7 +46,7 @@ export function completeThoughtMarquee(nodes, sizes, viewport, box) {
 export function attachThoughtChild(nodes, parentId, childId) {
   const byId = new Map(nodes.map(node => [node.id, node]));
   const parent = byId.get(parentId), child = byId.get(childId);
-  if (!parent || !child || parent.type !== 'thought' || child.type !== 'thought' || parentId === childId) return nodes;
+  if (!parent || !child || parentId === childId) return nodes;
   const seen = new Set();
   for (let node = parent; node; node = byId.get(node.parentId)) {
     if (node.id === childId || seen.has(node.id)) return nodes;

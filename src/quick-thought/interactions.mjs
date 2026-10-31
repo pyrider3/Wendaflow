@@ -11,7 +11,7 @@ export function combineSelection(base,hits,mode='replace') {
 export function connectionIntent(nodes,sourceId,targetId) {
   if(!targetId)return 'empty';
   const map=new Map(nodes.map(n=>[n.id,n])), source=map.get(sourceId),target=map.get(targetId);
-  if(!source || !target || source.type!=='thought' || target.type!=='thought')return 'invalid';
+  if(!source || !target)return 'invalid';
   if(sourceId===targetId)return 'self';
   const seen=new Set();let cursor=source;
   while(cursor){if(cursor.id===targetId || seen.has(cursor.id))return 'cycle';seen.add(cursor.id);cursor=map.get(cursor.parentId);}

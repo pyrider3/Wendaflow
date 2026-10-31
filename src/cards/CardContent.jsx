@@ -144,7 +144,7 @@ export function CardContent({
           </div>
         </div>
       ) : (
-        <h2 className="node-drag-title" title={view.dragHint}>{ideaIsBody ? node.content : displayTitle}</h2>
+        <h2 className="node-drag-title" title={view.dragHint} onWheel={handleContentWheel} hidden={view.captionless}>{ideaIsBody ? node.content : displayTitle}</h2>
       )}
       {node.type === "conversation" &&
         ["queued", "thinking", "streaming"].includes(node.status) && (
@@ -216,6 +216,7 @@ export function CardContent({
                     <a
                       key={item.id}
                       className="image-attachment"
+                      draggable={false}
                       href={item.dataUrl}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
@@ -224,8 +225,8 @@ export function CardContent({
                         openLibraryItem(item);
                       }}
                     >
-                      <img src={item.dataUrl} alt={item.name} />
-                      <span>
+                      <img src={item.dataUrl} alt={item.name} draggable={false} />
+                      <span hidden={node.type === "thought"}>
                         {item.name} ·{" "}
                         {tr("用系统查看器打开", "Open in system viewer")}
                       </span>

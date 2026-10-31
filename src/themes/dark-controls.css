@@ -278,3 +278,20 @@
   > span {
   color: var(--dark-muted);
 }
+
+/* Editing surfaces must use the same dark palette as their containing card. */
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) :is(.inline-node-editor,.quick-thought-editor) {
+  background:var(--dark-panel);color:var(--dark-text);border-color:var(--dark-border);
+}
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .inline-node-editor :is(input,textarea,button) {
+  background:var(--dark-control);color:var(--dark-text);border-color:var(--dark-border);
+}
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .node.conversation .markdown-content {
+  color:var(--dark-text);font-size:13px;line-height:1.75;
+}
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .node .image-attachment {
+  background:var(--dark-panel);color:var(--dark-accent);border-color:var(--dark-border);
+}
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .inline-node-editor button.save {
+  background:#286447;color:#fff;border-color:#86c5a1;
+}

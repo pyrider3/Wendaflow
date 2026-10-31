@@ -4,7 +4,7 @@
 .quick-thought-toggle[aria-checked="true"] .quick-switch-track {background:var(--accent,#416f5a);}
 .quick-thought-toggle[aria-checked="true"] .quick-switch-track i {transform:translateX(12px);}
 .quick-thought-toggle:focus-visible {outline:2px solid var(--accent,#416f5a);outline-offset:2px;}
-.quick-thinking .node:not(.thought) {opacity:.48;}
+/* All cards remain readable and interactive in quick-thinking mode. */
 .quick-thinking .node.thought {cursor:move;}
 .quick-thought-editor {position:absolute;z-index:60;background:var(--surface,#fff);color:var(--text,#213c2e);border:1px solid var(--accent,#416f5a);border-radius:12px;padding:14px 16px;box-shadow:0 5px 18px #0001;}
 .quick-thought-editor textarea {display:block;width:100%;min-height:42px;padding:0;border:0;outline:0;resize:none;overflow:hidden;background:transparent;color:inherit;font:500 14px/1.6 system-ui;}

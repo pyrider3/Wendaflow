@@ -1,3 +1,4 @@
+import {validatePublicEndpoint,publicRequestAllowed} from './deployment/public-policy.mjs';
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
@@ -5,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile } from 'node:fs/promises';
 
+const PUBLIC_WEB = process.env.WENDAFLOW_PUBLIC === '1';
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.WONDERFUL_PORT || 4318);
 const DATA_ROOT = process.env.WONDERFUL_DATA_DIR || process.cwd();
@@ -17,7 +19,7 @@ let harnessWebChild = null;
 let harnessWebReady = null;
 // The desktop app loads its UI from file://, while the browser build uses Vite.
 // This server is loopback-only, so either local client may access it safely.
-const allowedHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' };
+const allowedHeaders = PUBLIC_WEB ? {} : { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' };
 
 function reply(res, status, body) {
   res.writeHead(status, { ...allowedHeaders, 'Content-Type': 'application/json; charset=utf-8' });
@@ -79,6 +81,7 @@ async function resolveHarnessBin() {
 }
 
 function validateEndpoint(value) {
+  if(PUBLIC_WEB)return validatePublicEndpoint(value);
   const url = new URL(value);
   if (!['https:', 'http:'].includes(url.protocol)) throw new Error('仅允许 HTTP(S) 模型接口');
   if (url.protocol === 'http:' && !['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('非本机接口必须使用 HTTPS');
@@ -553,6 +556,11 @@ function publicJob(job) {
 }
 
 const server = http.createServer(async (req, res) => {
+  if(PUBLIC_WEB){
+    if(req.headers.origin && req.headers.origin !== process.env.WENDAFLOW_PUBLIC_ORIGIN){reply(res,403,{error:'Origin not allowed'});return;}
+    if(!publicRequestAllowed(req.method,req.url)){reply(res,403,{error:'此功能仅限本机版本；公开版不提供服务器文件或命令执行。'});return;}
+    if(req.method==='POST' && !String(req.headers['content-type']||'').startsWith('application/json')){reply(res,415,{error:'JSON required'});return;}
+  }
   if (req.method === 'OPTIONS') { res.writeHead(204, allowedHeaders); res.end(); return; }
   if (req.method === 'GET' && req.url === '/health') { reply(res, 200, { ok: true, service: 'branchspace-local-proxy' }); return; }
   if (req.method === 'GET' && req.url === '/canvases') {
@@ -719,6 +727,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method !== 'POST' || req.url !== '/stream') { reply(res, 404, { error: 'Not found' }); return; }
   try {
     const { endpoint, format, apiKey, model, messages, chatOptions = {} } = await readJson(req);
+    if(PUBLIC_WEB && (typeof apiKey !== 'string' || !apiKey.trim()))throw new Error('请填写你自己的模型 API 密钥。');
     const base = validateEndpoint(endpoint || (format === 'gemini' ? 'https://generativelanguage.googleapis.com/v1beta' : '')).toString().replace(/\/$/, '');
     const anthropic = format === 'anthropic';
     const gemini = format === 'gemini';
@@ -733,7 +742,7 @@ const server = http.createServer(async (req, res) => {
     const body = gemini ? { contents: geminiInput(messages), generationConfig: { ...(Number.isFinite(chatOptions.temperature) ? { temperature: chatOptions.temperature } : {}), ...(chatOptions.thinking ? { thinkingConfig: { thinkingBudget: -1 } } : {}) } } : anthropic
       ? { model, messages: anthropicInput(messages), max_tokens: 4096, stream: true }
       : responses ? { model, input: responseInput(messages), stream: true, store: false, ...((isDeepSeek || (chatOptions.reasoning && chatOptions.reasoning !== 'none')) ? { reasoning: { effort: isDeepSeek && chatOptions.reasoning === 'none' ? 'none' : chatOptions.reasoning } } : {}), ...(Number.isFinite(chatOptions.temperature) ? { temperature: chatOptions.temperature } : {}) } : { model, messages: compatibleInput(messages), stream: true, ...(Number.isFinite(chatOptions.temperature) ? { temperature: chatOptions.temperature } : {}), ...(isDoubao && reasoningEffort ? { reasoning_effort: reasoningEffort } : {}), ...(isDeepSeek ? { thinking: { type: chatOptions.reasoning === 'none' ? 'disabled' : 'enabled' } } : {}), ...(!isDoubao && !isDeepSeek && typeof chatOptions.thinking === 'boolean' ? { enable_thinking: chatOptions.thinking } : {}) };
-    const upstream = await fetch(target, { method: 'POST', headers, body: JSON.stringify(body) });
+    const upstream = await fetch(target, { method: 'POST', headers, body: JSON.stringify(body), ...(PUBLIC_WEB ? {redirect:'error', signal:AbortSignal.timeout(180000)} : {}) });
     res.writeHead(upstream.status, { ...allowedHeaders, 'Content-Type': upstream.headers.get('content-type') || 'text/event-stream', 'Cache-Control': 'no-cache' });
     if (!upstream.body) { res.end(); return; }
     for await (const chunk of upstream.body) res.write(chunk);

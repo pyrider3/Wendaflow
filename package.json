@@ -28,7 +28,8 @@
     "dist:mac:x64": "npm run make-icon:mac && npm run build && electron-builder --mac dmg zip --x64",
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
-    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs"
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs",
+    "test:public": "node --test deployment/*.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

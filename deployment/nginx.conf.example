@@ -1,0 +1,44 @@
+limit_req_zone $binary_remote_addr zone=wendaflow_requests:10m rate=12r/m;
+limit_conn_zone $binary_remote_addr zone=wendaflow_connections:10m;
+server {
+ listen 80;
+ server_name api.qnjyxh.xyz;
+ location ^~ /.well-known/acme-challenge/ { root /var/www/wendaflow-acme; }
+ location / { return 301 https://$host$request_uri; }
+}
+server {
+ listen 443 ssl;
+ server_name api.qnjyxh.xyz;
+ ssl_certificate /etc/letsencrypt/live/api.qnjyxh.xyz/fullchain.pem;
+ ssl_certificate_key /etc/letsencrypt/live/api.qnjyxh.xyz/privkey.pem;
+ include /etc/letsencrypt/options-ssl-nginx.conf;
+ ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+ root /opt/wendaflow/current/public;
+ index index.html;
+ client_max_body_size 16m;
+ add_header X-Content-Type-Options nosniff always;
+ add_header X-Frame-Options SAMEORIGIN always;
+ add_header Referrer-Policy strict-origin-when-cross-origin always;
+ location = /api/health { proxy_pass http://127.0.0.1:4318/health; }
+ location = /api/stream {
+  limit_req zone=wendaflow_requests burst=6 nodelay;
+  limit_req_status 429;
+  limit_conn wendaflow_connections 4;
+  limit_conn_status 429;
+  proxy_pass http://127.0.0.1:4318/stream;
+  proxy_http_version 1.1;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header Connection "";
+  proxy_buffering off;
+  proxy_cache off;
+  proxy_read_timeout 190s;
+  proxy_send_timeout 190s;
+ }
+ location ^~ /api/ { return 403; }
+ location ^~ /v1/ { return 404; }
+ location ^~ /assets/ { expires 1y; try_files $uri =404; }
+ location = /source.tar.gz { add_header Content-Disposition 'attachment; filename="wendaflow-source.tar.gz"'; }
+ location = /index.html { add_header Cache-Control no-store; }
+ location / { try_files $uri $uri/ /index.html; }
+}

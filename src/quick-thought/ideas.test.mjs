@@ -47,7 +47,7 @@ test('right-drag attaches the drop target as a child, preserves real references 
  assert.equal(records[1].parentId,'other');
  assert.equal(attachThoughtChild(result,'grandchild','parent'),result);
  assert.equal(attachThoughtChild(result,'parent','parent'),result);
- assert.equal(attachThoughtChild(result,'parent','chat'),result);
+ assert.equal(attachThoughtChild(result,'parent','chat').find(n=>n.id==='chat').parentId,'parent');
  const loaded=JSON.parse(JSON.stringify(result));assert.equal(loaded[1].parentId,'parent');assert.equal(loaded[0].relations[0].type,'reference');
 });
 

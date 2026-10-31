@@ -854,3 +854,6 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 /* A number of compact controls deliberately have no component-specific
    background. Give them a readable surface in every dark preset without
    outranking the specialised green, danger, or selected button styles. */.model-picker-menu button.selected { background: #dcefe4; color: #176348; }
+
+.public-web-note {position:absolute;z-index:10;left:80px;top:108px;max-width:calc(100% - 110px);padding:6px 10px;border:1px solid #86a494;border-radius:8px;background:#f1f8f4;color:#284a38;font-size:11px;line-height:1.5;}
+.public-web-note a {color:#225b41;text-decoration:underline;}
