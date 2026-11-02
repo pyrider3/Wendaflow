@@ -13,7 +13,7 @@
 ```bash
 npm install
 npm run build
-npm run desktop:dev
+npm run app
 ```
 
 提交前请至少运行：

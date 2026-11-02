@@ -69,7 +69,7 @@ npm ci
 npm run app
 ```
 
-打开 **[localhost:5173](http://localhost:5173/)** 即可使用。保持终端中的启动命令运行，它会同时启动网页前端与本机后端，无需启动 Electron。
+打开 **[localhost:5173](http://localhost:5173/)** 即可使用。保持终端中的启动命令运行，它会同时启动网页前端与本机后端。
 
 创建画布，在空白处双击，写下问题或想法。使用 AI 对话前，请先在设置中配置模型服务，或连接本地 Ollama。
 
@@ -205,7 +205,6 @@ Wendaflow 以 [GNU Affero General Public License v3.0](LICENSE) 开源。你可�
 - `src/`：React 界面、画布与交互逻辑
 - `server.mjs`：本地模型代理、文件保存与行动执行服务
 - `canvas-storage.mjs`：画布持久化
-- `electron-main.mjs`：保留的桌面入口
 - `notification-server/`、`notification-manager/`：通知服务及管理工具
 - `website/`：官网静态文件
 
@@ -214,7 +213,7 @@ npm test
 npm run build
 ```
 
-构建说明见 [docs/BUILDING.md](docs/BUILDING.md)。历史桌面安装包见 [Releases](https://github.com/pyrider3/Wendaflow/releases)。
+构建说明见 [docs/BUILDING.md](docs/BUILDING.md)。项目现在只维护网页端；历史桌面安装包见 [Releases](https://github.com/pyrider3/Wendaflow/releases)。
 
 ## 更新记录
 
