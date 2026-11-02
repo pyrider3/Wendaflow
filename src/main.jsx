@@ -1,3 +1,4 @@
+import {PersonalCloud} from './cloud/PersonalCloud.jsx';
 import {isTemporaryCanvas,durableCanvasIndex,LIBRARY_KEY,mergeCanvases,loadLibrary,writeLibrary,openLibraryTab,visibleLibraryTabs,duplicateCanvasState,reorderLibraryTabs,libraryItems as listLibraryCanvases,summarizeCanvas} from './canvas/library.mjs';
 import {storedZip} from './canvas/zip.mjs';
 import {CanvasHome} from './components/CanvasWorkspace.jsx';
@@ -1686,6 +1687,41 @@ function App() {
     if (!zoomFrameRef.current) zoomFrameRef.current = requestAnimationFrame(animateViewport);
   }
 
+  async function cloudSnapshot(id=activeCanvasId,commit=true) {
+    if(id===activeCanvasIdRef.current){if(commit)await persistCurrentCanvas();return {nodes:currentNodes(),selectedId,collapsedIds:[...collapsedIds],viewport:{...targetViewportRef.current}};}
+    return canvasDraftsRef.current.get(id)||await readCanvasState(id)||loadState(id);
+  }
+  function attachCloudCanvas(id,cloud,expectedId){
+    if(expectedId&&canvasesRef.current.find(c=>c.id===id)?.cloud?.id!==expectedId)return;
+    const next=canvasesRef.current.map(c=>c.id===id?{...c,cloud,temporary:false,savedAt:c.savedAt||new Date().toISOString()}:c);
+    localStorage.setItem(CANVAS_INDEX_KEY,JSON.stringify(durableCanvasIndex(next,activeCanvasIdRef.current,autosavePolicyRef.current,discardedCanvasIdsRef.current)));
+    canvasesRef.current=next;setCanvases(next);enableCanvasAutosave(id);
+  }
+  async function openCloudCanvas(document,owner){
+    if(document.deleted)throw Error('请先从历史版本恢复此画布');
+    const state=normalizeWdf({...document.state,format:'branchspace-wdf'});
+    await persistCurrentCanvas();
+    const id=`cloud-${owner}-${document.id}`,now=new Date().toISOString();
+    await writeCanvasState(id,state);canvasDraftsRef.current.set(id,state);discardedCanvasIdsRef.current.delete(id);
+    const canvas={id,name:document.name,createdAt:now,updatedAt:document.updated,temporary:false,savedAt:now,cloud:{owner,id:document.id,revision:document.revision}};
+    const next=[...canvasesRef.current.filter(c=>c.id!==id),canvas];
+    localStorage.setItem(CANVAS_INDEX_KEY,JSON.stringify(durableCanvasIndex(next,id,autosavePolicyRef.current,discardedCanvasIdsRef.current)));
+    canvasesRef.current=next;setCanvases(next);enableCanvasAutosave(id);
+    if(id===activeCanvasIdRef.current){replaceNodes(state.nodes,id);setSelectedId(state.selectedId||null);setSelectedIds(new Set());setCollapsedIds(new Set(state.collapsedIds||[]));targetViewportRef.current=state.viewport;commitViewport(state.viewport);setQuickEditor(null);setEditingNode(null);setCanvasMenuOpen(false);}
+    else await switchCanvas(id);
+    return state;
+  }
+  async function logoutCloud(owner){
+    await persistCurrentCanvas();
+    const ids=canvasesRef.current.filter(c=>c.cloud?.owner===owner).map(c=>c.id),removed=new Set(ids);
+    const next=canvasesRef.current.filter(c=>!removed.has(c.id));
+    const meta={...workspaceMetaRef.current,openTabs:workspaceMetaRef.current.openTabs.filter(id=>!removed.has(id)),cards:Object.fromEntries(Object.entries(workspaceMetaRef.current.cards).filter(([id])=>!removed.has(id)))};
+    localStorage.setItem(CANVAS_INDEX_KEY,JSON.stringify(durableCanvasIndex(next,null,autosavePolicyRef.current,discardedCanvasIdsRef.current)));writeLibrary(localStorage,meta);
+    canvasesRef.current=next;setCanvases(next);workspaceMetaRef.current=meta;setWorkspaceMeta(meta);
+    for(const id of ids){discardedCanvasIdsRef.current.add(id);canvasDraftsRef.current.delete(id);await deleteCanvasState(id);}
+    if(removed.has(activeCanvasIdRef.current)){activeCanvasIdRef.current=null;setActiveCanvasId(null);replaceNodes([],null);setQuickEditor(null);setEditingNode(null);setSelectedId(null);setSelectedIds(new Set());setCanvasManagementOpen(false);setCanvasMenuOpen(true);}
+  }
+
   async function persistCurrentCanvas() {
     if(!activeCanvasIdRef.current||discardedCanvasIdsRef.current.has(activeCanvasIdRef.current))return;
     if(editingNode && saveNodeEdit()===false)throw new Error(say("请先完成或取消当前编辑。","Finish or cancel the current edit first."));
@@ -2872,7 +2908,7 @@ function App() {
       {feedback && <div className="interaction-feedback" role="status">{feedback.message}</div>}
       {(storageWarning||cacheWarning) && <div className="storage-warning" role="alert">{systemText(storageWarning||cacheWarning)}{saveStatus==='保存失败' && <button className="warning-retry" onClick={()=>saveCanvas()}>{say('重试保存','Retry save')}</button>}<button onClick={() => {setStorageWarning('');setCacheWarning('');}} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
       {notificationDetail && <div className="modal-backdrop notification-detail-backdrop" onPointerDown={(event) => { if (!notificationDetail.requiresAcknowledgement && event.target === event.currentTarget) setNotificationDetail(null); }}><section className="notification-detail-card" role="dialog" aria-modal="true" aria-label={notificationDetail.title}><header><div><small>{notificationDetail.kind === 'update' ? tr('版本更新','Version update') : tr('通知详情','Notification details')}</small><h2>{notificationDetail.title}</h2></div>{!notificationDetail.requiresAcknowledgement && <button onClick={() => setNotificationDetail(null)} aria-label={tr('关闭','Close')}>×</button>}</header><div className="notification-detail-content"><p>{notificationDetail.body}</p><time>{new Date(notificationDetail.createdAt).toLocaleString(uiLanguage)}</time></div><footer>{notificationDetail.downloadUrl && <button onClick={() => openExternalUrl(notificationDetail.downloadUrl)}>{tr('打开下载页','Open download page')}</button>}<button className="primary" onClick={() => confirmNotification(notificationDetail)}>{notificationDetail.requiresAcknowledgement ? tr('确认','Acknowledge') : tr('完成','Done')}</button></footer></section></div>}
-      <header className="topbar">
+      <header className="topbar" style={canvasMenuOpen?{zIndex:80}:undefined}>
         <div className="brand-mark" aria-label="Wendaflow">
           <svg viewBox="0 0 32 32" aria-hidden="true">
             <path d="M6.5 8.5v6.2c0 5.9 3 8.8 6.6 8.8 2.2 0 3.4-1.2 3.4-3.3V8.5m0 8.2c0 4.5 1.4 6.8 4.1 6.8 3 0 4.9-2.8 4.9-8.8V8.5" />
@@ -2884,6 +2920,7 @@ function App() {
         <div className="canvas-tabs" aria-label={tr('画布标签栏','Canvas tabs')} onWheel={(event) => { const delta = event.deltaY || event.deltaX; if (!delta) return; event.preventDefault(); event.stopPropagation(); event.currentTarget.scrollLeft += delta; }}>{headerCanvases.map((canvas) => <button key={canvas.id} data-canvas-tab-id={canvas.id} draggable onDragStart={event=>event.dataTransfer.setData('application/x-wendaflow-tab',canvas.id)} onDragOver={event=>{if([...event.dataTransfer.types].includes('application/x-wendaflow-tab'))event.preventDefault();}} onDrop={event=>{const source=event.dataTransfer.getData('application/x-wendaflow-tab');if(source){event.preventDefault();changeWorkspace(meta=>reorderLibraryTabs(meta,source,canvas.id));}}} className={canvas.id === activeCanvasId ? 'active' : ''} onClick={() => switchCanvas(canvas.id)} onDoubleClick={(event) => { event.stopPropagation(); setEditingCanvasId(canvas.id); }}>{editingCanvasId === canvas.id ? <input autoFocus value={canvas.name} onClick={(event) => event.stopPropagation()} onChange={(event) => renameCanvas(canvas.id, event.target.value)} onBlur={() => { if (!canvas.name.trim()) renameCanvas(canvas.id, tr('未命名画布','Untitled canvas')); setEditingCanvasId(null); }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <span title={tr('双击重命名','Double-click to rename')}>{canvas.name}</span>}<i onClick={(event) => closeCanvas(canvas.id, event)}>×</i></button>)}<button className="new-tab" aria-label={tr('新建画布','New canvas')} title={tr('新建画布','New canvas')} onClick={createCanvas}>＋</button></div>
         <div className="window-drag-strip" style={!window.wonderfulWindow?{display:'none'}:undefined} aria-label={tr('拖动窗口','Drag window')} title={tr('拖动窗口','Drag window')} onPointerDown={(event) => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); window.wonderfulWindow?.beginDrag?.(event.screenX, event.screenY); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) window.wonderfulWindow?.moveDrag?.(event.screenX, event.screenY); }} onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); window.wonderfulWindow?.endDrag?.(); }} onPointerCancel={() => window.wonderfulWindow?.endDrag?.()} />
         <div className={`topbar-actions ${canvasMenuOpen?'workspace-at-home':''}`}>
+          {PUBLIC_WEB&&<PersonalCloud base={LOCAL_PROXY_URL} current={canvases.find(c=>c.id===activeCanvasId)} changeToken={nodes} getSnapshot={(commit=true)=>cloudSnapshot(activeCanvasId,commit)} canReceive={!quickEditor&&!editingNode&&!dragging&&!marquee&&!relationDrag} onOpen={openCloudCanvas} onAttach={attachCloudCanvas} onLogout={logoutCloud} onNew={createCanvas}/>}
           <div className="notification-anchor">
             <button className={`quiet-button notification-button ${notificationsOpen ? 'active' : ''}`} aria-label={tr('通知','Notifications')} onClick={() => setNotificationsOpen((value) => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{notifications.filter((item) => !item.read).length > 0 && <b>{Math.min(99, notifications.filter((item) => !item.read).length)}</b>}</button>
             {notificationToast && <section className={`notification-toast ${notificationToast.requiresAcknowledgement ? 'requires-confirmation' : ''}`} role="status" onClick={() => openNotificationDetail(notificationToast)}><i>{notificationToast.kind === 'update' ? '↑' : '●'}</i><div><strong>{notificationToast.title}</strong><p>{notificationToast.body}</p></div>{!notificationToast.requiresAcknowledgement && <button aria-label={tr('关闭','Close')} onClick={(event) => { event.stopPropagation(); setNotificationToast(null); }}>×</button>}</section>}
@@ -2933,7 +2970,7 @@ function App() {
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
       >
-        {PUBLIC_WEB && <aside className="public-web-note">{say('公开网页版 · 画布保存在此浏览器，导出 WDF 可备份。AI 需自备密钥。','Public web · Stored in this browser. Export WDF to back up. Bring your own API key.')} <a href="/source.tar.gz">{say('源码','Source')}</a></aside>}
+        {PUBLIC_WEB && <aside className="public-web-note">{say('本地画布保存在此浏览器 · 登录后可主动上传并同步 · AI 需自备密钥。','Local canvases stay in this browser · Sign in to upload and sync · Bring your own API key.')} <a href="/source.tar.gz">{say('源码','Source')}</a></aside>}
         <div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>
         {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
         {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span></div>}

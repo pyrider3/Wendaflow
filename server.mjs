@@ -1,3 +1,4 @@
+import {cloudApi} from './cloud/http.mjs';
 import {validatePublicEndpoint,publicRequestAllowed} from './deployment/public-policy.mjs';
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
@@ -555,7 +556,9 @@ function publicJob(job) {
   return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
+const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
 const server = http.createServer(async (req, res) => {
+  if(personalCloud && await personalCloud.handle(req,res))return;
   if(PUBLIC_WEB){
     if(req.headers.origin && req.headers.origin !== process.env.WENDAFLOW_PUBLIC_ORIGIN){reply(res,403,{error:'Origin not allowed'});return;}
     if(!publicRequestAllowed(req.method,req.url)){reply(res,403,{error:'此功能仅限本机版本；公开版不提供服务器文件或命令执行。'});return;}

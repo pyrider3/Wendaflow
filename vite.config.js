@@ -5,5 +5,6 @@ import react from '@vitejs/plugin-react';
 // directly from disk instead of through the Vite development server.
 export default defineConfig({
   base: './',
+  server: {proxy: {'/api': {target:process.env.WENDAFLOW_DEV_PROXY_TARGET||'http://127.0.0.1:4318',changeOrigin:false,rewrite:p=>p.replace(/^\/api/,'')}}},
   plugins: [react()],
 });

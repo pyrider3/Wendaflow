@@ -1,0 +1,15 @@
+[Unit]
+Description=Wendaflow encrypted personal cloud backup
+After=wendaflow-public.service
+[Service]
+Type=oneshot
+User=wendaflow
+Group=wendaflow
+EnvironmentFile=/etc/wendaflow-backup.env
+ExecStart=/usr/local/lib/elite/node /opt/wendaflow/current/cloud/backup.mjs backup /var/lib/wendaflow/cloud /var/backups/wendaflow
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/wendaflow/cloud /var/backups/wendaflow

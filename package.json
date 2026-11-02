@@ -29,7 +29,8 @@
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
     "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs",
-    "test:public": "node --test deployment/*.test.mjs"
+    "test:public": "node --test deployment/*.test.mjs",
+    "test:cloud": "node --test cloud/*.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
