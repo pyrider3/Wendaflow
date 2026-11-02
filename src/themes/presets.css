@@ -120,57 +120,6 @@
     #c8d4cd 0
   );
 }
-.custom-theme-editor {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px solid rgba(181, 199, 189, 0.78);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.5);
-}
-.custom-theme-editor > div:first-child {
-  display: grid;
-  gap: 3px;
-}
-.custom-theme-editor > div:first-child span {
-  color: #748179;
-  font-size: 8px;
-}
-.custom-theme-editor > div:nth-child(2) {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 7px;
-}
-.custom-theme-editor label {
-  display: grid;
-  gap: 4px;
-  color: #6e7b74;
-  font-size: 8px;
-}
-.custom-theme-editor input {
-  width: 100%;
-  height: 28px;
-  padding: 2px;
-  border: 1px solid #cbd8d1;
-  border-radius: 7px;
-  background: #fff;
-  cursor: pointer;
-}
-.custom-theme-editor code {
-  color: #68766f;
-  font-size: 7px;
-}
-.custom-theme-editor > button {
-  justify-self: start;
-  padding: 6px 9px;
-  border: 1px solid #cbd8d1;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #46564d;
-  cursor: pointer;
-  font-size: 8px;
-}
 :root[data-theme="sage"] .app-shell,
 :root[data-theme="sage"] .canvas {
   background-color: #f3f6f3;
@@ -263,61 +212,55 @@
   )
   .canvas-tabs
   button,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .quiet-button,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .rail-button,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .composer,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .inspector,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .settings-panel,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .search-panel,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .library-panel,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
   .canvas-overview,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
@@ -340,7 +283,6 @@
 :root[data-theme="midnight"] .composer,
 :root[data-theme="midnight"] .inspector,
 :root[data-theme="midnight"] .settings-panel,
-:root[data-theme="midnight"] .settings-card,
 :root[data-theme="midnight"] .search-panel,
 :root[data-theme="midnight"] .library-panel,
 :root[data-theme="midnight"] .canvas-overview,
@@ -459,110 +401,12 @@
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
-  .profile-tab,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
   .theme-presets
-  button,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  input,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  select,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  button:not(.primary-action) {
+  button {
   background-color: rgba(255, 255, 255, 0.055);
   border-color: rgba(255, 255, 255, 0.1);
   color: #dce4df;
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card {
-  background: #202529;
-  border-color: #343b3f;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.46);
-}
-:root[data-theme="midnight"] .settings-card {
-  background: #182129;
-  border-color: #2b3943;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-nav {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-code {
-  border-color: #405149;
-  background: #222a26;
-  color: #edf5ef;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-code
-  img {
-  border-color: #45554d;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-code
-  small,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-note {
-  color: #b8c8bf;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-code
-  span {
-  color: #8ee0bc;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .sponsor-wallet,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
@@ -577,83 +421,6 @@
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
-  :is(.sponsor-wallet, .sponsor-preview-wallet)
-  code {
-  color: #d9e6df;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-nav
-  button {
-  background: transparent;
-  color: #c9d0cc;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  .settings-nav
-  button:not(.active) {
-  background: transparent;
-  border: 1px solid transparent;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  .settings-nav
-  button:not(.active):hover {
-  background: rgba(255, 255, 255, 0.045);
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-nav
-  button
-  small,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-section
-  > header
-  p,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-pane
-  > p,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .profile-title
-  p,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .appearance-setting
-  span,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
   .workspace-setting
   span {
   color: #929d97;
@@ -663,100 +430,20 @@
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
-  .settings-nav
-  button.active {
-  background: #2b3d35;
-  color: #8ee0bc;
-}
-:root[data-theme="midnight"] .settings-nav button.active {
-  background: #223744;
-  color: #9fd5ed;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-pane,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .appearance-setting,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
   .workspace-setting,
-:root:is(
+    :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"]
   )
-  .agent-advanced-settings,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-project-row {
+  .agent-advanced-settings {
   background: #282e31;
   border-color: #3b4448;
 }
-:root[data-theme="midnight"] .settings-pane,
-:root[data-theme="midnight"] .appearance-setting,
 :root[data-theme="midnight"] .workspace-setting,
-:root[data-theme="midnight"] .agent-advanced-settings,
-:root[data-theme="midnight"] .settings-project-row {
+:root[data-theme="midnight"] .agent-advanced-settings {
   background: #202b34;
   border-color: #34434e;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  input,
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .settings-card
-  select {
-  background: #171b1e;
-  border-color: #414a4f;
-  color: #edf1ef;
-}
-:root[data-theme="midnight"] .settings-card input,
-:root[data-theme="midnight"] .settings-card select {
-  background: #141c22;
-  border-color: #3a4a56;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .profile-tabs
-  button {
-  background: #333a3e;
-  color: #c4ccc8;
-  border-color: #444e53;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"]
-  )
-  .profile-tabs
-  button.active {
-  background: #285040;
-  color: #a8e8ca;
-  border-color: #3e735e;
 }
 :root:is(
     [data-theme="midnight"],
@@ -2071,37 +1758,31 @@
   )
   .canvas-tabs
   button,
-:root:is(
+    :root:is(
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
   )
   .quiet-button,
-:root:is(
+    :root:is(
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
   )
   .rail-button,
-:root:is(
+    :root:is(
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
   )
   .composer,
-:root:is(
+    :root:is(
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
   )
   .inspector,
-:root:is(
-    [data-theme="contrast-blue"],
-    [data-theme="contrast-amber"],
-    [data-theme="contrast-plum"]
-  )
-  .settings-card,
-:root:is(
+    :root:is(
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
@@ -2116,7 +1797,6 @@
 :root[data-theme="contrast-amber"] .rail-button,
 :root[data-theme="contrast-amber"] .composer,
 :root[data-theme="contrast-amber"] .inspector,
-:root[data-theme="contrast-amber"] .settings-card,
 :root[data-theme="contrast-amber"] .agent-config-popover {
   background: #2a1b06;
   border-color: #ffca42;
@@ -2127,7 +1807,6 @@
 :root[data-theme="contrast-plum"] .rail-button,
 :root[data-theme="contrast-plum"] .composer,
 :root[data-theme="contrast-plum"] .inspector,
-:root[data-theme="contrast-plum"] .settings-card,
 :root[data-theme="contrast-plum"] .agent-config-popover {
   background: #281039;
   border-color: #d98cff;
@@ -2158,22 +1837,6 @@
   )
   textarea {
   color: inherit;
-}
-:root:is(
-    [data-theme="contrast-blue"],
-    [data-theme="contrast-amber"],
-    [data-theme="contrast-plum"]
-  )
-  .settings-nav
-  button.active {
-  background: #145477;
-  color: #fff;
-}
-:root[data-theme="contrast-amber"] .settings-nav button.active {
-  background: #704300;
-}
-:root[data-theme="contrast-plum"] .settings-nav button.active {
-  background: #66278b;
 }
 :root[data-theme="contrast-light"] .node.selected {
   border-color: #0069d9;
@@ -2228,7 +1891,6 @@
 :root[data-theme="custom"] .node,
 :root[data-theme="custom"] .composer,
 :root[data-theme="custom"] .inspector,
-:root[data-theme="custom"] .settings-card,
 :root[data-theme="custom"] .canvas-tabs button,
 :root[data-theme="custom"] .rail-button,
 :root[data-theme="custom"] .quiet-button,

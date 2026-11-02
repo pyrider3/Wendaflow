@@ -1,3 +1,5 @@
+import {SettingsDialog} from './components/settings/SettingsDialog.jsx';
+import {Page,Group,Row,Fields,Field,Input,Select,Switch,Button,Chips,Status,Empty} from './components/settings/ui.jsx';
 import {PersonalCloud} from './cloud/PersonalCloud.jsx';
 import {isTemporaryCanvas,durableCanvasIndex,LIBRARY_KEY,mergeCanvases,loadLibrary,writeLibrary,openLibraryTab,visibleLibraryTabs,duplicateCanvasState,reorderLibraryTabs,libraryItems as listLibraryCanvases,summarizeCanvas} from './canvas/library.mjs';
 import {storedZip} from './canvas/zip.mjs';
@@ -3136,48 +3138,148 @@ function App() {
       {libraryOpen && <section className="library-panel"><header><div><span>{text('currentCanvas')}</span><h2>{text('library')}</h2></div><button aria-label={text('close')} onClick={() => closeFloatingPanel('library', setLibraryOpen)}>×</button></header><div className="library-upload"><button onClick={() => libraryUploadRef.current?.click()}>{text('uploadCurrent')}</button><input ref={libraryUploadRef} type="file" multiple hidden onChange={(event) => { addAttachments(event); if (nodes.length && !branchSource) setRootComposerOpen(true); }} /><span>{tr('图片、PDF、文本、代码及常见文件','Images, PDFs, text, code, and common files')}</span></div><div className="library-list">{libraryItems.length ? libraryItems.map((item) => <article key={`${item.nodeId || 'draft'}-${item.id}`}><button className="library-preview" onClick={() => openLibraryItem(item)}>{item.dataUrl?.startsWith('data:image/') ? <img src={item.dataUrl} alt="" /> : <span>{item.name.split('.').pop()?.slice(0, 5).toUpperCase() || 'FILE'}</span>}</button><div><strong>{item.name}</strong><small>{item.nodeTitle} · {Math.max(1, Math.ceil((item.size || item.text?.length || 0) / 1024))} KB</small></div><div className="library-actions">{item.nodeId && <button onClick={() => { focusSearchResult(nodes.find((node) => node.id === item.nodeId)); closeFloatingPanel('library', setLibraryOpen); }}>{tr('定位','Locate')}</button>}<button onClick={() => addLibraryItemToInput(item)}>{tr('使用','Use')}</button><button className="remove" onClick={() => removeLibraryItem(item)}>{tr('移除','Remove')}</button></div></article>) : <p>{text('libraryEmpty')}</p>}</div><footer>{libraryItems.length} {tr('项资料','items')} · {tr('文件随当前画布保存','Files are saved with the current canvas')}</footer></section>}
       {minimapOpen && <section className={`minimap ${inspectorOpen && selected ? 'with-inspector' : ''}`} onPointerDown={navigateMiniMap} aria-label={text('minimap')}><div className="minimap-stage">{visibleNodes.map((node) => <i key={node.id} className={selectedIds.has(node.id) ? 'selected' : ''} style={{ left: `${((node.x - miniBounds.minX) / miniBounds.width) * 100}%`, top: `${((node.y - miniBounds.minY) / miniBounds.height) * 100}%`, width: `${Math.max(3, ((nodeSizes.get(node.id)?.width || 224) / miniBounds.width) * 100)}%`, height: `${Math.max(3, ((nodeSizes.get(node.id)?.height || 110) / miniBounds.height) * 100)}%` }} />)}</div><span>{text('navigate')}</span></section>}
       {settingsOpen && (
-        <div className={`modal-backdrop ${settingsClosing ? 'closing' : ''}`} onPointerDown={(event) => { if (event.target === event.currentTarget) closeSettings(); }}>
-          <section className="settings-card settings-unified">
-            <div className="settings-head"><div><span>Wendaflow</span><h2>{text('settings')}</h2></div><button aria-label={text('close')} onClick={closeSettings}>×</button></div>
-            <div className="settings-layout">
-              <nav className="settings-nav" aria-label={text('settings')}>{[['models',text('modelConnections'),text('modelConnectionsHint')],['appearance',text('appearance'),text('themeDisplay')],['license',tr('授权','License'),tr('激活码与设备授权','Activation code and device access')],['notifications',tr('通知','Notifications'),tr('运行期间的应用内提醒','In-app alerts while the app is running')],['plugins',tr('插件','Plugins'),tr('扩展功能即将推出','Extensions are coming soon')],['project',text('projectData'),text('projectDataHint')],['about',tr('关于','About'),tr('版本、授权与官方入口','Version, license, and official links')],['sponsor',tr('赞助','Sponsor'),tr('支持 Wendaflow 的持续开发','Support continued Wendaflow development')]].map(([value,label,description]) => <button key={value} className={settingsSection === value ? 'active' : ''} onClick={() => setSettingsSection(value)}><i /> <span><strong>{label}</strong><small>{description}</small></span></button>)}</nav>
-              <div className="settings-content">
-              {settingsSection === 'models' && <section className="settings-section"><header><h3>{text('modelConnections')}</h3><p>{tr('管理本地模型与云端 API。修改会自动保存。','Manage local models and cloud APIs. Changes are saved automatically.')}</p></header><div className="settings-columns">
-              <section className="settings-pane">
-                <div className="pane-heading"><span>{tr('本地模型','Local models')}</span><h3>Ollama</h3></div>
-                <div className="profile-tabs">{localProfiles.map((profile) => <button key={profile.id} className={profile.id === ollama.id ? 'active' : ''} onClick={() => { setActiveLocalId(profile.id); setOllamaStatus(''); }}>{profile.name}</button>)}<button className="add-profile" onClick={addLocalProfile}>＋</button></div>
-                <div className="profile-title"><p>{localProfiles.length ? tr('可以保存多个本地模型，并在输入框里直接切换。','Save multiple local models and switch between them in the composer.') : tr('尚未添加本地模型，点击 ＋ 添加。','No local models yet. Click ＋ to add one.')}</p>{localProfiles.length > 0 && <button onClick={removeActiveLocal}>{tr('删除当前','Delete current')}</button>}</div>
-                <p>{tr('请求只发送到你填写的本机地址。','Requests are sent only to the local address you enter.')}</p>
-                <label>{tr('显示名称','Display name')}<input value={ollama.name} onChange={(event) => updateActiveLocal({ name: event.target.value })} /></label>
-                <label>{tr('服务地址','Server URL')}<input value={ollama.endpoint} onChange={(event) => updateActiveLocal({ endpoint: event.target.value })} /></label>
-                <label>{tr('模型名称','Model name')}<input value={ollama.model} onChange={(event) => updateActiveLocal({ model: event.target.value })} /></label>
-                <div className="settings-actions"><span>{systemText(ollamaStatus) || tr('尚未测试连接','Connection not tested')}</span><button onClick={testOllama}>{tr('测试连接','Test connection')}</button></div>
-              </section>
-              <section className="settings-pane cloud-pane">
-                <div className="pane-heading"><span>{tr('云端模型库','Cloud model library')}</span><h3>{tr('API 配置','API configuration')}</h3></div>
-                <div className="profile-tabs">{cloudProfiles.map((profile) => <button key={profile.id} className={profile.id === activeCloud.id ? 'active' : ''} onClick={() => setActiveCloudId(profile.id)}>{profile.name}</button>)}<button className="add-profile" onClick={addCloudProfile}>＋</button></div>
-                <div className="profile-title"><p>{cloudProfiles.length ? tr('每个模型独立保存协议、地址和模型名。','Each model keeps its own protocol, endpoint, and model name.') : tr('尚未添加云端模型，点击 ＋ 添加。','No cloud models yet. Click ＋ to add one.')}</p>{cloudProfiles.length > 0 && <button onClick={removeActiveCloud}>{tr('删除当前','Delete current')}</button>}</div>
-                <div className="cloud-form-grid">
-                  <label>{tr('显示名称','Display name')}<input value={activeCloud.name} onChange={(event) => updateActiveCloud({ name: event.target.value })} /></label>
-                  <label>{tr('接口格式','API format')}<select value={activeCloud.format} onChange={(event) => { const format = event.target.value; const preset = CLOUD_FORMAT_PRESETS[format]; updateActiveCloud({ format, endpoint: preset.endpoint, model: preset.model }); }}><option value="responses">OpenAI Responses</option><option value="openai-compatible">OpenAI-compatible</option><option value="anthropic">Anthropic Messages</option><option value="gemini">Google Gemini</option></select></label>
-                  <label className="span-two">{tr('接口地址','Endpoint')}<input value={activeCloud.endpoint} onChange={(event) => updateActiveCloud({ endpoint: event.target.value })} placeholder={activeCloud.format === 'gemini' ? GEMINI_ENDPOINT : 'https://…'} /></label>
-                  <label>{tr('模型名称','Model name')}<input value={activeCloud.model} onChange={(event) => updateActiveCloud({ model: event.target.value })} /></label>
-                  <label>{tr('API 密钥','API key')}<input type="password" autoComplete="off" value={activeCloud.apiKey} onChange={(event) => updateActiveCloud({ apiKey: event.target.value })} placeholder={tr('仅保存在本次会话','Stored only for this session')} /></label>
+        <SettingsDialog
+          closing={settingsClosing}
+          onClose={closeSettings}
+          title={text('settings')}
+          closeLabel={text('close')}
+          active={settingsSection}
+          onSelect={setSettingsSection}
+          sections={[
+            { id: 'models', label: text('modelConnections') },
+            { id: 'appearance', label: text('appearance') },
+            { id: 'license', label: tr('授权','License') },
+            { id: 'notifications', label: tr('通知','Notifications') },
+            { id: 'plugins', label: tr('插件','Plugins') },
+            { id: 'project', label: text('projectData') },
+            { id: 'about', label: tr('关于','About') },
+            { id: 'sponsor', label: tr('赞助','Sponsor') },
+          ]}
+        >
+          {settingsSection === 'models' && (
+            <Page title={text('modelConnections')} description={tr('管理本地模型与云端 API。修改会自动保存。','Manage local models and cloud APIs. Changes are saved automatically.')}>
+              <Group title={`${tr('本地模型','Local models')} · Ollama`} hint={`${tr('请求只发送到你填写的本机地址。','Requests are sent only to the local address you enter.')} ${tr('可以保存多个本地模型，并在输入框里直接切换。','Save multiple local models and switch between them in the composer.')}`} action={localProfiles.length > 0 ? <Button kind="danger" className="small" onClick={removeActiveLocal}>{tr('删除当前','Delete current')}</Button> : null}>
+                <Chips items={localProfiles} activeId={ollama.id} onSelect={(id) => { setActiveLocalId(id); setOllamaStatus(''); }} onAdd={addLocalProfile} addLabel={`＋ ${tr('本地模型','Local models')}`} />
+                {localProfiles.length === 0 && <p className="sx-note" style={{ padding: '12px 18px 0' }}>{tr('尚未添加本地模型，点击 ＋ 添加。','No local models yet. Click ＋ to add one.')}</p>}
+                <Fields>
+                  <Field label={tr('显示名称','Display name')}><Input value={ollama.name} onChange={(event) => updateActiveLocal({ name: event.target.value })} /></Field>
+                  <Field label={tr('模型名称','Model name')}><Input value={ollama.model} onChange={(event) => updateActiveLocal({ model: event.target.value })} /></Field>
+                  <Field label={tr('服务地址','Server URL')} span><Input value={ollama.endpoint} onChange={(event) => updateActiveLocal({ endpoint: event.target.value })} /></Field>
+                </Fields>
+                <div className="sx-actionbar">
+                  <Status tone={ollamaStatus ? 'ok' : 'idle'}>{systemText(ollamaStatus) || tr('尚未测试连接','Connection not tested')}</Status>
+                  <Button kind="primary" onClick={testOllama}>{tr('测试连接','Test connection')}</Button>
                 </div>
-                <div className="cloud-state"><i className={activeCloud.apiKey ? 'ready' : ''} />{activeCloud.apiKey ? tr('已配置，可在输入框直接选择','Configured and available in the composer') : tr('等待配置','Not configured')}</div>
-              </section>
-              </div></section>}
-              {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
-              {settingsSection === 'notifications' && <section className="settings-section notification-settings"><header><h3>{tr('应用内通知','In-app notifications')}</h3><p>{tr('仅当 Wendaflow 正在运行时接收通知；关闭软件后不会保留后台连接。','Receive notifications only while Wendaflow is running. No background connection is kept after you close the app.')}</p></header><div className="appearance-setting preview-toggle-setting"><div><strong>{tr('接收通知','Receive notifications')}</strong><span>{tr('开启后，新消息会以右上角弹窗显示，并保留在通知中心。','When enabled, new messages appear as a pop-up and remain in Notification Center.')}</span></div><button type="button" className={`preview-switch ${notificationSettings.enabled ? 'enabled' : ''}`} role="switch" aria-checked={notificationSettings.enabled} onClick={() => setNotificationSettings((value) => ({ ...value, enabled: !value.enabled }))}><i aria-hidden="true" /><span>{notificationSettings.enabled ? text('enabled') : text('disabled')}</span></button></div><div className="notification-server-setting notification-device-setting"><span>{tr('通知中心','Notification center')}</span><small>{tr('通知服务会自动同步，无需设置地址。需要确认的通知会在详情窗口中保留，直到你手动确认。','Notifications sync automatically. Address setup is not required, and confirmation-required notices remain until acknowledged.')}</small><label>{tr('本机设备 ID','This device ID')}<input readOnly value={notificationSettings.deviceId} /></label></div></section>}
-              {settingsSection === 'plugins' && <section className="settings-section plugin-settings"><header><h3>{tr('插件','Plugins')}</h3><p>{tr('扩展功能正在准备中。','Extensions are being prepared.')}</p></header><div className="plugin-coming-soon"><i>⌘</i><strong>{tr('敬请期待','Coming soon')}</strong><span>{tr('未来你可以在这里发现和管理 Wendaflow 的扩展能力。','You will be able to discover and manage Wendaflow extensions here.')}</span></div></section>}
-              {settingsSection === 'sponsor' && <section className="settings-section sponsor-settings"><header><h3>{tr('赞助 Wendaflow','Sponsor Wendaflow')}</h3><p>{tr('如果 Wendaflow 对你有帮助，欢迎任选一种方式支持后续开发。点击二维码可放大查看。','If Wendaflow helps you, you can support its continued development through any option below. Click a QR code to enlarge it.')}</p></header><div className="sponsor-grid">{[['wechat.jpg',tr('微信支付','WeChat Pay'),tr('推荐使用微信支付','WeChat Pay recommended')],['alipay.jpg',tr('支付宝','Alipay'),tr('支付宝扫码支付','Scan with Alipay')],['binance.jpg',tr('币安支付','Binance Pay'),tr('使用币安 App 扫码支付','Scan with Binance App')],['usdt-tron.jpg',tr('USDT · TRON','USDT · TRON'),tr('仅支持 TRON 资产','TRON network only')]].map(([file,title,hint]) => <article className="sponsor-code" key={file} role="button" tabIndex={0} onClick={() => setSponsorPreview({ file, title, hint })} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSponsorPreview({ file, title, hint }); } }}><img src={`sponsor/${file}`} alt={`${title} ${tr('赞助二维码','sponsorship QR code')}`} /><strong>{title}</strong><small>{hint}</small>{file === 'usdt-tron.jpg' && <div className="sponsor-wallet" onClick={(event) => event.stopPropagation()}><code>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</code><button type="button" onClick={() => { navigator.clipboard?.writeText('TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr'); setSponsorCopied(true); window.setTimeout(() => setSponsorCopied(false), 1600); }}>{sponsorCopied ? tr('已复制','Copied') : tr('复制地址','Copy address')}</button></div>}<span>{tr('点击放大','Click to enlarge')}</span></article>)}</div><p className="sponsor-note">{tr('感谢你的支持，它会直接帮助 Wendaflow 持续改进。','Thank you — your support directly helps Wendaflow keep improving.')}</p></section>}
-              {settingsSection === 'license' && <section className="settings-section notification-settings license-settings"><header><h3>{tr('授权与激活','License & activation')}</h3><p>{tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}</p></header>{license ? <div className="license-client-status"><strong>{tr('已激活','Activated')} · {String(license.tier || 'pro').toUpperCase()}</strong><span>{license.expiresAt ? `${tr('有效至','Valid until')} ${new Date(license.expiresAt).toLocaleDateString(uiLanguage)}` : tr('永久授权','Perpetual license')}</span><small>{systemText(licenseStatus) || tr('已绑定到这台设备。','Bound to this device.')}</small><button className="danger" onClick={deactivateLicense}>{tr('移除此设备上的授权','Remove local license')}</button></div> : <div className="license-activation"><label>{tr('激活码','Activation code')}<input value={activationCode} onChange={(event) => setActivationCode(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === 'Enter') activateLicense(); }} placeholder="WDF-XXXXXXX-XXXXXXX-XXXXXXX" autoComplete="off" /></label><button className="primary" disabled={licenseBusy} onClick={activateLicense}>{licenseBusy ? tr('正在激活…','Activating…') : tr('激活此设备','Activate this device')}</button>{licenseStatus && <small>{systemText(licenseStatus)}</small>}</div>}</section>}
-              {settingsSection === 'project' && <section className="settings-section"><header><h3>{text('projectData')}</h3><p>{tr('备份或恢复完整画布，包括节点、附件和布局。','Back up or restore complete canvases, including nodes, attachments, and layout.')}</p></header><div className="settings-project-row"><div><strong>{tr('Wendaflow 画布文件','Wendaflow canvas file')}</strong><span>{systemText(projectStatus) || tr('使用 .wdf 格式保存完整项目','Save the complete project in .wdf format')}</span></div><div><button onClick={exportProject}>{tr('导出 WDF','Export WDF')}</button><button onClick={() => importRef.current?.click()}>{text('importWdf')}</button></div><input ref={importRef} type="file" accept=".wdf,application/x-branchspace-wdf" hidden onChange={importProject} /></div></section>}
-              {settingsSection === 'about' && <section className="settings-section about-settings"><header><h3>{tr('关于 Wendaflow','About Wendaflow')}</h3><p>{tr('让思考不再被单一线性对话束缚。','A spatial workspace for conversations, context, and execution.')}</p></header><div className="about-hero"><div className="about-mark">W</div><div><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div><em>v{APP_VERSION}</em></div><div className="about-grid"><article><strong>{tr('当前版本','Current version')}</strong><span>v{APP_VERSION}</span></article><article><strong>{tr('授权状态','License status')}</strong><span>{license ? `${String(license.tier || 'pro').toUpperCase()} · ${tr('已激活','Activated')}` : tr('未激活','Not activated')}</span></article><article><strong>{tr('官方网站','Official website')}</strong><a href="https://cn.qnjyxh.xyz" target="_blank" rel="noreferrer">cn.qnjyxh.xyz</a></article><article><strong>{tr('通知服务','Notification service')}</strong><span>{notificationSettings.enabled ? tr('已开启','Enabled') : tr('已关闭','Disabled')}</span></article></div><div className="settings-project-row update-check-row"><div><strong>{tr('软件更新','Software updates')}</strong><span>{updateCheckState === 'checking' ? tr('正在检查更新…','Checking for updates…') : updateCheckState === 'available' ? tr('发现可用更新，已显示在通知中心。','An update is available in Notification Center.') : updateCheckState === 'current' ? tr('当前已是最新版本。','You are up to date.') : updateCheckState === 'failed' ? tr('无法连接更新服务，请稍后重试。','Could not reach the update service. Please try again.') : tr('启动时会自动检查；也可以随时手动检查。','Checked at startup; you can also check manually.')}</span></div><button type="button" disabled={updateCheckState === 'checking'} onClick={() => { void checkForUpdates(true); }}>{updateCheckState === 'checking' ? tr('正在检查…','Checking…') : tr('检查更新','Check for updates')}</button></div><p className="about-note">{tr('Wendaflow 仅在你选择的模型连接中处理请求；模型密钥与画布数据由当前设备管理。','Wendaflow sends requests only through the model connections you configure. Model keys and canvas data stay managed by this device.')}</p></section>}
-              </div>
-            </div>
-          </section>
-        </div>
+              </Group>
+              <Group title={`${tr('云端模型库','Cloud model library')} · ${tr('API 配置','API configuration')}`} hint={tr('每个模型独立保存协议、地址和模型名。','Each model keeps its own protocol, endpoint, and model name.')} action={cloudProfiles.length > 0 ? <Button kind="danger" className="small" onClick={removeActiveCloud}>{tr('删除当前','Delete current')}</Button> : null}>
+                <Chips items={cloudProfiles} activeId={activeCloud.id} onSelect={setActiveCloudId} onAdd={addCloudProfile} addLabel={`＋ ${tr('云端模型库','Cloud model library')}`} />
+                {cloudProfiles.length === 0 && <p className="sx-note" style={{ padding: '12px 18px 0' }}>{tr('尚未添加云端模型，点击 ＋ 添加。','No cloud models yet. Click ＋ to add one.')}</p>}
+                <Fields>
+                  <Field label={tr('显示名称','Display name')}><Input value={activeCloud.name} onChange={(event) => updateActiveCloud({ name: event.target.value })} /></Field>
+                  <Field label={tr('接口格式','API format')}>
+                    <Select value={activeCloud.format} onChange={(event) => { const format = event.target.value; const preset = CLOUD_FORMAT_PRESETS[format]; updateActiveCloud({ format, endpoint: preset.endpoint, model: preset.model }); }}>
+                      <option value="responses">OpenAI Responses</option>
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                      <option value="anthropic">Anthropic Messages</option>
+                      <option value="gemini">Google Gemini</option>
+                    </Select>
+                  </Field>
+                  <Field label={tr('接口地址','Endpoint')} span><Input value={activeCloud.endpoint} onChange={(event) => updateActiveCloud({ endpoint: event.target.value })} placeholder={activeCloud.format === 'gemini' ? GEMINI_ENDPOINT : 'https://…'} /></Field>
+                  <Field label={tr('模型名称','Model name')}><Input value={activeCloud.model} onChange={(event) => updateActiveCloud({ model: event.target.value })} /></Field>
+                  <Field label={tr('API 密钥','API key')}><Input type="password" autoComplete="off" value={activeCloud.apiKey} onChange={(event) => updateActiveCloud({ apiKey: event.target.value })} placeholder={tr('仅保存在本次会话','Stored only for this session')} /></Field>
+                </Fields>
+                <div className="sx-actionbar">
+                  <Status tone={activeCloud.apiKey ? 'ok' : 'idle'}>{activeCloud.apiKey ? tr('已配置，可在输入框直接选择','Configured and available in the composer') : tr('等待配置','Not configured')}</Status>
+                </div>
+              </Group>
+            </Page>
+          )}
+          {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
+          {settingsSection === 'license' && (
+            <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
+              {license ? (
+                <Group>
+                  <Row title={`${tr('已激活','Activated')} · ${String(license.tier || 'pro').toUpperCase()}`} hint={license.expiresAt ? `${tr('有效至','Valid until')} ${new Date(license.expiresAt).toLocaleDateString(uiLanguage)}` : tr('永久授权','Perpetual license')}>
+                    <Status tone="ok">{systemText(licenseStatus) || tr('已绑定到这台设备。','Bound to this device.')}</Status>
+                  </Row>
+                  <Row title={tr('移除此设备上的授权','Remove local license')}>
+                    <Button kind="danger" onClick={deactivateLicense}>{tr('移除授权','Remove')}</Button>
+                  </Row>
+                </Group>
+              ) : (
+                <Group>
+                  <Fields>
+                    <Field label={tr('激活码','Activation code')} span><Input value={activationCode} onChange={(event) => setActivationCode(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === 'Enter') activateLicense(); }} placeholder="WDF-XXXXXXX-XXXXXXX-XXXXXXX" autoComplete="off" /></Field>
+                  </Fields>
+                  <div className="sx-actionbar">
+                    <Status tone={licenseBusy ? 'busy' : 'idle'}>{systemText(licenseStatus) || tr('尚未激活','Not activated')}</Status>
+                    <Button kind="primary" disabled={licenseBusy} onClick={activateLicense}>{licenseBusy ? tr('正在激活…','Activating…') : tr('激活此设备','Activate this device')}</Button>
+                  </div>
+                </Group>
+              )}
+            </Page>
+          )}
+          {settingsSection === 'notifications' && (
+            <Page title={tr('应用内通知','In-app notifications')} description={tr('仅当 Wendaflow 正在运行时接收通知；关闭软件后不会保留后台连接。','Receive notifications only while Wendaflow is running. No background connection is kept after you close the app.')}>
+              <Group>
+                <Row title={tr('接收通知','Receive notifications')} hint={tr('开启后，新消息会以右上角弹窗显示，并保留在通知中心。','When enabled, new messages appear as a pop-up and remain in Notification Center.')}>
+                  <Switch checked={notificationSettings.enabled} onChange={(enabled) => setNotificationSettings((value) => ({ ...value, enabled }))} label={tr('接收通知','Receive notifications')} onLabel={text('enabled')} offLabel={text('disabled')} />
+                </Row>
+              </Group>
+              <Group title={tr('通知中心','Notification center')} hint={tr('通知服务会自动同步，无需设置地址。需要确认的通知会在详情窗口中保留，直到你手动确认。','Notifications sync automatically. Address setup is not required, and confirmation-required notices remain until acknowledged.')}>
+                <Fields>
+                  <Field label={tr('本机设备 ID','This device ID')} span><Input readOnly value={notificationSettings.deviceId} /></Field>
+                </Fields>
+              </Group>
+            </Page>
+          )}
+          {settingsSection === 'plugins' && (
+            <Page title={tr('插件','Plugins')} description={tr('扩展功能正在准备中。','Extensions are being prepared.')}>
+              <Group>
+                <Empty icon="⌘" title={tr('敬请期待','Coming soon')}>{tr('未来你可以在这里发现和管理 Wendaflow 的扩展能力。','You will be able to discover and manage Wendaflow extensions here.')}</Empty>
+              </Group>
+            </Page>
+          )}
+          {settingsSection === 'project' && (
+            <Page title={text('projectData')} description={tr('备份或恢复完整画布，包括节点、附件和布局。','Back up or restore complete canvases, including nodes, attachments, and layout.')}>
+              <Group>
+                <Row title={tr('Wendaflow 画布文件','Wendaflow canvas file')} hint={systemText(projectStatus) || tr('使用 .wdf 格式保存完整项目','Save the complete project in .wdf format')}>
+                  <Button onClick={exportProject}>{tr('导出 WDF','Export WDF')}</Button>
+                  <Button onClick={() => importRef.current?.click()}>{text('importWdf')}</Button>
+                  <input ref={importRef} type="file" accept=".wdf,application/x-branchspace-wdf" hidden onChange={importProject} />
+                </Row>
+              </Group>
+            </Page>
+          )}
+          {settingsSection === 'about' && (
+            <Page title={tr('关于 Wendaflow','About Wendaflow')} description={tr('让思考不再被单一线性对话束缚。','A spatial workspace for conversations, context, and execution.')}>
+              <Group>
+                <div className="sx-hero"><div className="sx-hero-mark">W</div><div><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div><em>v{APP_VERSION}</em></div>
+                <Row title={tr('授权状态','License status')}><span className="sx-value">{license ? `${String(license.tier || 'pro').toUpperCase()} · ${tr('已激活','Activated')}` : tr('未激活','Not activated')}</span></Row>
+                <Row title={tr('官方网站','Official website')}><a href="https://cn.qnjyxh.xyz" target="_blank" rel="noreferrer">cn.qnjyxh.xyz</a></Row>
+                <Row title={tr('通知服务','Notification service')}><span className="sx-value">{notificationSettings.enabled ? tr('已开启','Enabled') : tr('已关闭','Disabled')}</span></Row>
+              </Group>
+              <Group>
+                <Row title={tr('软件更新','Software updates')} hint={updateCheckState === 'checking' ? tr('正在检查更新…','Checking for updates…') : updateCheckState === 'available' ? tr('发现可用更新，已显示在通知中心。','An update is available in Notification Center.') : updateCheckState === 'current' ? tr('当前已是最新版本。','You are up to date.') : updateCheckState === 'failed' ? tr('无法连接更新服务，请稍后重试。','Could not reach the update service. Please try again.') : tr('启动时会自动检查；也可以随时手动检查。','Checked at startup; you can also check manually.')}>
+                  <Button disabled={updateCheckState === 'checking'} onClick={() => { void checkForUpdates(true); }}>{updateCheckState === 'checking' ? tr('正在检查…','Checking…') : tr('检查更新','Check for updates')}</Button>
+                </Row>
+              </Group>
+              <p className="sx-note">{tr('Wendaflow 仅在你选择的模型连接中处理请求；模型密钥与画布数据由当前设备管理。','Wendaflow sends requests only through the model connections you configure. Model keys and canvas data stay managed by this device.')}</p>
+            </Page>
+          )}
+          {settingsSection === 'sponsor' && (
+            <Page title={tr('赞助 Wendaflow','Sponsor Wendaflow')} description={tr('如果 Wendaflow 对你有帮助，欢迎任选一种方式支持后续开发。点击二维码可放大查看。','If Wendaflow helps you, you can support its continued development through any option below. Click a QR code to enlarge it.')}>
+              <div className="sx-sponsors">{[['wechat.jpg',tr('微信支付','WeChat Pay'),tr('推荐使用微信支付','WeChat Pay recommended')],['alipay.jpg',tr('支付宝','Alipay'),tr('支付宝扫码支付','Scan with Alipay')],['binance.jpg',tr('币安支付','Binance Pay'),tr('使用币安 App 扫码支付','Scan with Binance App')],['usdt-tron.jpg','USDT · TRON',tr('仅支持 TRON 资产','TRON network only')]].map(([file,title,hint]) => (
+                <article className="sx-sponsor" key={file} role="button" tabIndex={0} onClick={() => setSponsorPreview({ file, title, hint })} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSponsorPreview({ file, title, hint }); } }}>
+                  <img src={`sponsor/${file}`} alt={`${title} ${tr('赞助二维码','sponsorship QR code')}`} />
+                  <strong>{title}</strong><small>{hint}</small>
+                  {file === 'usdt-tron.jpg' && <div className="sx-wallet" onClick={(event) => event.stopPropagation()}><code>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</code><Button className="small" onClick={() => { navigator.clipboard?.writeText('TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr'); setSponsorCopied(true); window.setTimeout(() => setSponsorCopied(false), 1600); }}>{sponsorCopied ? tr('已复制','Copied') : tr('复制地址','Copy address')}</Button></div>}
+                </article>
+              ))}</div>
+              <p className="sx-note">{tr('感谢你的支持，它会直接帮助 Wendaflow 持续改进。','Thank you — your support directly helps Wendaflow keep improving.')}</p>
+            </Page>
+          )}
+        </SettingsDialog>
       )}
       {sponsorPreview && <div className="sponsor-preview-backdrop" role="dialog" aria-modal="true" aria-label={sponsorPreview.title} onPointerDown={(event) => { if (event.target === event.currentTarget) setSponsorPreview(null); }}><section className="sponsor-preview"><button className="sponsor-preview-close" type="button" aria-label={text('close')} onClick={() => setSponsorPreview(null)}>×</button><strong>{sponsorPreview.title}</strong><small>{sponsorPreview.hint}</small><img src={`sponsor/${sponsorPreview.file}`} alt={`${sponsorPreview.title} ${tr('赞助二维码','sponsorship QR code')}`} />{sponsorPreview.file === 'usdt-tron.jpg' && <div className="sponsor-preview-wallet"><code>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</code><button type="button" onClick={() => { navigator.clipboard?.writeText('TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr'); setSponsorCopied(true); window.setTimeout(() => setSponsorCopied(false), 1600); }}>{sponsorCopied ? tr('已复制','Copied') : tr('复制地址','Copy address')}</button></div>}</section></div>}
     </div>
