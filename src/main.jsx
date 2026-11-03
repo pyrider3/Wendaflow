@@ -750,7 +750,10 @@ function App() {
           setCacheWarning(tr('自动缓存失败；请点击“保存”写入本地 WDF。',"Local cache unavailable. Use Save to write a WDF file."));
         });
     }, 180);
-    return () => window.clearTimeout(timer);
+    // Local mode also writes the WDF file shortly after the last change, so the
+    // save indicator settles instead of waiting for the two-minute interval.
+    const fileTimer = PUBLIC_WEB ? null : window.setTimeout(() => { void saveCanvasRef.current?.(true); }, 2000);
+    return () => { window.clearTimeout(timer); if (fileTimer) window.clearTimeout(fileTimer); };
   }, [nodes, selectedId, collapsedIds, activeCanvasId,autosavePolicy]);
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -2969,7 +2972,19 @@ function App() {
               {!!notifications.length && <footer><button onClick={() => { setNotifications((items) => items.map((item) => ({ ...item, read: true }))); syncNotificationState([], 'read'); }}>{tr('全部标为已读','Mark all as read')}</button><button onClick={() => { syncNotificationState([], 'dismiss'); setNotifications([]); }}>{tr('清除全部','Clear all')}</button></footer>}
             </section>}
           </div>
-          <button className={`quiet-button save-button ${saveStatus === '保存中…' ? 'saving' : saveStatus === '已保存' ? 'saved' : saveStatus === '保存失败' ? 'failed' : ''}`} disabled={saveStatus === '保存中…'} title={autosavePolicy[activeCanvasId]===true?say('自动保存已开启','Autosave is on'):say('手动保存一次后启用自动保存','Save once to enable autosave')} onClick={()=>saveCanvas()}>{saveStatus === '保存中…' ? text('saving') : saveStatus === '已保存' ? (PUBLIC_WEB?say('已保存到浏览器','Saved in browser'):text('saved')) : saveStatus === '保存失败' ? text('saveFailed') : saveStatus ? (PUBLIC_WEB?say('保存到浏览器','Save in browser'):say('保存 *','Save *')) : (PUBLIC_WEB?say('保存到浏览器','Save in browser'):text('save'))}</button><button className="quiet-button" onClick={()=>exportCanvases([activeCanvasId])}>{say('导出 WDF','Export WDF')}</button>
+          {(() => {
+            const autosaveOn = autosavePolicy[activeCanvasId] === true;
+            const state = saveStatus === '保存中…' ? 'saving' : saveStatus === '保存失败' ? 'failed' : saveStatus === '已保存' ? 'saved' : saveStatus ? 'dirty' : 'idle';
+            const label = PUBLIC_WEB
+              ? (state === 'saving' ? text('saving') : state === 'saved' ? say('已保存到浏览器','Saved in browser') : state === 'failed' ? text('saveFailed') : say('保存到浏览器','Save in browser'))
+              : state === 'saving' ? text('saving')
+              : state === 'failed' ? text('saveFailed')
+              : autosaveOn ? (state === 'dirty' ? tr('自动保存中…','Autosaving…') : tr('已自动保存','Autosaved'))
+              : text('save');
+            const hint = autosaveOn ? tr('修改会自动保存，也可按 Ctrl+S 立即保存。','Changes save automatically. Press Ctrl+S to save now.') : tr('尚未保存。保存一次后，之后的修改会自动保存（Ctrl+S）。','Not saved yet. Save once and later changes save automatically (Ctrl+S).');
+            const className = `quiet-button save-button ${state === 'saving' ? 'saving' : state === 'saved' || (autosaveOn && state === 'idle') ? 'saved' : state === 'failed' ? 'failed' : ''} ${!autosaveOn && state === 'dirty' ? 'unsaved' : ''}`;
+            return <button className={className} disabled={state === 'saving'} title={hint} onClick={() => saveCanvas()}>{label}</button>;
+          })()}<button className="quiet-button" onClick={()=>exportCanvases([activeCanvasId])}>{say('导出 WDF','Export WDF')}</button>
           <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z">↶</button>
         <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z">↷</button>
         <button className="quiet-button" onClick={fitView}>{text('fitCanvas')}</button>
@@ -3151,7 +3166,7 @@ function App() {
       {inspectorOpen && selected && selectedIds.size === 1 ? (
         <aside className={`inspector ${inspectorClosing ? 'closing' : ''}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
           <div className="inspector-head"><div><span>{selectedIds.size > 1 ? `${selectedIds.size} ${text('selectedNodes')}` : text('currentNode')}</span><button type="button" className={`inspector-title ${inspectorTitleExpanded ? 'expanded' : ''}`} title={selected?.title} onClick={() => setInspectorTitleExpanded((value) => !value)}>{selected?.title}</button></div><button aria-label={text('close')} onClick={() => setInspectorOpen(false)}>×</button></div>
-          <div className="meta-row"><span>{selected?.author}</span><span>{selected?.model || text('manualInput')}</span><span>{selected?.type === 'action' ? statusLabel(selected.status, uiLanguage) : text('saved')}</span></div>
+          <div className="meta-row"><span>{selected?.author}</span><span>{selected?.model || text('manualInput')}</span>{selected?.type === 'action' && <span>{statusLabel(selected.status, uiLanguage)}</span>}</div>
           <nav className="inspector-tabs" aria-label={text('currentNode')}>{[['overview',text('overview')],['context',`${text('context')} ${activePath.length}`],['actions',text('operations')]].map(([value,label]) => <button key={value} className={inspectorTab === value ? 'active' : ''} onClick={() => setInspectorTab(value)}>{label}</button>)}</nav>
           <div key={inspectorTab} className={`inspector-body tab-${inspectorTab}`}>
           {inspectorTab === 'overview' && selected?.prompt && <section className="inspector-section prompt-section"><h3>{tr('这一轮的问题','Question in this turn')}</h3><p>{selected.prompt}</p></section>}

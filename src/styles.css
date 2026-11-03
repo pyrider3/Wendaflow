@@ -768,3 +768,5 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 .resize-handle::after, .collapse-button::after { content: ""; position: absolute; inset: -6px; }
 /* Mouse-gesture hints do not apply to touch screens. */
 @media (pointer: coarse) { .empty-welcome span, .canvas-hint { display: none; } }
+
+.save-button.unsaved::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-focus, #247b56); flex: none; }
