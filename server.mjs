@@ -15,9 +15,6 @@ const CANVAS_DIR = path.join(DATA_ROOT, 'data', 'canvases');
 const canvasFiles = canvasStorage(DATA_ROOT);
 const DSH_BIN = process.env.DSH_CLI || path.join(os.homedir(), 'Documents', 'Codex', '2026-08-21', 'new-chat', 'work', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js');
 const agentJobs = new Map();
-const HARNESS_WEB_PORT = Number(process.env.WONDERFUL_HARNESS_PORT || 43178);
-let harnessWebChild = null;
-let harnessWebReady = null;
 // The desktop app loads its UI from file://, while the browser build uses Vite.
 // This server is loopback-only, so either local client may access it safely.
 const allowedHeaders = PUBLIC_WEB ? {} : { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' };
@@ -169,209 +166,68 @@ function createAgentEventDecoder(hooks = {}) {
   };
 }
 
-function harnessText(value) {
-  if (value == null) return '';
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.map(harnessText).filter(Boolean).join('\n');
-  if (typeof value !== 'object') return String(value);
-  if (Array.isArray(value.content)) return harnessText(value.content);
-  if (Array.isArray(value.message?.content)) return harnessText(value.message.content);
-  return value.text || value.output || value.summary || value.message || value.result || '';
+// DeepSeek Harness runs through its one-shot `headless` profile. API-key routes
+// read DEEPSEEK_API_KEY from the launch environment, `<workspace>/.env` or
+// `~/.dsh/.env`; Wendaflow never handles the key itself.
+function harnessFailureMessage(text) {
+  if (/MISSING_CREDENTIAL|no API key/i.test(text)) return '未找到 DeepSeek API 密钥。请在 ~/.dsh/.env 中写入一行 DEEPSEEK_API_KEY=你的密钥（或在启动后端的环境里设置它），然后重试。';
+  return String(text || '').replace(/^dsh:\s*/, '').trim() || 'DeepSeek Harness 执行失败';
 }
 
-function relayHarnessFrame(frame, sessionId, hooks = {}) {
-  if (!frame || frame.sessionId !== sessionId) return '';
-  if (frame.type === 'host/session-status') {
-    hooks.onEvent?.('status', frame.running ? 'Harness 正在执行' : 'Harness 已完成');
-    return frame.running ? 'running' : 'done';
+function harnessToolInput(input) {
+  if (input && typeof input === 'object') {
+    const direct = input.command || input.cmd || input.file_path || input.path || input.pattern || input.url || input.query;
+    return direct ? String(direct) : (Object.keys(input).length ? JSON.stringify(input) : '');
   }
-  if (frame.type !== 'session/event') return '';
-  const event = frame.event || {};
-  const data = event.data || {};
-  if (event.type === 'assistant/chunk') {
-    const chunk = data.chunk || {};
-    const text = chunk.text || '';
-    if (text) hooks.onEvent?.(chunk.type === 'reasoning-delta' ? 'thinking' : 'message', text);
-  } else if (event.type === 'assistant/message') {
-    const blocks = data.message?.content || data.content || [];
-    const visible = blocks.filter((block) => block?.type !== 'reasoning').map(harnessText).filter(Boolean).join('\n');
-    const reasoning = blocks.filter((block) => block?.type === 'reasoning').map(harnessText).filter(Boolean).join('\n');
-    if (reasoning) hooks.onEvent?.('thinking', reasoning);
-    if (visible) hooks.onEvent?.('message', visible);
-  } else if (event.type === 'tool/call') {
-    hooks.onEvent?.('command', `${data.name || '工具'}${data.arguments ? `\n${data.arguments}` : ''}`);
-  } else if (event.type === 'tool/result') {
-    const text = harnessText(data.message || data.result || data);
-    hooks.onEvent?.('command', text || '工具已返回结果');
-  } else if (event.type === 'command/run' || event.type === 'command/done') {
-    hooks.onEvent?.('command', harnessText(data) || event.type);
-  }
-  return '';
+  return input ? String(input) : '';
 }
 
-let harnessCookie = '';
-const harnessHeaders = (extra = {}) => (harnessCookie ? { ...extra, cookie: harnessCookie } : extra);
-
-// Older builds answer `/` with 200 as soon as they listen.
-async function pollHarnessWeb(child) {
-  const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
-  for (let attempt = 0; attempt < 200 && harnessWebChild === child && !harnessCookie; attempt += 1) {
-    try {
-      const response = await fetch(`${origin}/`, { signal: AbortSignal.timeout(800) });
-      if (response.ok) { harnessCookie = ''; return origin; }
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-  throw new Error('DeepSeek Harness Web/API 服务启动超时');
-}
-
-// Current builds print `dsh web: http://host:port/?token=…` and answer 401 to
-// everything else; the token is traded once for an auth cookie.
-function authenticateHarnessWeb(child) {
-  return new Promise((resolve, reject) => {
-    let output = '', stderr = '', started = false;
-    child.stdout.on('data', async (chunk) => {
-      output += chunk;
-      const match = output.match(/https?:\/\/\S+?[?&]token=([^\s&]+)/);
-      if (!match || started) return;
-      started = true;
-      try {
-        const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
-        const response = await fetch(`${origin}/?token=${match[1]}`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
-        const cookies = response.headers.getSetCookie().map((cookie) => cookie.split(';')[0]);
-        if (!cookies.length) throw new Error('DeepSeek Harness 没有返回登录凭证');
-        harnessCookie = cookies.join('; ');
-        resolve(origin);
-      } catch (error) { reject(error); }
-    });
-    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-400); });
-    child.on('close', () => reject(new Error(`DeepSeek Harness 启动后立即退出${stderr.trim() ? `：${stderr.trim()}` : ''}`)));
-  });
-}
-
-async function ensureHarnessWeb() {
-  const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
-  try {
-    const response = await fetch(`${origin}/`, { headers: harnessHeaders(), signal: AbortSignal.timeout(500) });
-    if (response.ok) return origin;
-  } catch {}
-  if (!harnessWebReady) {
-    const harnessBin = await resolveHarnessBin();
-    harnessCookie = '';
-    harnessWebChild = spawn(process.execPath, [harnessBin, '--profile', 'web', '--no-open', '--host', HOST, '--port', String(HARNESS_WEB_PORT), '--trusted-host', `${HOST}:${HARNESS_WEB_PORT}`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    harnessWebChild.on('error', () => { harnessWebReady = null; harnessWebChild = null; harnessCookie = ''; });
-    harnessWebChild.on('close', () => { harnessWebReady = null; harnessWebChild = null; harnessCookie = ''; });
-    harnessWebReady = Promise.any([authenticateHarnessWeb(harnessWebChild), pollHarnessWeb(harnessWebChild)])
-      .catch((error) => { harnessWebReady = null; throw error.errors?.[0] || error; });
-  }
-  return harnessWebReady;
-}
-
-async function harnessRpc(origin, method, payload, signal) {
-  const rpcId = `wonderful-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const response = await fetch(`${origin}/api/${method}`, {
-    method: 'POST',
-    headers: harnessHeaders({ 'content-type': 'application/json' }),
-    // Harness' browser transport uses an RPC envelope even for unary HTTP
-    // calls.  Posting only the payload looks like an unknown route to it.
-    body: JSON.stringify({ type: 'client-request', rpcId, method, payload }),
-    signal,
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).replace(/\s+/g, ' ').slice(0, 240);
-    if (response.status === 404 && method === 'session.create') throw new Error('已启动 DeepSeek Harness，但它的网页接口与 Wendaflow 当前使用的协议不兼容（session.create 不存在）。请使用 Wendaflow 支持的 Harness 版本。');
-    throw new Error(`Harness API ${method} 返回 ${response.status}${detail ? `：${detail}` : ''}`);
-  }
-  const body = await response.json();
-  if (!body?.result?.ok) throw new Error(body?.result?.error?.message || `Harness API ${method} 请求失败`);
-  return body.result.value;
-}
-
-function openHarnessMux(origin, sessionId, hooks, signal, onError) {
-  const endpoint = `${origin.replace(/^http/, 'ws')}/api/events.mux`;
-  let socket;
-  let opened = false;
-  let closed = false;
-  const ready = new Promise((resolve, reject) => {
-    try {
-      socket = new WebSocket(endpoint, { headers: harnessHeaders() });
-      socket.addEventListener('open', () => { opened = true; resolve(); });
-      socket.addEventListener('message', (event) => {
-        try {
-          const frame = JSON.parse(String(event.data));
-          const payload = frame.payload || frame;
-          if (payload.type === 'stream/error') onError(payload.error?.message || 'Harness 事件流错误');
-          relayHarnessFrame(payload, sessionId, hooks);
-        } catch (error) { onError(error.message); }
-      });
-      socket.addEventListener('error', () => {
-        const error = new Error('无法连接 DeepSeek Harness 实时事件流');
-        if (!opened) reject(error);
-        else onError(error.message);
-      });
-      socket.addEventListener('close', () => {
-        if (!closed && !signal.aborted) onError('DeepSeek Harness 实时事件流已断开');
-      });
-    } catch (error) { reject(error); }
-  });
-  const close = () => {
-    closed = true;
-    try { socket?.close(); } catch {}
-  };
-  signal.addEventListener('abort', close, { once: true });
-  return { ready, close };
-}
-
-async function runHarnessWeb(prompt, images = [], files = [], workspace = process.cwd(), hooks = {}, options = {}) {
+async function runHarnessHeadless(prompt, images = [], files = [], workspace = process.cwd(), hooks = {}, options = {}) {
   const resolvedWorkspace = path.resolve(workspace || process.cwd());
   if (!(await stat(resolvedWorkspace)).isDirectory()) throw new Error('行动工作目录不是有效文件夹');
-  const origin = await ensureHarnessWeb();
-  const controller = new AbortController();
-  hooks.onAbort?.(() => controller.abort());
-  const session = await harnessRpc(origin, 'session.create', { cwd: resolvedWorkspace }, controller.signal);
-  const sessionId = session.sessionId;
-  let finalOutput = '';
-  let streamError = null;
-  let settled = false;
-  const mux = openHarnessMux(origin, sessionId, hooks, controller.signal, (error) => { streamError ||= error; });
-  await mux.ready;
+  const harnessBin = await resolveHarnessBin();
   const attachmentSet = await materializeAttachments([...images, ...files], resolvedWorkspace);
   const attachmentNotice = attachmentSet.paths.length
     ? `\n\nWendaflow 已将附件保存到以下路径。请实际打开并读取它们：\n${attachmentSet.paths.map((item) => `- ${item.name}: ${item.path}`).join('\n')}`
     : '';
-  const parts = [{ type: 'text', text: `${prompt}${attachmentNotice}` }];
-  for (const item of images) {
-    const match = item.dataUrl?.match(/^data:([^;,]+)?(?:;[^,]*)?;base64,(.+)$/s);
-    if (match && String(match[1]).startsWith('image/')) parts.push({ type: 'image', mediaType: match[1], data: match[2], name: item.name || 'image' });
+  // Reasoning level is a model setting, so it travels as a temporary profile overlay.
+  const effort = options.thinking === false || options.reasoning === 'none' ? 'off' : ['low', 'max'].includes(options.reasoning) ? options.reasoning : 'high';
+  const patchDir = await mkdtemp(path.join(os.tmpdir(), 'wendaflow-dsh-'));
+  const patchFile = path.join(patchDir, 'model.yml');
+  await writeFile(patchFile, `- id: agent-default-model\n  config:\n    provider: deepseek-official\n    model: deepseek-flash\n    reasoningEffort: ${effort}\n`);
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, [harnessBin, '--profile', 'headless', '--patch', patchFile, '--json', '-'], { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+      hooks.onChild?.(child);
+      let buffer = '', stderr = '', sessionId = '', finalText = '', failure = '';
+      const timer = setTimeout(() => { failure ||= 'DeepSeek Harness 任务超时（15 分钟）'; child.kill('SIGTERM'); }, 15 * 60_000);
+      const handle = (line) => {
+        let event;
+        try { event = JSON.parse(line); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); return; }
+        if (event.type === 'session') sessionId = event.sessionId || sessionId;
+        else if (event.type === 'thinking') { if (event.text) hooks.onEvent?.('thinking', event.text); }
+        else if (event.type === 'text') { if (event.text) hooks.onEvent?.('message', event.text); }
+        else if (event.type === 'tool_call') { const input = harnessToolInput(event.input); hooks.onEvent?.('command', `${event.tool || '工具'}${input ? `\n${input}` : ''}`); }
+        else if (event.type === 'tool_result') hooks.onEvent?.('command', event.result ? `${event.status === 'error' ? '失败：' : ''}${event.result}` : '工具已返回结果');
+        else if (event.type === 'final') finalText = event.text || '';
+        else if (event.type === 'error') failure ||= event.error?.message || event.message || 'DeepSeek Harness 出错';
+        else if (event.type === 'status' && event.phase === 'turn_end' && event.reason?.kind === 'error') failure ||= event.reason.error?.message || '任务失败';
+      };
+      child.stdout.on('data', (chunk) => { buffer += chunk; const lines = buffer.split(/\r?\n/); buffer = lines.pop() || ''; lines.forEach(handle); });
+      child.stderr.on('data', (chunk) => { const text = chunk.toString(); hooks.onEvent?.('stderr', text); stderr = (stderr + text).slice(-2000); });
+      child.on('error', (error) => { clearTimeout(timer); reject(new Error(`DeepSeek Harness 无法启动：${error.message}`)); });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (buffer.trim()) handle(buffer);
+        if (code === 0 && !failure) resolve({ output: finalText || 'DeepSeek Harness 已完成任务。', terminal: `DeepSeek Harness session: ${sessionId}` });
+        else reject(new Error(harnessFailureMessage(failure || stderr || `退出码 ${code}`)));
+      });
+      child.stdin.end(`${prompt}${attachmentNotice}`);
+    });
+  } finally {
+    await rm(patchDir, { recursive: true, force: true }).catch(() => {});
+    if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true }).catch(() => {});
   }
-  await harnessRpc(origin, 'session.prompt', { sessionId, mode: 'queue', content: parts, clientTimeZone: 'Asia/Shanghai' }, controller.signal);
-  const deadline = Date.now() + 15 * 60_000;
-  // `events.mux` carries the detailed per-session log while running state is
-  // intentionally published on the separate host stream. Poll the session
-  // summary for that one bit so completion cannot depend on UI-only events.
-  let sawRunning = false;
-  const promptStartedAt = Date.now();
-  while (!settled && !controller.signal.aborted && Date.now() < deadline) {
-    try {
-      const listing = await harnessRpc(origin, 'session.list', {}, controller.signal);
-      const summary = (listing.items || []).find((item) => item.sessionId === sessionId);
-      if (summary?.running) sawRunning = true;
-      else if (sawRunning || Date.now() - promptStartedAt > 900) settled = true;
-    } catch (error) { streamError ||= error.message; }
-    if (!settled) await new Promise((resolve) => setTimeout(resolve, 180));
-  }
-  mux.close();
-  if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true });
-  if (streamError) throw new Error(streamError);
-  if (!settled) throw new Error('DeepSeek Harness 任务超时或已停止');
-  const history = await harnessRpc(origin, 'session.history', { sessionId, maxMessages: 100 }, undefined);
-  for (const item of history.events || []) {
-    if (item.event?.type !== 'assistant/message') continue;
-    const blocks = item.event.data?.message?.content || [];
-    const text = blocks.filter((block) => block?.type !== 'reasoning').map(harnessText).filter(Boolean).join('\n');
-    if (text) finalOutput = text;
-  }
-  return { output: finalOutput || 'DeepSeek Harness 已完成任务。', terminal: `Harness Web session: ${sessionId}` };
 }
 
 async function readJson(req, limit = 12_000_000) {
@@ -490,10 +346,8 @@ async function runCodex(prompt, images = [], files = [], workspace = process.cwd
 async function runCliAgent(runner, prompt, images = [], files = [], workspace = process.cwd(), hooks = {}, options = {}) {
   const resolvedWorkspace = path.resolve(workspace || process.cwd());
   if (!(await stat(resolvedWorkspace)).isDirectory()) throw new Error('行动工作目录不是有效文件夹');
-  // Headless only prints a completed transcript.  The Web/API session exposes
-  // the same event sequence as Harness' own client, including tool calls and
-  // incremental assistant/reasoning chunks.
-  if (runner === 'deepseek') return runHarnessWeb(prompt, images, files, resolvedWorkspace, hooks, options);
+  // DeepSeek Harness has its own one-shot runner (`dsh headless --json`).
+  if (runner === 'deepseek') return runHarnessHeadless(prompt, images, files, resolvedWorkspace, hooks, options);
   const { tempDir, paths: attachmentPaths } = await materializeAttachments([...images, ...files], resolvedWorkspace);
   const effectivePrompt = attachmentPaths.length ? `${prompt}\n\nWendaflow 已将用户上传的附件保存到以下本地路径。你必须实际打开并读取它们；图片也需要通过这些路径查看：\n${attachmentPaths.map((item) => `- ${item.name}: ${item.path}`).join('\n')}` : prompt;
   const claudeCommand = process.env.CLAUDE_CLI || await findCommand(process.platform === 'win32' ? ['claude.cmd', 'claude.exe', 'claude'] : ['claude']);
