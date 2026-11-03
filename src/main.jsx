@@ -1431,7 +1431,7 @@ function App() {
     event.nativeEvent?.stopImmediatePropagation?.();
   }
 
-  function beginResize(event, node) {
+  function beginResize(event, node, axis = 'both') {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     beginHistory();
     if (event.button !== 0) return;
@@ -1440,7 +1440,7 @@ function App() {
     const size = nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 };
     event.currentTarget.setPointerCapture?.(event.pointerId);
     resizingRef.current = node.id;
-    setResizing({ id: node.id, startX: event.clientX, startY: event.clientY, width: size.width, height: size.height, compact:node.type==='thought'&&!node.attachments?.length });
+    setResizing({ axis, id: node.id, startX: event.clientX, startY: event.clientY, width: size.width, height: size.height, compact:node.type==='thought'&&!node.attachments?.length });
   }
 
   function removeConnections(connections = selectedConnections) {
@@ -1564,8 +1564,8 @@ function App() {
         setRelationDrag(next);
       }
     } else if (resizing) {
-      const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (event.clientX - resizing.startX) / viewportRef.current.zoom));
-      const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (event.clientY - resizing.startY) / viewportRef.current.zoom));
+      const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (resizing.axis==='y'?0:event.clientX - resizing.startX) / viewportRef.current.zoom));
+      const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (resizing.axis==='x'?0:event.clientY - resizing.startY) / viewportRef.current.zoom));
       setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
       window.requestAnimationFrame(syncConnectionGeometry);
     } else if (marquee) {

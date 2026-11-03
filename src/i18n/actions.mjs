@@ -92,6 +92,8 @@ Open with the default app|使用預設程式開啟|既定のアプリで開く|�
 DOC|文|文書|문서|DOC|DOC|DOK|DOC|ДОК|مستند
 Stop|停止|停止|중지|Detener|Arrêter|Stoppen|Parar|Остановить|إيقاف
 Resize card|調整卡片大小|カードのサイズ変更|카드 크기 조절|Cambiar tamaño de tarjeta|Redimensionner la carte|Kartengröße ändern|Redimensionar cartão|Изменить размер карточки|تغيير حجم البطاقة
+Resize card width|調整卡片寬度|カードの幅を変更|카드 너비 조절|Cambiar ancho de tarjeta|Ajuster la largeur de la carte|Kartenbreite ändern|Ajustar largura do cartão|Изменить ширину карточки|تغيير عرض البطاقة
+Resize card height|調整卡片高度|カードの高さを変更|카드 높이 조절|Cambiar alto de tarjeta|Ajuster la hauteur de la carte|Kartenhöhe ändern|Ajustar altura do cartão|Изменить высоту карточки|تغيير ارتفاع البطاقة
 Create relation|建立關係|関係を作成|관계 만들기|Crear relación|Créer une relation|Beziehung erstellen|Criar relação|Создать связь|إنشاء علاقة
 Drag to another node, then choose inherit, reference, or merge|拖曳至其他節點，再選繼承、引用或合併|別のノードへドラッグし、継承・参照・統合を選択|다른 노드로 끌고 상속, 참조 또는 병합 선택|Arrastra a otro nodo y elige herencia, referencia o fusión|Glissez vers un autre nœud, puis choisissez héritage, référence ou fusion|Zu anderem Knoten ziehen, dann Vererbung, Referenz oder Zusammenführung wählen|Arraste para outro nó e escolha herança, referência ou fusão|Перетащите на другой узел и выберите наследование, ссылку или объединение|اسحب إلى عقدة أخرى ثم اختر الوراثة أو المرجع أو الدمج
 Cancel branch|取消建立分支|分岐をキャンセル|분기 취소|Cancelar rama|Annuler la branche|Zweig abbrechen|Cancelar ramo|Отменить ветвление|إلغاء الفرع

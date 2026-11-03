@@ -418,6 +418,18 @@ export function CardContent({
         </button>
       )}
       <button
+        className="resize-edge resize-edge-x"
+        tabIndex={-1}
+        aria-label={tr("调整卡片宽度", "Resize card width")}
+        onPointerDown={(event) => beginResize(event, node, "x")}
+      />
+      <button
+        className="resize-edge resize-edge-y"
+        tabIndex={-1}
+        aria-label={tr("调整卡片高度", "Resize card height")}
+        onPointerDown={(event) => beginResize(event, node, "y")}
+      />
+      <button
         className="resize-handle"
         aria-label={tr("调整卡片大小", "Resize card")}
         onPointerDown={(event) => beginResize(event, node)}

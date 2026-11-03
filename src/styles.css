@@ -347,10 +347,13 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .status.failed { color: #9a443c; background: #f5dfdc; }
 .status.stopped { color: #726a55; background: #eee9dc; }
 .stop-generation { position: absolute; right: 14px; bottom: 11px; padding: 4px 8px; border: 1px solid rgba(159,73,64,.25); border-radius: 7px; background: rgba(255,255,255,.88); color: #9a443c; cursor: pointer; font-size: 9px; }
-.resize-handle { position: absolute; right: 4px; bottom: 4px; width: 16px; height: 16px; padding: 0; border: 0; background: transparent; cursor: nwse-resize; opacity: 0; transition: opacity .15s var(--ease-out); }
-.resize-handle::before { content: ""; position: absolute; right: 2px; bottom: 2px; width: 7px; height: 7px; border-right: 1.5px solid #779087; border-bottom: 1.5px solid #779087; border-radius: 0 0 2px; }
+.resize-handle { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; padding: 0; border: 0; background: transparent; cursor: nwse-resize; opacity: 0; transition: opacity .15s var(--ease-out); }
+.resize-handle::before { content: ""; position: absolute; right: 5px; bottom: 5px; width: 7px; height: 7px; border-right: 1.5px solid #779087; border-bottom: 1.5px solid #779087; border-radius: 0 0 2px; }
 .node:hover .resize-handle, .node.selected .resize-handle { opacity: .72; }
 .resize-handle:hover { opacity: 1 !important; }
+.resize-edge { position: absolute; z-index: 2; padding: 0; border: 0; background: transparent; }
+.resize-edge-x { top: 16px; bottom: 16px; right: -3px; width: 7px; cursor: ew-resize; }
+.resize-edge-y { left: 16px; right: 16px; bottom: -3px; height: 7px; cursor: ns-resize; }
 .node.summary { width: calc(var(--preview-width, 184px) + (var(--full-width, 224px) - var(--preview-width, 184px)) * (1 - var(--semantic, 0))); min-height: calc(110px + 24px * var(--semantic, 0)); padding: 14px 15px; }
 .node.preview-reserve.summary { box-sizing: border-box; height: calc(var(--preview-height, 110px) + (var(--full-card-height, 180px) - var(--preview-height, 110px)) * (1 - var(--semantic, 0))); min-height: 0; overflow: hidden; }
 .node.preview-reserve .markdown-content { position: absolute; z-index: 1; top: var(--preview-content-top, 69px); left: 15px; width: calc(var(--full-width) - 30px); max-width: calc(var(--full-width) - 30px); max-height: calc(var(--full-card-height, 180px) - var(--preview-content-top, 69px) - 14px); margin: 0; contain: layout paint; }
@@ -655,7 +658,7 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 .public-web-note a {color:#225b41;text-decoration:underline;}
 
 /* Larger invisible hit areas for small card controls. */
-.resize-handle::after, .collapse-button::after { content: ""; position: absolute; inset: -6px; }
+.collapse-button::after { content: ""; position: absolute; inset: -6px; }
 /* Mouse-gesture hints do not apply to touch screens. */
 @media (pointer: coarse) { .empty-welcome span, .canvas-hint { display: none; } }
 
