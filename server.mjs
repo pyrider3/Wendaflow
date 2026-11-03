@@ -93,8 +93,17 @@ function eventText(value) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(eventText).filter(Boolean).join('\n');
-  if (typeof value === 'object') return value.text || value.summary || value.content || value.output || value.aggregated_output || value.command || value.cmd || value.path || value.file || '';
+  if (typeof value === 'object') {
+    const picked = value.text || value.summary || value.content || value.output || value.aggregated_output || value.command || value.cmd || value.path || value.file || '';
+    return typeof picked === 'string' ? picked : eventText(picked);
+  }
   return String(value);
+}
+
+// One-line description of a Claude tool call: the command or target it was given.
+function toolUseText(block) {
+  const input = block?.input || {};
+  return eventText(input.command || input.file_path || input.path || input.pattern || input.url || input.query) || block?.name || '工具调用';
 }
 
 function emitAgentTerminalEvents(text, hooks = {}) {
@@ -116,6 +125,11 @@ function emitAgentTerminalEvents(text, hooks = {}) {
       } else if (event.type === 'system') {
         const label = event.subtype === 'init' ? 'Claude Code 已就绪' : event.subtype === 'status' ? 'Claude Code 状态已更新' : eventText(event) || 'Claude Code 系统事件';
         hooks.onEvent?.('status', label);
+      } else if (event.type === 'assistant' && event.message?.content?.some?.((block) => block?.type === 'tool_use')) {
+        for (const block of event.message.content) {
+          if (block?.type === 'tool_use') hooks.onEvent?.('command', toolUseText(block));
+          else { const text = eventText(block); if (text) hooks.onEvent?.('message', text); }
+        }
       } else if (event.type === 'assistant' || event.type === 'stream_event') {
         const delta = event.event?.delta?.text || event.delta?.text || event.message?.content?.map?.(eventText).join('\n') || eventText(event.message) || eventText(event);
         if (delta) hooks.onEvent?.('message', delta);
