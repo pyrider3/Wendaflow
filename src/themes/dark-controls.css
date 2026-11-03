@@ -27,16 +27,6 @@
     [data-theme="contrast-black"],
     [data-theme="starlight"]
   )
-  :is(.inspector-tabs button, .segmented button) {
-  background: transparent;
-  color: var(--dark-muted);
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"]
-  )
   .segmented::before {
   background: var(--dark-active);
 }
@@ -85,28 +75,6 @@
   background: transparent;
   color: var(--dark-text);
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"]
-  )
-  .inspector-footer
-  button.branch {
-  background: #286447;
-  color: #fff;
-  border-color: #86c5a1;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"]
-  )
-  .danger-outline {
-  color: #ffb5ba;
-  border-color: #be7780;
-}
 
 :root:is(
     [data-theme="midnight"],
@@ -129,16 +97,6 @@
     var(--node-tint) 18%,
     var(--dark-panel)
   ) !important;
-}
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"]
-  )
-  .node-colors
-  > span {
-  color: var(--dark-muted);
 }
 
 /* Editing surfaces must use the same dark palette as their containing card. */

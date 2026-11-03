@@ -13,15 +13,6 @@
   color: #b5b5b5; opacity: 1;
 }
 :root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
-  .permission-warning, .storage-warning, .canvas-library-status,
-  .context-menu .danger, .library-actions .remove, .danger-outline
-) { color: #ffc2c6; }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
-  .node-prompt, .thinking-output, .action-live-feed article,
-  .request-record, .context-inspector, .action-terminal,
-  .markdown-content pre, .markdown-content th
-) { background: #202020; color: #e4e4e4; border-color: #606060; }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
   .node-tags span, .status, .output-assets a, .thinking-output summary,
   .action-live-feed article > i
 ) { background-color: #283a32; color: #d6f1e3; border-color: #789d89; }

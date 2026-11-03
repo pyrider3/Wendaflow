@@ -1,4 +1,14 @@
 export default `
+Remove from favorites|取消收藏|お気に入りを解除|즐겨찾기 해제|Quitar de favoritos|Retirer des favoris|Aus Favoriten entfernen|Remover dos favoritos|Убрать из избранного|إزالة من المفضلة
+Mark as not done|標為未完成|未完了にする|미완료로 표시|Marcar como pendiente|Marquer comme non terminé|Als unerledigt markieren|Marcar como não concluído|Отметить как невыполненное|وضع علامة غير مكتمل
+Mark as done|標為完成|完了にする|완료로 표시|Marcar como hecho|Marquer comme terminé|Als erledigt markieren|Marcar como concluído|Отметить как выполненное|وضع علامة مكتمل
+Generation failed|生成失敗|生成に失敗しました|생성 실패|Error al generar|Échec de la génération|Generierung fehlgeschlagen|Falha na geração|Не удалось сгенерировать|فشل التوليد
+Card|卡片|カード|카드|Tarjeta|Carte|Karte|Cartão|Карточка|البطاقة
+Edit|編輯|編集|편집|Editar|Modifier|Bearbeiten|Editar|Изменить|تحرير
+Ask from another angle|換個角度追問|別の角度から質問|다른 각도로 질문|Preguntar desde otro ángulo|Demander sous un autre angle|Aus anderem Blickwinkel fragen|Perguntar de outro ângulo|Спросить с другой стороны|اسأل من زاوية أخرى
+Link type|關聯方式|リンクの種類|연결 방식|Tipo de enlace|Type de lien|Verknüpfungsart|Tipo de vínculo|Тип связи|نوع الربط
+Expand|展開|展開|펼치기|Expandir|Développer|Erweitern|Expandir|Развернуть|توسيع
+Open card details|打開卡片詳情|カードの詳細を開く|카드 상세 열기|Abrir detalles de la tarjeta|Ouvrir les détails de la carte|Kartendetails öffnen|Abrir detalhes do cartão|Открыть сведения о карточке|فتح تفاصيل البطاقة
 Autosaved|已自動儲存|自動保存済み|자동 저장됨|Guardado automáticamente|Enregistré automatiquement|Automatisch gespeichert|Salvo automaticamente|Автосохранено|تم الحفظ تلقائيًا
 Autosaving…|自動儲存中…|自動保存中…|자동 저장 중…|Guardando automáticamente…|Enregistrement automatique…|Automatisches Speichern…|Salvando automaticamente…|Автосохранение…|جارٍ الحفظ التلقائي…
 Changes save automatically. Press Ctrl+S to save now.|修改會自動儲存，也可按 Ctrl+S 立即儲存。|変更は自動で保存されます。Ctrl+S ですぐに保存できます。|변경 사항은 자동으로 저장됩니다. Ctrl+S로 바로 저장할 수 있습니다.|Los cambios se guardan automáticamente. Pulsa Ctrl+S para guardar ahora.|Les modifications sont enregistrées automatiquement. Appuyez sur Ctrl+S pour enregistrer maintenant.|Änderungen werden automatisch gespeichert. Mit Strg+S sofort speichern.|As alterações são salvas automaticamente. Pressione Ctrl+S para salvar agora.|Изменения сохраняются автоматически. Нажмите Ctrl+S, чтобы сохранить сейчас.|تُحفظ التغييرات تلقائيًا. اضغط Ctrl+S للحفظ الآن.

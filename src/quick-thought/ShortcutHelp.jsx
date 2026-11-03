@@ -12,6 +12,7 @@ export function ShortcutHelp({quick,say,hints,onToggleHints,onClose}) {
   ['Alt + '+say('框选','marquee'),say('减去选择','Subtract selection')],
   ...(quick?[[say('右键从卡片拖动','Right-drag from card'),say('连接母子节点，拖到空白新建子想法','Connect parent/child; drop on blank to create child')],[say('右键划过空白','Right-drag on blank'),say('划动切除想法或连线','Slice ideas or links')],['Enter',say('完成编辑 / 新建同级想法','Finish editing / New sibling idea')],['Ctrl / ⌘ + Enter',say('完成并新建同级想法','Finish and create sibling')],['Tab',say('完成并新建子想法','Finish and create child')],['F2',say('编辑选中想法','Edit selected idea')],[say('方向键','Arrow keys'),say('选择相邻想法','Select nearby idea')]]:[]),
   ['Shift + Enter',say('编辑时换行','New line while editing')],['Esc',say('取消当前编辑或关闭面板','Cancel editing or close panel')],
+  ['I',say('打开 / 关闭卡片详情','Toggle card details')],
   ['Ctrl / ⌘ + Z',say('撤销','Undo')],['Ctrl / ⌘ + Shift + Z',say('重做','Redo')],['Ctrl / ⌘ + S',say('保存本地 WDF','Save local WDF')],['?',say('打开快捷键帮助','Keyboard shortcuts')]
  ];
  return <div className="shortcut-backdrop" onPointerDown={e=>e.stopPropagation()} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
