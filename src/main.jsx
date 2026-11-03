@@ -2,6 +2,7 @@ import {AppIcon} from './components/icons.jsx';
 import {Inspector} from './components/inspector/Inspector.jsx';
 import {ConfirmDialog} from './components/ConfirmDialog.jsx';
 import {SettingsDialog} from './components/settings/SettingsDialog.jsx';
+import {BrandMark} from './components/BrandMark.jsx';
 import {Page,Group,Row,Fields,Field,Input,Select,Switch,Button,Chips,Status,Empty} from './components/settings/ui.jsx';
 import {PersonalCloud} from './cloud/PersonalCloud.jsx';
 import {isTemporaryCanvas,durableCanvasIndex,LIBRARY_KEY,mergeCanvases,loadLibrary,writeLibrary,openLibraryTab,visibleLibraryTabs,duplicateCanvasState,reorderLibraryTabs,libraryItems as listLibraryCanvases,summarizeCanvas} from './canvas/library.mjs';
@@ -3005,12 +3006,7 @@ function App() {
       {(storageWarning||cacheWarning) && <div className="storage-warning" role="alert">{systemText(storageWarning||cacheWarning)}{saveStatus==='保存失败' && <button className="warning-retry" onClick={()=>saveCanvas()}>{say('重试保存','Retry save')}</button>}<button onClick={() => {setStorageWarning('');setCacheWarning('');}} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
       {notificationDetail && <div className="modal-backdrop notification-detail-backdrop" onPointerDown={(event) => { if (!notificationDetail.requiresAcknowledgement && event.target === event.currentTarget) setNotificationDetail(null); }}><section className="notification-detail-card" role="dialog" aria-modal="true" aria-label={notificationDetail.title}><header><div><small>{notificationDetail.kind === 'update' ? tr('版本更新','Version update') : tr('通知详情','Notification details')}</small><h2>{notificationDetail.title}</h2></div>{!notificationDetail.requiresAcknowledgement && <button onClick={() => setNotificationDetail(null)} aria-label={tr('关闭','Close')}>×</button>}</header><div className="notification-detail-content"><p>{notificationDetail.body}</p><time>{new Date(notificationDetail.createdAt).toLocaleString(uiLanguage)}</time></div><footer>{notificationDetail.downloadUrl && <button onClick={() => openExternalUrl(notificationDetail.downloadUrl)}>{tr('打开下载页','Open download page')}</button>}<button className="primary" onClick={() => confirmNotification(notificationDetail)}>{notificationDetail.requiresAcknowledgement ? tr('确认','Acknowledge') : tr('完成','Done')}</button></footer></section></div>}
       <header className="topbar" style={canvasMenuOpen?{zIndex:80}:undefined}>
-        <div className="brand-mark" aria-label="Wendaflow">
-          <svg viewBox="0 0 32 32" aria-hidden="true">
-            <path d="M6.5 8.5v6.2c0 5.9 3 8.8 6.6 8.8 2.2 0 3.4-1.2 3.4-3.3V8.5m0 8.2c0 4.5 1.4 6.8 4.1 6.8 3 0 4.9-2.8 4.9-8.8V8.5" />
-            <circle cx="6.5" cy="7" r="1.5" /><circle cx="16.5" cy="7" r="1.5" /><circle cx="25.5" cy="7" r="1.5" />
-          </svg>
-        </div>
+        <BrandMark />
         <div className="project-block"><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div>
         <QuickThoughtSwitch enabled={quickThought} onToggle={toggleQuickThought} labels={quickCopy} />
         <div className="canvas-tabs" aria-label={tr('画布标签栏','Canvas tabs')} onWheel={(event) => { const delta = event.deltaY || event.deltaX; if (!delta) return; event.preventDefault(); event.stopPropagation(); event.currentTarget.scrollLeft += delta; }}>{headerCanvases.map((canvas) => <button key={canvas.id} data-canvas-tab-id={canvas.id} draggable onDragStart={event=>event.dataTransfer.setData('application/x-wendaflow-tab',canvas.id)} onDragOver={event=>{if([...event.dataTransfer.types].includes('application/x-wendaflow-tab'))event.preventDefault();}} onDrop={event=>{const source=event.dataTransfer.getData('application/x-wendaflow-tab');if(source){event.preventDefault();changeWorkspace(meta=>reorderLibraryTabs(meta,source,canvas.id));}}} className={canvas.id === activeCanvasId ? 'active' : ''} onClick={() => switchCanvas(canvas.id)} onDoubleClick={(event) => { event.stopPropagation(); setEditingCanvasId(canvas.id); }}>{editingCanvasId === canvas.id ? <input autoFocus value={canvas.name} onClick={(event) => event.stopPropagation()} onChange={(event) => renameCanvas(canvas.id, event.target.value)} onBlur={() => { if (!canvas.name.trim()) renameCanvas(canvas.id, tr('未命名画布','Untitled canvas')); setEditingCanvasId(null); }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} /> : <span title={tr('双击重命名','Double-click to rename')}>{canvas.name}</span>}<i onClick={(event) => closeCanvas(canvas.id, event)}>×</i></button>)}<button className="new-tab" aria-label={tr('新建画布','New canvas')} title={tr('新建画布','New canvas')} onClick={createCanvas}>＋</button></div>
@@ -3356,7 +3352,7 @@ function App() {
           {settingsSection === 'about' && (
             <Page title={tr('关于 Wendaflow','About Wendaflow')} description={tr('让思考不再被单一线性对话束缚。','A spatial workspace for conversations, context, and execution.')}>
               <Group>
-                <div className="sx-hero"><div className="sx-hero-mark">W</div><div><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div><em>v{APP_VERSION}</em></div>
+                <div className="sx-hero"><BrandMark size={56} /><div><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div><em>v{APP_VERSION}</em></div>
                 <Row title={tr('授权状态','License status')}><span className="sx-value">{license ? `${String(license.tier || 'pro').toUpperCase()} · ${tr('已激活','Activated')}` : tr('未激活','Not activated')}</span></Row>
                 <Row title={tr('官方网站','Official website')}><a href="https://cn.qnjyxh.xyz" target="_blank" rel="noreferrer">cn.qnjyxh.xyz</a></Row>
                 <Row title={tr('通知服务','Notification service')}><span className="sx-value">{notificationSettings.enabled ? tr('已开启','Enabled') : tr('已关闭','Disabled')}</span></Row>

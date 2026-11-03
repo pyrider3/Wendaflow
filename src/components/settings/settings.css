@@ -144,12 +144,6 @@
   background: var(--sx-side);
 }
 .sx-brand { display: flex; align-items: center; gap: 11px; padding: 0 8px; }
-.sx-brand-mark {
-  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px;
-  background: var(--sx-accent); color: var(--sx-accent-ink);
-  font-weight: 800; font-size: 16px;
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--sx-accent) 35%, transparent);
-}
 .sx-brand strong { display: block; font-size: 14px; letter-spacing: 0.01em; }
 .sx-brand small { display: block; color: var(--sx-muted); font-size: 11px; }
 .sx-nav { position: relative; display: flex; flex-direction: column; gap: 4px; }
@@ -381,11 +375,6 @@
 /* ---------- page-specific ---------- */
 
 .sx-hero { display: flex; align-items: center; gap: 16px; padding: 20px 18px; }
-.sx-hero-mark {
-  display: grid; place-items: center; width: 56px; height: 56px; border-radius: 17px;
-  background: var(--sx-accent); color: var(--sx-accent-ink); font-size: 26px; font-weight: 800;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--sx-accent) 35%, transparent);
-}
 .sx-hero strong { display: block; font-size: 17px; }
 .sx-hero span { color: var(--sx-muted); }
 .sx-hero em { margin-left: auto; padding: 4px 11px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-style: normal; font-size: 12px; font-weight: 700; }

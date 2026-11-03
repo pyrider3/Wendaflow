@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { NavIcon } from "./ui.jsx";
+import { BrandMark } from "../BrandMark.jsx";
 import "./settings.css";
 
 // Shell for the settings dialog: backdrop, card, sliding navigation pill and an
@@ -63,7 +64,7 @@ export function SettingsDialog({
       >
         <aside className="sx-side">
           <div className="sx-brand">
-            <span className="sx-brand-mark">W</span>
+            <BrandMark size={34} />
             <div>
               <strong>Wendaflow</strong>
               <small>{title}</small>

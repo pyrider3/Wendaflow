@@ -33,14 +33,14 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .app-shell { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); background: #f4f6f2; }
 .topbar { position: absolute; top: 12px; left: 14px; right: 14px; height: 42px; display: flex; align-items: center; gap: 10px; padding: 0; background: transparent; border: 0; z-index: 20; pointer-events: none; }
 .topbar > * { pointer-events: auto; }
-.brand-mark { width: 31px; height: 31px; border-radius: 10px; display: grid; place-items: center; background: #111312; color: #fff; box-shadow: 0 7px 18px rgba(17,19,18,.16), inset 0 0 0 1px rgba(255,255,255,.1); }
-.brand-mark svg { width: 23px; height: 23px; overflow: visible; }
+.brand-mark { flex: none; width: var(--bm, 31px); height: var(--bm, 31px); border-radius: calc(var(--bm, 31px) * .32); display: grid; place-items: center; background: #111312; color: #fff; box-shadow: 0 7px 18px rgba(17,19,18,.16), inset 0 0 0 1px rgba(255,255,255,.1); }
+.brand-mark svg { width: 74%; height: 74%; overflow: visible; }
 .brand-mark path { fill: none; stroke: currentColor; stroke-width: 2.15; stroke-linecap: round; stroke-linejoin: round; }
 .brand-mark circle { fill: currentColor; }
 .storage-warning { position: fixed; z-index: 1000; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 12px 10px 16px; border: 1px solid rgba(17,19,18,.12); border-radius: 16px; background: rgba(24,25,24,.92); color: #fff; box-shadow: 0 14px 38px rgba(17,19,18,.22); backdrop-filter: blur(18px); font-size: 12px; animation: toast-in .24s var(--ease-out); }
 .storage-warning button { border: 0; background: rgba(255,255,255,.12); color: inherit; width: 24px; height: 24px; border-radius: 8px; cursor: pointer; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px) scale(.97); } }
-.project-block { display: flex; flex-direction: column; min-width: 132px; padding: 4px 9px 4px 2px; border: 0; background: transparent; text-align: left; text-shadow: 0 1px 0 rgba(255,255,255,.72); cursor: pointer; }
+.project-block { display: flex; flex-direction: column; min-width: 132px; padding: 4px 9px 4px 2px; border: 0; background: transparent; text-align: left; cursor: pointer; }
 .project-block strong { font-size: 13px; font-weight: 600; }
 .project-block span { font-size: 10px; color: #7b8781; }
 .canvas-tabs { flex: 1 1 260px; min-width: 120px; max-width: 520px; height: 36px; display: flex; align-items: center; gap: 5px; overflow-x: auto; overflow-y: hidden; padding: 2px; pointer-events: auto; scrollbar-width: none; -ms-overflow-style: none; }
