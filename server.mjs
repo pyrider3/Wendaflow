@@ -541,10 +541,13 @@ async function collectJobArtifacts(workspace, after = {}, output = '', startedAt
   for (const match of String(output).matchAll(bareFilePattern)) add(match[1], '生成文件');
   await collectRecentArtifacts(root, startedAt, add);
   const artifacts = [];
+  const runStart = new Date(startedAt || 0).getTime() - 2_000;
   for (const [filePath, state] of candidates) {
     try {
       const info = await stat(filePath);
       if (!info.isFile()) continue;
+      // A file merely named in the answer is not an output unless it was written during this run.
+      if (state === '生成文件' && info.mtimeMs < runStart) continue;
       const type = artifactMime(filePath);
       artifacts.push({ path: filePath, name: path.basename(filePath), size: info.size, type, image: type.startsWith('image/'), state });
     } catch {}
