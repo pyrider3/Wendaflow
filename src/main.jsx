@@ -566,6 +566,8 @@ function App() {
   const [confirmDialog,setConfirmDialog]=useState(null);
   const [editorHints,setEditorHints]=useState(()=>localStorage.getItem('wendaflow-editor-hints')!=='0');
   useEffect(()=>localStorage.setItem('wendaflow-editor-hints',editorHints?'1':'0'),[editorHints]);
+  const [canvasHints,setCanvasHints]=useState(()=>localStorage.getItem('wendaflow-canvas-hints')!=='0');
+  useEffect(()=>localStorage.setItem('wendaflow-canvas-hints',canvasHints?'1':'0'),[canvasHints]);
   const [cacheWarning,setCacheWarning]=useState('');
   useEffect(()=>{if(!feedback)return;const timer=setTimeout(()=>setFeedback(null),2400);return()=>clearTimeout(timer);},[feedback]);
   function notify(message){setFeedback({message,key:Date.now()});}
@@ -3076,7 +3078,7 @@ function App() {
         onDrop={handleCanvasDrop}
       >
         {PUBLIC_WEB && <aside className="public-web-note">{say('本地画布保存在此浏览器 · 登录后可主动上传并同步 · AI 需自备密钥。','Local canvases stay in this browser · Sign in to upload and sync · Bring your own API key.')} <a href="/source.tar.gz">{say('源码','Source')}</a></aside>}
-        <div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>
+        {(canvasHints||marquee)&&<div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>}
         {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
         {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span></div>}
         {marquee && (() => { const m = marqueeLiveRef.current ? { ...marquee, ...marqueeLiveRef.current } : marquee; return <div ref={marqueeElRef} className="selection-marquee" style={{ left: Math.min(m.startX, m.x), top: Math.min(m.startY, m.y), width: Math.abs(m.x - m.startX), height: Math.abs(m.y - m.startY) }} />; })()}
@@ -3292,7 +3294,7 @@ function App() {
               </Group>
             </Page>
           )}
-          {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
+          {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
           {settingsSection === 'license' && (
             <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
               {license ? (

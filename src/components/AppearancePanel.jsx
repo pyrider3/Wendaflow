@@ -10,6 +10,8 @@ export function AppearancePanel({
   languages,
   previewEnabled,
   onPreviewChange,
+  canvasHints,
+  onCanvasHintsChange,
   customTheme,
   onCustomThemeChange,
   onRestoreColors,
@@ -85,6 +87,18 @@ export function AppearancePanel({
             checked={previewEnabled}
             onChange={(value) => onPreviewChange(value)}
             label={text("preview")}
+            onLabel={text("enabled")}
+            offLabel={text("disabled")}
+          />
+        </Row>
+        <Row
+          title={tr("画布操作提示", "Canvas hints")}
+          hint={tr("在画布底部显示操作提示条。框选时的模式提示仍会显示。", "Show the gesture hints at the bottom of the canvas. Selection mode feedback still appears while selecting.")}
+        >
+          <Switch
+            checked={canvasHints}
+            onChange={(value) => onCanvasHintsChange(value)}
+            label={tr("画布操作提示", "Canvas hints")}
             onLabel={text("enabled")}
             offLabel={text("disabled")}
           />
