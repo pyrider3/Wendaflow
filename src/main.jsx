@@ -1,3 +1,4 @@
+import {ConfirmDialog} from './components/ConfirmDialog.jsx';
 import {SettingsDialog} from './components/settings/SettingsDialog.jsx';
 import {Page,Group,Row,Fields,Field,Input,Select,Switch,Button,Chips,Status,Empty} from './components/settings/ui.jsx';
 import {PersonalCloud} from './cloud/PersonalCloud.jsx';
@@ -535,6 +536,7 @@ function App() {
   const [storageWarning, setStorageWarning] = useState('');
   const [feedback,setFeedback]=useState(null);
   const [shortcutHelp,setShortcutHelp]=useState(false);
+  const [confirmDialog,setConfirmDialog]=useState(null);
   const [editorHints,setEditorHints]=useState(()=>localStorage.getItem('wendaflow-editor-hints')!=='0');
   useEffect(()=>localStorage.setItem('wendaflow-editor-hints',editorHints?'1':'0'),[editorHints]);
   const [cacheWarning,setCacheWarning]=useState('');
@@ -891,10 +893,25 @@ function App() {
     if (settingsOpen && importRef.current) importRef.current.accept = '.wdf,application/x-branchspace-wdf';
   }, [settingsOpen]);
 
+  const unsavedWorkRef = useRef(false);
+  useEffect(() => {
+    const active = canvases.find((canvas) => canvas.id === activeCanvasId);
+    const activeUnsaved = nodes.length > 0 && isTemporaryCanvas(active, autosavePolicy);
+    const draftUnsaved = [...canvasDraftsRef.current].some(([id, draft]) => id !== activeCanvasId && draft?.nodes?.length && isTemporaryCanvas(canvases.find((canvas) => canvas.id === id), autosavePolicy));
+    unsavedWorkRef.current = activeUnsaved || draftUnsaved;
+  }, [nodes, canvases, activeCanvasId, autosavePolicy]);
+  useEffect(() => {
+    const warn = (event) => { if (!unsavedWorkRef.current) return; event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
+
   useEffect(() => {
     const handler = (event) => {
       const editing = event.target instanceof Element && event.target.closest('textarea, input, [contenteditable="true"]');
-      if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !editing) {
+      // A field with text keeps the browser's own undo; an empty one hands Ctrl+Z to the canvas.
+      const fieldHasText = Boolean(editing) && String(editing.value ?? editing.textContent ?? '').length > 0;
+      if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !fieldHasText) {
         event.preventDefault();
         if(event.shiftKey || event.key.toLowerCase()==='y')applyCanvasHistory(true);else undoDelete();
         setDeleteUndo(null);setSelectedId(null);setSelectedIds(new Set());
@@ -2087,6 +2104,9 @@ function App() {
     return true;
   }
 
+  function askConfirm(config) { return new Promise((resolve) => setConfirmDialog({ ...config, resolve })); }
+  function answerConfirm(choice) { const dialog = confirmDialog; setConfirmDialog(null); dialog?.resolve(choice); }
+
   async function closeCanvas(id,event) {
     event?.stopPropagation();
     if(workspaceBusyRef.current)return;
@@ -2098,7 +2118,24 @@ function App() {
       const canvas=canvasesRef.current.find(item=>item.id===id);
       let stored;
       if(canvas&&canvas.temporary==null&&/^(新画布|New canvas)\s+\d+$/.test(canvas.name||'')&&autosavePolicyRef.current[id]!==true)stored=await readCanvasState(id,true).catch(()=>null);
-      const temporary=isTemporaryCanvas(canvas,autosavePolicyRef.current,stored);
+      let temporary=isTemporaryCanvas(canvas,autosavePolicyRef.current,stored);
+      if(temporary){
+        const isActive=id===activeCanvasIdRef.current;
+        const draftNodes=isActive?currentNodes():canvasDraftsRef.current.get(id)?.nodes||[];
+        if(draftNodes.length){
+          const choice=await askConfirm({
+            title:tr('关闭未保存的画布？','Close unsaved canvas?'),
+            message:tr('这个画布上有从未保存的卡片，关闭后将永久删除。','This canvas has cards that were never saved. Closing it permanently deletes them.'),
+            actions:[
+              {id:'cancel',label:tr('取消','Cancel')},
+              {id:'discard',label:tr('不保存并关闭','Close without saving'),kind:'danger'},
+              ...(isActive?[{id:'save',label:tr('保存并关闭','Save and close'),kind:'primary'}]:[]),
+            ],
+          });
+          if(choice==='cancel')return;
+          if(choice==='save'){await saveCanvasRef.current?.(false);temporary=false;}
+        }
+      }
       if(!temporary){try{await persistCurrentCanvas();}catch(error){setStorageWarning(error.message);return;}}
       const tabs=workspaceMetaRef.current.openTabs,closedIndex=tabs.indexOf(id),nextTabs=tabs.filter(tab=>tab!==id);
       const nextId=nextTabs[Math.min(Math.max(0,closedIndex),nextTabs.length-1)];
@@ -3137,6 +3174,7 @@ function App() {
       {searchOpen && <section className="search-panel"><div className="search-input"><span>⌕</span><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={text('searchPlaceholder')} /><small>Esc</small></div><div className="search-results">{searchResults.length ? searchResults.map((node) => <button key={node.id} onClick={() => focusSearchResult(node)}><span className={`result-dot ${node.type}`} /><div><strong>{node.title}</strong><small>{node.prompt || node.content}</small></div><em>{node.model || copy.idea}</em></button>) : <p>{text('noResults')}</p>}</div><footer>{searchResults.length} {text('results')} · Ctrl K</footer></section>}
       {libraryOpen && <section className="library-panel"><header><div><span>{text('currentCanvas')}</span><h2>{text('library')}</h2></div><button aria-label={text('close')} onClick={() => closeFloatingPanel('library', setLibraryOpen)}>×</button></header><div className="library-upload"><button onClick={() => libraryUploadRef.current?.click()}>{text('uploadCurrent')}</button><input ref={libraryUploadRef} type="file" multiple hidden onChange={(event) => { addAttachments(event); if (nodes.length && !branchSource) setRootComposerOpen(true); }} /><span>{tr('图片、PDF、文本、代码及常见文件','Images, PDFs, text, code, and common files')}</span></div><div className="library-list">{libraryItems.length ? libraryItems.map((item) => <article key={`${item.nodeId || 'draft'}-${item.id}`}><button className="library-preview" onClick={() => openLibraryItem(item)}>{item.dataUrl?.startsWith('data:image/') ? <img src={item.dataUrl} alt="" /> : <span>{item.name.split('.').pop()?.slice(0, 5).toUpperCase() || 'FILE'}</span>}</button><div><strong>{item.name}</strong><small>{item.nodeTitle} · {Math.max(1, Math.ceil((item.size || item.text?.length || 0) / 1024))} KB</small></div><div className="library-actions">{item.nodeId && <button onClick={() => { focusSearchResult(nodes.find((node) => node.id === item.nodeId)); closeFloatingPanel('library', setLibraryOpen); }}>{tr('定位','Locate')}</button>}<button onClick={() => addLibraryItemToInput(item)}>{tr('使用','Use')}</button><button className="remove" onClick={() => removeLibraryItem(item)}>{tr('移除','Remove')}</button></div></article>) : <p>{text('libraryEmpty')}</p>}</div><footer>{libraryItems.length} {tr('项资料','items')} · {tr('文件随当前画布保存','Files are saved with the current canvas')}</footer></section>}
       {minimapOpen && <section className={`minimap ${inspectorOpen && selected ? 'with-inspector' : ''}`} onPointerDown={navigateMiniMap} aria-label={text('minimap')}><div className="minimap-stage">{visibleNodes.map((node) => <i key={node.id} className={selectedIds.has(node.id) ? 'selected' : ''} style={{ left: `${((node.x - miniBounds.minX) / miniBounds.width) * 100}%`, top: `${((node.y - miniBounds.minY) / miniBounds.height) * 100}%`, width: `${Math.max(3, ((nodeSizes.get(node.id)?.width || 224) / miniBounds.width) * 100)}%`, height: `${Math.max(3, ((nodeSizes.get(node.id)?.height || 110) / miniBounds.height) * 100)}%` }} />)}</div><span>{text('navigate')}</span></section>}
+      {confirmDialog && <ConfirmDialog title={confirmDialog.title} message={confirmDialog.message} actions={confirmDialog.actions} onAnswer={answerConfirm} />}
       {settingsOpen && (
         <SettingsDialog
           closing={settingsClosing}

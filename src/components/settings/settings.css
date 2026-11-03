@@ -438,3 +438,21 @@
 @media (prefers-reduced-motion: reduce) {
   .sx *, .sx *::before, .sx *::after, .sx-backdrop, .sx-card { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- confirmation dialog ---------- */
+
+.sx-confirm-backdrop { z-index: 150; }
+.sx-confirm {
+  width: min(440px, calc(100% - 32px));
+  padding: 24px 24px 20px;
+  border: 1px solid var(--sx-line);
+  border-radius: 20px;
+  background: var(--sx-bg);
+  color: var(--sx-text);
+  box-shadow: var(--sx-shadow);
+  outline: 0;
+  animation: sx-card-in 0.45s var(--sx-ease) both;
+}
+.sx-confirm h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.sx-confirm p { margin: 8px 0 20px; color: var(--sx-muted); font-size: 13px; line-height: 1.6; }
+.sx-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }

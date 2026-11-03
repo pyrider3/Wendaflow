@@ -1,4 +1,8 @@
 export default `
+Close unsaved canvas?|關閉未儲存的畫布？|未保存のキャンバスを閉じますか？|저장하지 않은 캔버스를 닫을까요?|¿Cerrar el lienzo sin guardar?|Fermer le canevas non enregistré ?|Nicht gespeicherte Leinwand schließen?|Fechar a tela não salva?|Закрыть несохранённый холст?|إغلاق اللوحة غير المحفوظة؟
+This canvas has cards that were never saved. Closing it permanently deletes them.|這個畫布上有從未儲存的卡片，關閉後將永久刪除。|このキャンバスには一度も保存されていないカードがあります。閉じると完全に削除されます。|이 캔버스에는 저장한 적 없는 카드가 있습니다. 닫으면 영구적으로 삭제됩니다.|Este lienzo tiene tarjetas que nunca se guardaron. Al cerrarlo se eliminarán permanentemente.|Ce canevas contient des cartes jamais enregistrées. Les fermer les supprimera définitivement.|Diese Leinwand enthält Karten, die nie gespeichert wurden. Beim Schließen werden sie endgültig gelöscht.|Esta tela tem cartões que nunca foram salvos. Ao fechar, eles serão excluídos permanentemente.|На этом холсте есть карточки, которые ни разу не сохранялись. При закрытии они будут удалены навсегда.|تحتوي هذه اللوحة على بطاقات لم تُحفظ أبدًا. سيؤدي إغلاقها إلى حذفها نهائيًا.
+Save and close|儲存並關閉|保存して閉じる|저장하고 닫기|Guardar y cerrar|Enregistrer et fermer|Speichern und schließen|Salvar e fechar|Сохранить и закрыть|حفظ وإغلاق
+Close without saving|不儲存並關閉|保存せずに閉じる|저장하지 않고 닫기|Cerrar sin guardar|Fermer sans enregistrer|Ohne Speichern schließen|Fechar sem salvar|Закрыть без сохранения|إغلاق بدون حفظ
 Starlight|星夜|星夜|별빛|Noche estrellada|Nuit étoilée|Sternennacht|Noite estrelada|Звёздная ночь|ليلة مرصعة بالنجوم
 Nightfall|極夜|極夜|극야|Noche|Nuit|Polarnacht|Noite|Полярная ночь|الليل القطبي
 License verified.|授權已驗證。|ライセンスを確認しました。|라이선스가 확인되었습니다.|Licencia verificada.|Licence vérifiée.|Lizenz verifiziert.|Licença verificada.|Лицензия проверена.|تم التحقق من الترخيص.

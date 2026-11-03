@@ -145,10 +145,10 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
    in a compositor layer, especially immediately after a wheel zoom. */
 .canvas.panning .world, .canvas.panning .connections { will-change: transform; }
 .canvas.marquee-active { cursor: crosshair; }
-.canvas-hint { position: absolute; top: 78px; left: 72px; z-index: 8; color: #7c8882; font-size: 10px; letter-spacing: .01em; pointer-events: none; }
+.canvas-hint { position: absolute; top: 78px; left: 72px; right: 24px; z-index: 8; line-height: 1.5; color: var(--ui-muted, #65736b); font-size: 12px; letter-spacing: .01em; pointer-events: none; }
 .empty-welcome { position: absolute; left: 50%; top: 44%; z-index: 7; display: flex; flex-direction: column; align-items: center; gap: 6px; transform: translate(-50%,-50%); color: #87928c; pointer-events: none; }
 .empty-welcome strong { color: #59675f; font-size: 18px; font-weight: 550; }
-.empty-welcome span { font-size: 10px; }
+.empty-welcome span { max-width: min(560px, 80vw); color: var(--ui-muted, #65736b); font-size: 12px; text-align: center; }
 .selection-marquee { position: absolute; z-index: 12; border: 1px solid rgba(37,132,96,.72); border-radius: 8px; background: rgba(50,151,111,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); pointer-events: none; }
 .world, .connections { position: absolute; inset: 0; width: 1800px; height: 1100px; transform-origin: 0 0; backface-visibility: hidden; }
 .world { contain: layout style; }
@@ -763,3 +763,8 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 
 .public-web-note {position:absolute;z-index:10;left:80px;top:108px;max-width:calc(100% - 110px);padding:6px 10px;border:1px solid #86a494;border-radius:8px;background:#f1f8f4;color:#284a38;font-size:11px;line-height:1.5;}
 .public-web-note a {color:#225b41;text-decoration:underline;}
+
+/* Larger invisible hit areas for small card controls. */
+.resize-handle::after, .collapse-button::after { content: ""; position: absolute; inset: -6px; }
+/* Mouse-gesture hints do not apply to touch screens. */
+@media (pointer: coarse) { .empty-welcome span, .canvas-hint { display: none; } }
