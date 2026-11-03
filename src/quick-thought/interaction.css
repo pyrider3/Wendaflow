@@ -1,7 +1,7 @@
 .canvas.space-panning, .canvas.space-panning .node, .canvas.space-panning .markdown-content { cursor: grab; }
 .node .node-drag-title { cursor: grab; }
 .node.dragging .node-drag-title { cursor: grabbing; }
-.node.thought.text-thought:not(:hover):not(:focus-visible):not(:has(>button:focus-visible)) > :is(.fork-button,.relation-handle,.collapse-button:not(.collapsed)) { opacity: 0; visibility: hidden; pointer-events: none; }
+.node.thought.text-thought:not(:hover):not(:focus-within) > :is(.fork-button,.relation-handle,.collapse-button:not(.collapsed)) { opacity: 0; visibility: hidden; pointer-events: none; }
 .node.thought.text-thought:focus-visible > :is(.fork-button,.relation-handle,.collapse-button) { opacity: 1; }
 .node:focus-visible { outline: 2px solid var(--accent,#416f5a); outline-offset: 4px; }
 .node.connection-invalid { outline: 2px solid #ca4d57; outline-offset: 3px; cursor: not-allowed; }

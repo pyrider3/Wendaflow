@@ -536,6 +536,19 @@ function App() {
   const [dragging, setDragging] = useState(null);
   const [panning, setPanning] = useState(null);
   const [marquee, setMarquee] = useState(null);
+  // The marquee rectangle and its hit-test run once per animation frame and write
+  // straight to the DOM; React state only changes when the selection does.
+  const marqueeRef = useRef(null);
+  marqueeRef.current = marquee;
+  const marqueeElRef = useRef(null);
+  const marqueeLiveRef = useRef(null);
+  const marqueeFrameRef = useRef(0);
+  const marqueeHitsRef = useRef('');
+  useEffect(() => {
+    if (marquee) return;
+    window.cancelAnimationFrame(marqueeFrameRef.current);
+    marqueeFrameRef.current = 0; marqueeLiveRef.current = null; marqueeHitsRef.current = '';
+  }, [marquee]);
   const [selectedConnections, setSelectedConnections] = useState([]);
   const [lineSelectionMenu, setLineSelectionMenu] = useState(null);
   const [resizing, setResizing] = useState(null);
@@ -1471,7 +1484,7 @@ function App() {
       event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
-      setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
+      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
     if (editingRelation) closeRelationEditor();
@@ -1486,6 +1499,7 @@ function App() {
       const y = event.clientY - rect.top;
       setSelectedConnections([]);
       setLineSelectionMenu(null);
+      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';
       setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});
       return;
     }
@@ -1513,6 +1527,29 @@ function App() {
     setCollapsedIds(current=>new Set([...current].filter(id=>!ids.has(id))));
     setSelectedIds(new Set());setSelectedId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);
   }
+  function runMarqueeFrame() {
+    marqueeFrameRef.current = 0;
+    const live = marqueeLiveRef.current, current = marqueeRef.current;
+    if (!live || !current || !canvasRef.current) return;
+    const next = { ...current, x: live.x, y: live.y };
+    const left = Math.min(next.startX, next.x), right = Math.max(next.startX, next.x);
+    const top = Math.min(next.startY, next.y), bottom = Math.max(next.startY, next.y);
+    const box = marqueeElRef.current;
+    if (box) { box.style.left = `${left}px`; box.style.top = `${top}px`; box.style.width = `${right - left}px`; box.style.height = `${bottom - top}px`; }
+    const hits = quickThought ? boxThoughtIds(visibleNodes,nodeSizes,viewportRef.current,next) : visibleNodes.filter((node) => {
+      const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
+      const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
+      return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
+    }).map((node) => node.id);
+    // Most frames hit the same cards as the last one; skip the state updates then.
+    const key = `${next.mode}|${[...hits].join(',')}`;
+    if (key === marqueeHitsRef.current) return;
+    marqueeHitsRef.current = key;
+    const selection = combineSelection(next.base, hits, next.mode);
+    setSelectedIds(selection);
+    setSelectedId([...selection].at(-1) || null);
+    if (hits.length) { setSelectedConnections([]); setLineSelectionMenu(null); setInspectorOpen(!quickThought && inspectorPinnedRef.current); setInspectorClosing(false); }
+  }
   function movePointer(event) {
     if(quickBlankClick.current){updateQuickSlice(event);return;}
     if (relationDrag) {
@@ -1533,19 +1570,8 @@ function App() {
       window.requestAnimationFrame(syncConnectionGeometry);
     } else if (marquee) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const next = { ...marquee, x: event.clientX - rect.left, y: event.clientY - rect.top };
-      setMarquee(next);
-      const left = Math.min(next.startX, next.x), right = Math.max(next.startX, next.x);
-      const top = Math.min(next.startY, next.y), bottom = Math.max(next.startY, next.y);
-      const hits = quickThought ? boxThoughtIds(visibleNodes,nodeSizes,viewportRef.current,next) : visibleNodes.filter((node) => {
-        const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
-        const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
-        return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
-      }).map((node) => node.id);
-      const selection=combineSelection(next.base,hits,next.mode);
-      setSelectedIds(selection);
-      setSelectedId([...selection].at(-1)||null);
-      if (hits.length) { setSelectedConnections([]); setLineSelectionMenu(null); setInspectorOpen(!quickThought && inspectorPinnedRef.current); setInspectorClosing(false); }
+      marqueeLiveRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      if (!marqueeFrameRef.current) marqueeFrameRef.current = window.requestAnimationFrame(runMarqueeFrame);
     } else if (dragging) {
       if(!crossedDragThreshold(dragging,event))return;
       if(!dragging.started)setDragging({...dragging,started:true});
@@ -3056,7 +3082,7 @@ function App() {
         <div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>
         {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
         {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span></div>}
-        {marquee && <div className="selection-marquee" style={{ left: Math.min(marquee.startX, marquee.x), top: Math.min(marquee.startY, marquee.y), width: Math.abs(marquee.x - marquee.startX), height: Math.abs(marquee.y - marquee.startY) }} />}
+        {marquee && (() => { const m = marqueeLiveRef.current ? { ...marquee, ...marqueeLiveRef.current } : marquee; return <div ref={marqueeElRef} className="selection-marquee" style={{ left: Math.min(m.startX, m.x), top: Math.min(m.startY, m.y), width: Math.abs(m.x - m.startX), height: Math.abs(m.y - m.startY) }} />; })()}
         <svg ref={quickSliceTrailRef} className="quick-slice-trail" style={{display:'none'}} aria-hidden="true"><polyline /></svg>
         <svg ref={connectionsRef} className="connections" style={{ transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})` }}>
           <defs>
