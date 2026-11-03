@@ -291,3 +291,17 @@ export async function listOllamaModels(endpoint, signal) {
   const data = await response.json();
   return (data.models || []).map((item) => item.name);
 }
+
+// What the conversation options actually do for a profile.  Mirrors the
+// request builders above: a control that is not listed here is never sent.
+export function chatOptionSupport(profile, { local = false } = {}) {
+  if (local) return { levels: false, toggle: true, temperature: true };
+  const format = profile?.format;
+  if (format === 'anthropic') return { levels: false, toggle: false, temperature: false };
+  if (format === 'gemini') return { levels: false, toggle: true, temperature: true };
+  if (format === 'openai-compatible') {
+    const doubao = /doubao/i.test(profile?.model || '') || /(?:volces|volcengine)\.com/i.test(profile?.endpoint || '');
+    return { levels: doubao, toggle: true, temperature: true };
+  }
+  return { levels: true, toggle: true, temperature: true };
+}

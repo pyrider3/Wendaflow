@@ -42,7 +42,7 @@ import './themes/black-readability.css';
 import './components/polish.css';
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
-import { contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
+import { chatOptionSupport, contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
 
 const CANVAS_INDEX_KEY = 'branchspace-canvas-index';
 const CANVAS_DB_NAME = 'wonderful-canvas-store';
@@ -2943,17 +2943,20 @@ function App() {
   function renderConversationControls() {
     const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : localProfiles.find((item) => item.id === model.slice(6));
     const options = normalizeChatOptions(profile?.chatOptions || {});
+    const support = chatOptionSupport(profile, { local: !model.startsWith('cloud:') });
     const reasoningDisabled = options.reasoning === 'none';
     const reasoningLabel = ({none:tr('已关闭','Off'),low:tr('低','Low'),medium:tr('中','Medium'),high:tr('高','High')}[options.reasoning] || options.reasoning);
-    const summary = `${reasoningDisabled || !options.thinking ? tr('直接回答','Direct answer') : tr('思考开启','Thinking on')} · ${reasoningLabel}`;
+    const summary = !support.toggle ? tr('默认设置','Default') : `${reasoningDisabled || !options.thinking ? tr('直接回答','Direct answer') : tr('思考开启','Thinking on')}${support.levels ? ` · ${reasoningLabel}` : ''}`;
     return <div className="inline-agent-config conversation-config">
       <button className={`agent-summary-button ${chatOptionsOpen ? 'active' : ''}`} onClick={() => setChatOptionsOpen((value) => !value)}><span>{summary}</span><i>⌄</i></button>
       {chatOptionsOpen && <div className="agent-config-popover chat-config-popover">
         <header><div><small>{tr('本次对话配置','Conversation settings')}</small><strong>{profile?.name || tr('当前模型','Current model')}</strong></div><button onClick={() => setChatOptionsOpen(false)}>×</button></header>
         <div className="inline-option-grid two-column">
-          <label>{tr('推理强度','Reasoning effort')}<select value={options.reasoning} onChange={(event) => { const reasoning = event.target.value; updateConversationOptions({ reasoning, thinking: reasoning !== 'none' }); }}><option value="none">{tr('已关闭','Off')}</option><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option></select></label>
-          <label>{tr('创造性','Creativity')}<select value={String(options.temperature)} onChange={(event) => updateConversationOptions({ temperature: Number(event.target.value) })}><option value="0.2">{tr('精确','Precise')}</option><option value="0.7">{tr('平衡','Balanced')}</option><option value="1">{tr('发散','Creative')}</option></select></label>
-          <label className="inline-checkbox full-row"><input type="checkbox" checked={!reasoningDisabled && !!options.thinking} onChange={(event) => updateConversationOptions(event.target.checked ? { thinking: true, reasoning: options.reasoning === 'none' ? 'low' : options.reasoning } : { thinking: false, reasoning: 'none' })} />{tr('开启模型的深度思考（若该模型支持）','Enable extended thinking when supported')}</label>
+          {support.levels&&<label>{tr('推理强度','Reasoning effort')}<select value={options.reasoning} onChange={(event) => { const reasoning = event.target.value; updateConversationOptions({ reasoning, thinking: reasoning !== 'none' }); }}><option value="none">{tr('已关闭','Off')}</option><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option></select></label>}
+          {support.temperature&&<label>{tr('创造性','Creativity')}<select value={String(options.temperature)} onChange={(event) => updateConversationOptions({ temperature: Number(event.target.value) })}><option value="0.2">{tr('精确','Precise')}</option><option value="0.7">{tr('平衡','Balanced')}</option><option value="1">{tr('发散','Creative')}</option></select></label>}
+          {support.toggle&&<label className="inline-checkbox full-row"><input type="checkbox" checked={!reasoningDisabled && !!options.thinking} onChange={(event) => updateConversationOptions(event.target.checked ? { thinking: true, reasoning: options.reasoning === 'none' ? 'low' : options.reasoning } : { thinking: false, reasoning: 'none' })} />{tr('开启模型的深度思考（若该模型支持）','Enable extended thinking when supported')}</label>}
+          {support.toggle&&!support.levels&&<p className="full-row option-note">{tr('此接口只能开关思考，不能调节强度。','This API can only turn thinking on or off, not set its level.')}</p>}
+          {!support.toggle&&<p className="full-row option-note">{tr('此接口暂不使用思考与创造性设置。','This API does not use thinking or creativity settings yet.')}</p>}
         </div>
         <footer><span>{tr('配置会记住，并随当前模型使用','Settings are remembered for the current model')}</span><button onClick={() => setChatOptionsOpen(false)}>{tr('完成','Done')}</button></footer>
       </div>}

@@ -663,3 +663,4 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 @media (pointer: coarse) { .empty-welcome span, .canvas-hint { display: none; } }
 
 .save-button.unsaved::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-focus, #247b56); flex: none; }
+.chat-config-popover .option-note { margin: 0; font-size: 11.5px; color: var(--sx-muted, #7b8781); line-height: 1.5; }
