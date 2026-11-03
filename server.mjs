@@ -5,7 +5,7 @@ import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
-import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile, realpath } from 'node:fs/promises';
 
 const PUBLIC_WEB = process.env.WENDAFLOW_PUBLIC === '1';
 const HOST = '127.0.0.1';
@@ -73,7 +73,13 @@ function openWithSystemApplication(target, { reveal = false } = {}) {
 }
 
 async function resolveHarnessBin() {
-  const roots = [process.env.DSH_CLI, DSH_BIN,
+  // A global npm install (`npm i -g @deepseek-ai/dsh`) puts a `dsh` launcher on PATH
+  // that points at lib/bin.js; resolve it so the file can be run with node directly.
+  let onPath = null;
+  try { const launcher = await findCommand(['dsh']); onPath = launcher && await realpath(launcher); } catch {}
+  const roots = [process.env.DSH_CLI, DSH_BIN, onPath,
+    path.join(os.homedir(), '.npm-global', 'lib', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+    '/usr/lib/node_modules/@deepseek-ai/dsh/lib/bin.js', '/usr/local/lib/node_modules/@deepseek-ai/dsh/lib/bin.js',
     path.join(os.homedir(), 'Documents', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js'),
     path.join(process.cwd(), 'node_modules', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js')];
   const found = await firstExistingPath(roots);
@@ -203,30 +209,60 @@ function relayHarnessFrame(frame, sessionId, hooks = {}) {
   return '';
 }
 
-async function waitForHarnessWeb() {
+let harnessCookie = '';
+const harnessHeaders = (extra = {}) => (harnessCookie ? { ...extra, cookie: harnessCookie } : extra);
+
+// Older builds answer `/` with 200 as soon as they listen.
+async function pollHarnessWeb(child) {
   const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 200 && harnessWebChild === child && !harnessCookie; attempt += 1) {
     try {
       const response = await fetch(`${origin}/`, { signal: AbortSignal.timeout(800) });
-      if (response.ok) return origin;
+      if (response.ok) { harnessCookie = ''; return origin; }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
   throw new Error('DeepSeek Harness Web/API 服务启动超时');
 }
 
+// Current builds print `dsh web: http://host:port/?token=…` and answer 401 to
+// everything else; the token is traded once for an auth cookie.
+function authenticateHarnessWeb(child) {
+  return new Promise((resolve, reject) => {
+    let output = '', stderr = '', started = false;
+    child.stdout.on('data', async (chunk) => {
+      output += chunk;
+      const match = output.match(/https?:\/\/\S+?[?&]token=([^\s&]+)/);
+      if (!match || started) return;
+      started = true;
+      try {
+        const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
+        const response = await fetch(`${origin}/?token=${match[1]}`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
+        const cookies = response.headers.getSetCookie().map((cookie) => cookie.split(';')[0]);
+        if (!cookies.length) throw new Error('DeepSeek Harness 没有返回登录凭证');
+        harnessCookie = cookies.join('; ');
+        resolve(origin);
+      } catch (error) { reject(error); }
+    });
+    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-400); });
+    child.on('close', () => reject(new Error(`DeepSeek Harness 启动后立即退出${stderr.trim() ? `：${stderr.trim()}` : ''}`)));
+  });
+}
+
 async function ensureHarnessWeb() {
   const origin = `http://${HOST}:${HARNESS_WEB_PORT}`;
   try {
-    const response = await fetch(`${origin}/`, { signal: AbortSignal.timeout(500) });
+    const response = await fetch(`${origin}/`, { headers: harnessHeaders(), signal: AbortSignal.timeout(500) });
     if (response.ok) return origin;
   } catch {}
   if (!harnessWebReady) {
     const harnessBin = await resolveHarnessBin();
+    harnessCookie = '';
     harnessWebChild = spawn(process.execPath, [harnessBin, '--profile', 'web', '--no-open', '--host', HOST, '--port', String(HARNESS_WEB_PORT), '--trusted-host', `${HOST}:${HARNESS_WEB_PORT}`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    harnessWebChild.on('error', () => { harnessWebReady = null; harnessWebChild = null; });
-    harnessWebChild.on('close', () => { harnessWebReady = null; harnessWebChild = null; });
-    harnessWebReady = waitForHarnessWeb().catch((error) => { harnessWebReady = null; throw error; });
+    harnessWebChild.on('error', () => { harnessWebReady = null; harnessWebChild = null; harnessCookie = ''; });
+    harnessWebChild.on('close', () => { harnessWebReady = null; harnessWebChild = null; harnessCookie = ''; });
+    harnessWebReady = Promise.any([authenticateHarnessWeb(harnessWebChild), pollHarnessWeb(harnessWebChild)])
+      .catch((error) => { harnessWebReady = null; throw error.errors?.[0] || error; });
   }
   return harnessWebReady;
 }
@@ -235,7 +271,7 @@ async function harnessRpc(origin, method, payload, signal) {
   const rpcId = `wonderful-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const response = await fetch(`${origin}/api/${method}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: harnessHeaders({ 'content-type': 'application/json' }),
     // Harness' browser transport uses an RPC envelope even for unary HTTP
     // calls.  Posting only the payload looks like an unknown route to it.
     body: JSON.stringify({ type: 'client-request', rpcId, method, payload }),
@@ -257,7 +293,7 @@ function openHarnessMux(origin, sessionId, hooks, signal, onError) {
   let closed = false;
   const ready = new Promise((resolve, reject) => {
     try {
-      socket = new WebSocket(endpoint);
+      socket = new WebSocket(endpoint, { headers: harnessHeaders() });
       socket.addEventListener('open', () => { opened = true; resolve(); });
       socket.addEventListener('message', (event) => {
         try {
