@@ -786,13 +786,12 @@ function App() {
   useEffect(() => {
     localStorage.setItem('wonderful-theme', theme);
     const root = document.documentElement;
-    if (themeAppliedRef.current) {
-      // Fade colours for a moment so a theme change is not a hard cut.
-      root.classList.add('theme-fading');
-      window.setTimeout(() => root.classList.remove('theme-fading'), 520);
-    }
+    const apply = () => { root.dataset.theme = theme; };
+    // A view transition cross-fades a snapshot of the page, so it stays cheap on
+    // large canvases; browsers without it (or reduced motion) switch instantly.
+    if (themeAppliedRef.current && document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(apply);
+    else apply();
     themeAppliedRef.current = true;
-    root.dataset.theme = theme;
   }, [theme]);
   useEffect(() => {
     localStorage.setItem('wendaflow-ui-language', uiLanguage);
