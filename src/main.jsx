@@ -21,6 +21,8 @@ import { LOCAL_PROXY_URL, PUBLIC_WEB } from './localProxy.js';
 import {CanvasCard} from './cards/CanvasCard.jsx';
 import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs';
 import {AppearancePanel} from './components/AppearancePanel.jsx';
+import {AgentsPanel} from './components/AgentsPanel.jsx';
+import {AGENT_LABELS} from './agents/catalog.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
 import './styles.css';
 import './themes/presets.css';
@@ -127,6 +129,7 @@ const DEFAULT_AGENT_SETTINGS = {
   codex: { model: '', reasoning: 'high', accessMode: 'workspace-write', profile: '', ephemeral: true, addDir: '' },
   claude: { model: '', permissionMode: 'default', maxTurns: '', verbose: false },
   deepseek: { profile: 'headless', reasoning: 'high', thinking: true },
+  pi: { command: '', provider: '', model: '', thinking: '', readOnly: false, extraArgs: '', ephemeral: true },
 };
 const DEFAULT_CUSTOM_THEME = { background: '#f4f6f2', surface: '#ffffff', text: '#18231d', accent: '#267c5b', grid: '#c8d4cd' };
 const UI_LANGUAGES = [
@@ -415,7 +418,11 @@ function App() {
     try { return { ...DEFAULT_CUSTOM_THEME, ...JSON.parse(localStorage.getItem('wonderful-custom-theme') || '{}') }; }
     catch { return DEFAULT_CUSTOM_THEME; }
   });
-  const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || 'codex');
+  const [enabledAgents, setEnabledAgents] = useState(() => {
+    try { const saved = JSON.parse(localStorage.getItem('wendaflow-enabled-agents')); return Array.isArray(saved) ? saved.filter((id) => AGENT_LABELS[id]) : []; } catch { return []; }
+  });
+  const [agentDetection, setAgentDetection] = useState(null);
+  const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || '');
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
   const [actionWorkspace, setActionWorkspace] = useState('');
@@ -425,7 +432,7 @@ function App() {
     try {
       const saved = JSON.parse(localStorage.getItem('wonderful-agent-settings')) || {};
       const oldCodexMode = saved.codex?.accessMode || saved.codex?.sandbox || 'workspace-write';
-      return { codex: { ...DEFAULT_AGENT_SETTINGS.codex, ...saved.codex, accessMode: oldCodexMode }, claude: { ...DEFAULT_AGENT_SETTINGS.claude, ...saved.claude }, deepseek: { ...DEFAULT_AGENT_SETTINGS.deepseek, ...saved.deepseek } };
+      return { codex: { ...DEFAULT_AGENT_SETTINGS.codex, ...saved.codex, accessMode: oldCodexMode }, claude: { ...DEFAULT_AGENT_SETTINGS.claude, ...saved.claude }, deepseek: { ...DEFAULT_AGENT_SETTINGS.deepseek, ...saved.deepseek }, pi: { ...DEFAULT_AGENT_SETTINGS.pi, ...saved.pi } };
     } catch { return JSON.parse(JSON.stringify(DEFAULT_AGENT_SETTINGS)); }
   });
   const [taskAgentSettings, setTaskAgentSettings] = useState(() => JSON.parse(JSON.stringify(agentSettings)));
@@ -831,6 +838,10 @@ function App() {
     Object.entries(customTheme).forEach(([key, value]) => root.style.setProperty(`--custom-${key}`, value));
   }, [customTheme]);
   useEffect(() => localStorage.setItem('wonderful-action-runner', actionRunner), [actionRunner]);
+  useEffect(() => localStorage.setItem('wendaflow-enabled-agents', JSON.stringify(enabledAgents)), [enabledAgents]);
+  useEffect(() => { if (settingsOpen && settingsSection === 'agents') void detectAgents(); }, [settingsOpen, settingsSection]);
+  // Action mode only offers enabled agents; keep the selection on one of them.
+  useEffect(() => { if (enabledAgents.length && !enabledAgents.includes(actionRunner)) setActionRunner(enabledAgents[0]); }, [enabledAgents, actionRunner]);
   useEffect(() => localStorage.setItem('wonderful-agent-settings', JSON.stringify(agentSettings)), [agentSettings]);
   useEffect(() => localStorage.setItem('branchspace-cloud-profiles', JSON.stringify(cloudProfiles)), [cloudProfiles]);
   useEffect(() => localStorage.setItem('wendaflow-notifications', JSON.stringify(notifications.slice(0, 120))), [notifications]);
@@ -2127,6 +2138,7 @@ function App() {
   async function createFirstNode() {
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
+    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
     const text = draft.trim();
     if (!text && !attachments.length) return;
     const requestText = text || tr('请理解并描述我上传的图片或文件。',"Please interpret the uploaded images or files.");
@@ -2135,7 +2147,7 @@ function App() {
     const root = {
       id: `root-${Date.now()}`, parentId: null, type: creationType,
       author: creationType === 'thought' ? tr('你',"You") : creationType === 'action' ? tr('执行代理',"Agent") : 'AI',
-      model: creationType === 'thought' ? null : creationType === 'action' ? ({ codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' }[actionRunner]) : profile?.model || localProfile?.model,
+      model: creationType === 'thought' ? null : creationType === 'action' ? (AGENT_LABELS[actionRunner]) : profile?.model || localProfile?.model,
       title: questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
       content: requestText, prompt: creationType === 'conversation' ? requestText : null,
       x: rootPosition.x, y: rootPosition.y, attachments,
@@ -2257,6 +2269,7 @@ function App() {
   async function createBranch() {
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
+    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
     const text = draft.trim();
     if ((!text && !attachments.length) || !selected) return;
     if (parallelMode && creationType === 'conversation') {
@@ -2284,7 +2297,7 @@ function App() {
       parentId: selected.id,
       type: creationType,
       author: creationType === 'thought' ? tr('你',"You") : creationType === 'action' ? tr('执行代理',"Agent") : 'AI',
-      model: creationType === 'thought' ? null : creationType === 'action' ? ({ codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' }[actionRunner]) : selectedCloud?.model || selectedLocal?.model,
+      model: creationType === 'thought' ? null : creationType === 'action' ? (AGENT_LABELS[actionRunner]) : selectedCloud?.model || selectedLocal?.model,
       title: questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
       content: text,
       prompt: creationType === 'conversation' ? text : null,
@@ -2705,6 +2718,24 @@ function App() {
     return true;
   }
 
+  function toggleAgent(id, on) {
+    setEnabledAgents((current) => on ? (current.includes(id) ? current : [...current, id]) : current.filter((item) => item !== id));
+    if (on && !actionRunner) setActionRunner(id);
+  }
+
+  async function detectAgents() {
+    if (PUBLIC_WEB) return;
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/agents/detect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pi: agentSettings.pi?.command || '' }) });
+      if (response.ok) setAgentDetection(await response.json());
+    } catch { setAgentDetection({}); }
+  }
+
+  function openAgentSettings() {
+    setSettingsSection('agents');
+    openSettings();
+  }
+
   function openSettings() {
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
     setSettingsClosing(false);
@@ -2833,7 +2864,7 @@ function App() {
     const inheritedAttachments = inherited.flatMap((node) => node.attachments || []);
     const prompt = `${context ? `这是 Wendaflow 画布已经确认的上下文。必须先阅读并使用它；它不是可忽略的附注：\n\n${context}\n\n---\n\n` : ''}当前需要执行的任务：\n${task}\n\n请在最终答复中说明你实际使用了哪些上下文节点；如果上下文与任务冲突，优先说明冲突而不是静默忽略。`;
     const runner = actionNode.actionRunner || 'codex';
-    const runnerName = { codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' }[runner];
+    const runnerName = AGENT_LABELS[runner];
     const taskCanvasId = activeCanvasIdRef.current;
     setNodesBackground((items) => items.map((node) => node.id === actionId ? { ...node, status: 'running', model: runnerName, execution: { ...(node.execution || {}), activityCollapsed: node.execution?.activityCollapsed !== false, runner, events: [{ id: `context-${actionId}`, type: 'message', text: inherited.length ? tr(`已注入 ${inherited.length} 个上下文节点与 ${inheritedAttachments.length} 个附件。`,`Injected ${inherited.length} context nodes and ${inheritedAttachments.length} attachments.`) : tr('此任务从零开始，没有继承节点。',"Starting from scratch, without inherited nodes.") }], startedAt: new Date().toISOString() } } : node));
     try {
@@ -2916,12 +2947,22 @@ function App() {
     } catch (error) { setStorageWarning(error.message || tr('无法下载产物',"Cannot download artifact")); }
   }
 
+  function renderActionRunnerControls() {
+    if (!enabledAgents.length) {
+      return <button className="agent-setup-button" onClick={openAgentSettings}>{tr('配置执行器…','Set up an agent…')}</button>;
+    }
+    return <>
+      <ModelPicker language={uiLanguage} value={actionRunner} onChange={setActionRunner} options={enabledAgents.map((id) => ({ value: id, label: AGENT_LABELS[id] }))} />
+      {renderActionControls()}
+    </>;
+  }
+
   function renderActionControls() {
     const options = taskAgentSettings[actionRunner];
-    const runnerLabel = { codex: 'Codex', claude: 'Claude Code', deepseek: 'DeepSeek Harness' }[actionRunner];
+    const runnerLabel = AGENT_LABELS[actionRunner];
     const accessLabels = { 'read-only': tr('只读','Read only'), 'workspace-write': tr('工作区可写','Workspace write'), 'auto-review': tr('自动审查','Auto review'), 'full-access': tr('完全访问','Full access') };
     const reasoningLabels = { low:tr('低','Low'),medium:tr('中','Medium'),high:tr('高','High'),xhigh:tr('极高','XHigh'),max:tr('最高','Max') };
-    const summary = actionRunner === 'codex' ? `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${accessLabels[options.accessMode] || tr('工作区可写','Workspace write')}` : actionRunner === 'claude' ? `${options.model || tr('默认模型','Default model')} · ${options.permissionMode}` : `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${options.thinking ? tr('思考开启','Thinking on') : tr('直接执行','Direct execution')}`;
+    const summary = actionRunner === 'codex' ? `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${accessLabels[options.accessMode] || tr('工作区可写','Workspace write')}` : actionRunner === 'claude' ? `${options.model || tr('默认模型','Default model')} · ${options.permissionMode}` : actionRunner === 'pi' ? `${options.model || tr('默认模型','Default model')} · ${options.readOnly ? tr('只读','Read only') : tr('可读写','Read/write')}` : `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${options.thinking ? tr('思考开启','Thinking on') : tr('直接执行','Direct execution')}`;
     const workspace = actionWorkspace || activeCanvas?.workspace || '';
     return <div className="inline-agent-config">
       <button className={`agent-summary-button ${actionOptionsOpen ? 'active' : ''}`} onClick={() => setActionOptionsOpen((value) => !value)}><span>{summary}</span><i>⌄</i></button>
@@ -2942,6 +2983,11 @@ function App() {
           <label>{tr('权限模式','Permission mode')}<select value={options.permissionMode} onChange={(event) => updateAgentSetting('claude', { permissionMode: event.target.value })}><option value="default">{tr('默认','Default')}</option><option value="plan">{tr('计划模式','Plan mode')}</option><option value="acceptEdits">{tr('自动接受编辑','Accept edits automatically')}</option><option value="bypassPermissions">{tr('完全访问','Full access')}</option></select></label>
           <label>{tr('最大轮数','Maximum turns')}<input type="number" min="1" max="200" value={options.maxTurns} onChange={(event) => updateAgentSetting('claude', { maxTurns: event.target.value })} placeholder={tr('不限','No limit')} /></label>
           <label className="inline-checkbox"><input type="checkbox" checked={!!options.verbose} onChange={(event) => updateAgentSetting('claude', { verbose: event.target.checked })} />{tr('详细日志','Verbose logs')}</label>
+        </div>}
+        {actionRunner === 'pi' && <div className="inline-option-grid two-column">
+          <label>{tr('模型','Model')}<input value={options.model} onChange={(event) => updateAgentSetting('pi', { model: event.target.value })} placeholder={tr('使用 Pi 的默认设置','Use Pi\'s default')} /></label>
+          <label>{tr('思考强度','Thinking level')}<select value={options.thinking} onChange={(event) => updateAgentSetting('pi', { thinking: event.target.value })}>{['', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map((level) => <option key={level} value={level}>{level || tr('默认','Default')}</option>)}</select></label>
+          <label className="inline-checkbox full-row"><input type="checkbox" checked={!!options.readOnly} onChange={(event) => updateAgentSetting('pi', { readOnly: event.target.checked })} />{tr('只读模式','Read-only mode')}</label>
         </div>}
         {actionRunner === 'deepseek' && <div className="inline-option-grid two-column">
           <label>{tr('配置档','Profile')}<input value={options.profile} disabled /></label>
@@ -3215,8 +3261,7 @@ function App() {
               </div>
               {nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}
               {nodeType === 'conversation' && renderConversationControls()}
-              {nodeType === 'action' && <ModelPicker language={uiLanguage} value={actionRunner} onChange={setActionRunner} options={[{ value: 'codex', label: 'Codex' }, { value: 'claude', label: 'Claude Code' }, { value: 'deepseek', label: 'DeepSeek Harness' }]} />}
-              {nodeType === 'action' && renderActionControls()}
+              {nodeType === 'action' && renderActionRunnerControls()}
               {nodeType === 'conversation' && <button className={`parallel-toggle ${parallelMode ? 'active' : ''}`} onClick={() => setParallelMode((value) => !value)}>{tr('并行','Parallel')}</button>}
               <button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />
               <span className="shortcut">{copy.shortcut}</span>
@@ -3224,7 +3269,7 @@ function App() {
             </div>
           </section>
         )}
-        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row"><div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={nodeType === 'action' ? tr(`描述要交给${actionRunner}的任务……`,`Describe the task for ${actionRunner}…`) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); createFirstNode(); } }} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><div className="segmented">{[['conversation', copy.chat], ['thought', copy.idea], ['action', copy.action]].filter(([value])=>!PUBLIC_WEB || value!=='action').map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}</div>{nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}{nodeType === 'conversation' && renderConversationControls()}{nodeType === 'action' && <ModelPicker language={uiLanguage} value={actionRunner} options={[{ value: 'codex', label: 'Codex' }, { value: 'claude', label: 'Claude Code' }, { value: 'deepseek', label: 'DeepSeek Harness' }]} onChange={setActionRunner} />}{nodeType === 'action' && renderActionControls()}<button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} /><span className="shortcut">{copy.shortcut}</span><button className="send-button" onClick={createFirstNode}>↑</button></div></section>}
+        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row"><div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) : tr('先在 设置 → 执行器 里启用一个执行器','Enable an agent in Settings → Agents first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); createFirstNode(); } }} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><div className="segmented">{[['conversation', copy.chat], ['thought', copy.idea], ['action', copy.action]].filter(([value])=>!PUBLIC_WEB || value!=='action').map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}</div>{nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}{nodeType === 'conversation' && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} /><span className="shortcut">{copy.shortcut}</span><button className="send-button" onClick={createFirstNode}>↑</button></div></section>}
       </main>
 
       {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?say('松开将移动分支；原父子线会解除','Release to move branch; original parent link will detach'):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
@@ -3266,6 +3311,7 @@ function App() {
           sections={[
             { id: 'models', label: text('modelConnections') },
             { id: 'appearance', label: text('appearance') },
+            ...(PUBLIC_WEB ? [] : [{ id: 'agents', label: tr('执行器','Agents') }]),
             { id: 'license', label: tr('授权','License') },
             { id: 'notifications', label: tr('通知','Notifications') },
             { id: 'plugins', label: tr('插件','Plugins') },
@@ -3313,6 +3359,7 @@ function App() {
             </Page>
           )}
           {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
+          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} tr={tr} />}
           {settingsSection === 'license' && (
             <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
               {license ? (

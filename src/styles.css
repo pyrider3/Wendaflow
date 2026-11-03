@@ -668,3 +668,5 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 .workspace-path input { width: 100%; box-sizing: border-box; height: 30px; padding: 0 10px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
 .workspace-path input:focus { outline: 2px solid color-mix(in srgb, var(--sx-accent, #247b56) 55%, transparent); outline-offset: 1px; }
 .workspace-path p { margin: 5px 2px 0; color: var(--sx-danger, #a34f45); font-size: 11.5px; }
+.agent-setup-button { height: 34px; padding: 0 14px; border: 1px dashed color-mix(in srgb, var(--sx-accent, #247b56) 55%, transparent); border-radius: 11px; background: transparent; color: var(--sx-accent, #176348); font: inherit; font-size: 13px; cursor: pointer; transition: background-color .2s var(--ease-out), border-color .2s var(--ease-out); }
+.agent-setup-button:hover { background: color-mix(in srgb, var(--sx-accent, #247b56) 10%, transparent); border-style: solid; }

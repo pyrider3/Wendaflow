@@ -230,6 +230,117 @@ async function runHarnessHeadless(prompt, images = [], files = [], workspace = p
   }
 }
 
+// A configured command is either a bare name looked up on PATH or an absolute path.
+async function resolveAgentCommand(configured, fallbackName) {
+  const wanted = String(configured || '').trim();
+  if (!wanted) return findCommand([fallbackName]);
+  if (wanted.includes('\0') || wanted.length > 500) throw new Error('可执行文件路径无效');
+  if (wanted.includes('/') || wanted.includes('\\')) {
+    if (!path.isAbsolute(wanted)) throw new Error('请填写完整路径（以 / 开头），或只写命令名');
+    try { if (!(await stat(wanted)).isFile()) throw new Error(); } catch { throw new Error(`找不到可执行文件：${wanted}`); }
+    return wanted;
+  }
+  const found = await findCommand([wanted]);
+  if (!found) throw new Error(`在 PATH 中找不到命令：${wanted}`);
+  return found;
+}
+
+function piMessageText(blocks, type = 'text') {
+  return (Array.isArray(blocks) ? blocks : []).filter((block) => block?.type === type).map((block) => block.text || block.thinking || '').filter(Boolean).join('\n');
+}
+
+function piToolArgs(args) {
+  if (!args || typeof args !== 'object') return args ? String(args) : '';
+  const direct = args.command || args.cmd || args.path || args.file_path || args.pattern || args.url || args.query;
+  return direct ? String(direct) : (Object.keys(args).length ? JSON.stringify(args) : '');
+}
+
+// Pi (https://github.com/earendil-works/pi) runs one task with `pi -p --mode json`;
+// it reads the task from stdin, so stdin must be closed after writing it.
+async function runPiAgent(prompt, images = [], files = [], workspace = process.cwd(), hooks = {}, options = {}) {
+  const resolvedWorkspace = path.resolve(workspace || process.cwd());
+  if (!(await stat(resolvedWorkspace)).isDirectory()) throw new Error('行动工作目录不是有效文件夹');
+  const command = await resolveAgentCommand(options.command, 'pi');
+  if (!command) throw new Error('找不到 Pi。请先安装 Pi，或在 设置 → 执行器 里填写它的路径。');
+  const attachmentSet = await materializeAttachments([...images, ...files], resolvedWorkspace);
+  const attachmentNotice = attachmentSet.paths.length
+    ? `\n\nWendaflow 已将附件保存到以下路径。请实际打开并读取它们：\n${attachmentSet.paths.map((item) => `- ${item.name}: ${item.path}`).join('\n')}`
+    : '';
+  const thinking = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(options.thinking) ? options.thinking : '';
+  const clean = (value) => String(value || '').trim();
+  const extra = clean(options.extraArgs).split(/\s+/).filter(Boolean);
+  const args = ['-p', '--mode', 'json',
+    ...(options.ephemeral === false ? [] : ['--no-session']),
+    ...(clean(options.provider) ? ['--provider', clean(options.provider)] : []),
+    ...(clean(options.model) ? ['--model', clean(options.model)] : []),
+    ...(thinking ? ['--thinking', thinking] : []),
+    ...(options.readOnly ? ['--tools', 'read,grep,find,ls'] : []),
+    ...extra];
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(command, args, { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+      hooks.onChild?.(child);
+      let buffer = '', stderr = '', sessionId = '', answer = '', failure = '', aborted = false;
+      const timer = setTimeout(() => { failure ||= 'Pi 任务超时（15 分钟）'; child.kill('SIGTERM'); }, 15 * 60_000);
+      const handle = (line) => {
+        let event;
+        try { event = JSON.parse(line); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); return; }
+        if (event.type === 'session') sessionId = event.id || sessionId;
+        else if (event.type === 'message_end' && event.message?.role === 'assistant') {
+          const thought = piMessageText(event.message.content, 'thinking');
+          const text = piMessageText(event.message.content, 'text');
+          if (thought) hooks.onEvent?.('thinking', thought);
+          if (text) { hooks.onEvent?.('message', text); answer = text; }
+          if (event.message.stopReason === 'error') failure ||= event.message.errorMessage || 'Pi 请求模型时出错';
+        } else if (event.type === 'tool_execution_start') {
+          const detail = piToolArgs(event.args);
+          hooks.onEvent?.('command', `${event.toolName || '工具'}${detail ? `\n${detail}` : ''}`);
+        } else if (event.type === 'tool_execution_end') {
+          const text = piMessageText(event.result?.content) || (typeof event.result === 'string' ? event.result : '');
+          hooks.onEvent?.('command', text ? `${event.isError ? '失败：' : ''}${text}` : '工具已返回结果');
+        } else if (event.type === 'agent_settled') aborted = event.aborted === true;
+      };
+      child.stdout.on('data', (chunk) => { buffer += chunk; const lines = buffer.split('\n'); buffer = lines.pop() || ''; lines.forEach((line) => handle(line.replace(/\r$/, ''))); });
+      child.stderr.on('data', (chunk) => { const text = chunk.toString(); if (text.replace(/[\x00-\x1f\x7f]/g, '').trim()) hooks.onEvent?.('stderr', text); stderr = (stderr + text).slice(-2000); });
+      child.on('error', (error) => { clearTimeout(timer); reject(new Error(`Pi 无法启动：${error.message}`)); });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (buffer.trim()) handle(buffer.replace(/\r$/, ''));
+        if (code === 0 && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: `Pi session: ${sessionId}` });
+        else reject(new Error(failure || (aborted ? 'Pi 任务已中止' : '') || stderr.trim() || `Pi 退出码 ${code}`));
+      });
+      child.stdin.end(`${prompt}${attachmentNotice}`);
+    });
+  } finally {
+    if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function probeAgent(command, args = ['--version'], via = null) {
+  if (!command) return { installed: false };
+  return new Promise((resolve) => {
+    let child;
+    try { child = spawn(via || command, via ? [command, ...args] : args, { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, NO_COLOR: '1' } }); } catch { resolve({ installed: true, path: command }); return; }
+    let out = '';
+    const timer = setTimeout(() => { child.kill('SIGTERM'); }, 6000);
+    child.stdout.on('data', (chunk) => { out += chunk; });
+    child.on('error', () => { clearTimeout(timer); resolve({ installed: false }); });
+    child.on('close', () => { clearTimeout(timer); resolve({ installed: true, path: command, version: out.trim().split(/\r?\n/)[0]?.slice(0, 80) || '' }); });
+  });
+}
+
+async function detectAgents(piCommand = '') {
+  const safe = async (fn) => { try { return await fn(); } catch (error) { return { installed: false, error: error.message }; } };
+  const [codex, claude, pi, deepseek] = await Promise.all([
+    safe(async () => probeAgent(await findCommand(['codex']))),
+    safe(async () => probeAgent(process.env.CLAUDE_CLI || await findCommand(['claude']))),
+    safe(async () => probeAgent(await resolveAgentCommand(piCommand, 'pi'))),
+    safe(async () => probeAgent(await resolveHarnessBin().catch(() => null), ['--version'], process.execPath)),
+  ]);
+  return { codex, claude, pi, deepseek };
+}
+
+
 async function readJson(req, limit = 12_000_000) {
   const chunks = [];
   let size = 0;
@@ -348,6 +459,7 @@ async function runCliAgent(runner, prompt, images = [], files = [], workspace = 
   if (!(await stat(resolvedWorkspace)).isDirectory()) throw new Error('行动工作目录不是有效文件夹');
   // DeepSeek Harness has its own one-shot runner (`dsh headless --json`).
   if (runner === 'deepseek') return runHarnessHeadless(prompt, images, files, resolvedWorkspace, hooks, options);
+  if (runner === 'pi') return runPiAgent(prompt, images, files, resolvedWorkspace, hooks, options);
   const { tempDir, paths: attachmentPaths } = await materializeAttachments([...images, ...files], resolvedWorkspace);
   const effectivePrompt = attachmentPaths.length ? `${prompt}\n\nWendaflow 已将用户上传的附件保存到以下本地路径。你必须实际打开并读取它们；图片也需要通过这些路径查看：\n${attachmentPaths.map((item) => `- ${item.name}: ${item.path}`).join('\n')}` : prompt;
   const claudeCommand = process.env.CLAUDE_CLI || await findCommand(process.platform === 'win32' ? ['claude.cmd', 'claude.exe', 'claude'] : ['claude']);
@@ -559,6 +671,10 @@ const server = http.createServer(async (req, res) => {
     let output = '', error = '';
     child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; });
     child.on('close', (code) => code === 0 ? reply(res, 200, { path: output.trim() }) : reply(res, 400, { error: error.trim() || '目录选择已取消' }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/detect') {
+    try { const { pi = '' } = await readJson(req); reply(res, 200, await detectAgents(pi)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
   if (req.method === 'POST' && req.url === '/resolve-directory') {

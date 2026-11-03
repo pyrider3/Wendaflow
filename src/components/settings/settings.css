@@ -447,3 +447,4 @@
 .sx-confirm h3 { margin: 0; font-size: 17px; font-weight: 700; }
 .sx-confirm p { margin: 8px 0 20px; color: var(--sx-muted); font-size: 13px; line-height: 1.6; }
 .sx-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.sx-hint { color: var(--sx-muted); font-size: 12px; line-height: 1.5; }
