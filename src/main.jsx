@@ -1,3 +1,4 @@
+import {AppIcon} from './components/icons.jsx';
 import {Inspector} from './components/inspector/Inspector.jsx';
 import {ConfirmDialog} from './components/ConfirmDialog.jsx';
 import {SettingsDialog} from './components/settings/SettingsDialog.jsx';
@@ -37,6 +38,7 @@ import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
 import './themes/black-readability.css';
+import './components/polish.css';
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
@@ -780,7 +782,18 @@ function App() {
 
   useEffect(() => localStorage.setItem('branchspace-local-profiles', JSON.stringify(localProfiles)), [localProfiles]);
   useEffect(() => localStorage.setItem('branchspace-minimap', String(minimapOpen)), [minimapOpen]);
-  useEffect(() => { localStorage.setItem('wonderful-theme', theme); document.documentElement.dataset.theme = theme; }, [theme]);
+  const themeAppliedRef = useRef(false);
+  useEffect(() => {
+    localStorage.setItem('wonderful-theme', theme);
+    const root = document.documentElement;
+    if (themeAppliedRef.current) {
+      // Fade colours for a moment so a theme change is not a hard cut.
+      root.classList.add('theme-fading');
+      window.setTimeout(() => root.classList.remove('theme-fading'), 520);
+    }
+    themeAppliedRef.current = true;
+    root.dataset.theme = theme;
+  }, [theme]);
   useEffect(() => {
     localStorage.setItem('wendaflow-ui-language', uiLanguage);
     document.documentElement.lang = uiLanguage;
@@ -3000,24 +3013,24 @@ function App() {
             const hint = autosaveOn ? tr('修改会自动保存，也可按 Ctrl+S 立即保存。','Changes save automatically. Press Ctrl+S to save now.') : tr('尚未保存。保存一次后，之后的修改会自动保存（Ctrl+S）。','Not saved yet. Save once and later changes save automatically (Ctrl+S).');
             const className = `quiet-button save-button ${state === 'saving' ? 'saving' : state === 'saved' || (autosaveOn && state === 'idle') ? 'saved' : state === 'failed' ? 'failed' : ''} ${!autosaveOn && state === 'dirty' ? 'unsaved' : ''}`;
             return <button className={className} disabled={state === 'saving'} title={hint} onClick={() => saveCanvas()}>{label}</button>;
-          })()}<button className="quiet-button" onClick={()=>exportCanvases([activeCanvasId])}>{say('导出 WDF','Export WDF')}</button>
-          <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z">↶</button>
-        <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z">↷</button>
-        <button className="quiet-button" onClick={fitView}>{text('fitCanvas')}</button>
-          <button className="quiet-button" onClick={autoLayout}>{text('autoLayout')}</button>
-          <button className={minimapOpen ? 'quiet-button active' : 'quiet-button'} onClick={() => setMinimapOpen((value) => !value)}>{text('minimap')}</button>
-          <button className={focusMode ? 'quiet-button active' : 'quiet-button'} onClick={() => setFocusMode((value) => !value)}>{text('focusPath')}</button>
+          })()}<button className="quiet-button" onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" />{say('导出 WDF','Export WDF')}</button>
+          <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z"><AppIcon name="undo" /></button>
+        <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z"><AppIcon name="redo" /></button>
+        <button className="quiet-button" onClick={fitView}><AppIcon name="fit" />{text('fitCanvas')}</button>
+          <button className="quiet-button" onClick={autoLayout}><AppIcon name="arrange" />{text('autoLayout')}</button>
+          <button className={minimapOpen ? 'quiet-button active' : 'quiet-button'} onClick={() => setMinimapOpen((value) => !value)}><AppIcon name="map" />{text('minimap')}</button>
+          <button className={focusMode ? 'quiet-button active' : 'quiet-button'} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" />{text('focusPath')}</button>
           {window.wonderfulWindow&&<div className="window-controls"><button aria-label={tr('最小化','Minimize')} onClick={() => window.wonderfulWindow?.minimize?.()}>—</button><button aria-label={tr('切换窗口大小','Toggle window size')} onClick={() => window.wonderfulWindow?.maximize?.()}>□</button><button className="window-close" aria-label={tr('关闭 Wendaflow','Close Wendaflow')} onClick={() => persistCurrentCanvas().then(()=>window.wonderfulWindow?.close?.()).catch(error=>setStorageWarning(error.message))}>×</button></div>}
         </div>
       </header>
 
       <nav className="rail" aria-label={tr('主导航','Main navigation')}>
-        <button className={`rail-button ${canvasMenuOpen ? 'active' : ''}`} aria-label={text('allCanvases')} onClick={()=>void showCanvasHome('all')}>⌘</button>
-        <button className={`rail-button search-rail ${searchOpen ? 'active' : ''}`} aria-label={text('search')} onClick={() => { toggleFloatingPanel('search', searchOpen, setSearchOpen); setCanvasMenuOpen(false); setLibraryOpen(false); }}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/></svg></button>
-        <button className={`rail-button ${libraryOpen ? 'active' : ''}`} aria-label={text('library')} onClick={() => { toggleFloatingPanel('library', libraryOpen, setLibraryOpen); setSearchOpen(false); setCanvasMenuOpen(false); }}>▱</button>
-        <button className="rail-button" aria-label={say('快捷键帮助','Keyboard shortcuts')} onClick={()=>setShortcutHelp(true)}>?</button>
+        <button className={`rail-button ${canvasMenuOpen ? 'active' : ''}`} aria-label={text('allCanvases')} title={`${text('allCanvases')} (Ctrl P)`} onClick={()=>void showCanvasHome('all')}><AppIcon name="canvases" /></button>
+        <button className={`rail-button search-rail ${searchOpen ? 'active' : ''}`} aria-label={text('search')} title={`${text('search')} (Ctrl K)`} onClick={() => { toggleFloatingPanel('search', searchOpen, setSearchOpen); setCanvasMenuOpen(false); setLibraryOpen(false); }}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/></svg></button>
+        <button className={`rail-button ${libraryOpen ? 'active' : ''}`} aria-label={text('library')} title={text('library')} onClick={() => { toggleFloatingPanel('library', libraryOpen, setLibraryOpen); setSearchOpen(false); setCanvasMenuOpen(false); }}><AppIcon name="library" /></button>
+        <button className="rail-button" aria-label={say('快捷键帮助','Keyboard shortcuts')} title={`${say('快捷键帮助','Keyboard shortcuts')} (?)`} onClick={()=>setShortcutHelp(true)}><AppIcon name="help" /></button>
         <div className="rail-spacer" />
-        <button className="rail-button" aria-label={text('settings')} onPointerDown={(event) => { event.stopPropagation(); openSettings(); }} onClick={openSettings}>⚙</button>
+        <button className="rail-button" aria-label={text('settings')} title={text('settings')} onPointerDown={(event) => { event.stopPropagation(); openSettings(); }} onClick={openSettings}><AppIcon name="settings" /></button>
       </nav>
 
       {canvasMenuOpen&&<CanvasHome managementOpen={canvasManagementOpen} onManagementChange={open=>{setCanvasManagementOpen(open);if(open&&!PUBLIC_WEB)void refreshSavedCanvases();}} items={workspaceItems} meta={workspaceMeta} summaries={canvasSummaries} filter={canvasFilter} setFilter={setCanvasFilter} onOpen={switchCanvas} onCreate={createCanvas} onImport={()=>canvasImportRef.current?.click()} onStar={id=>changeWorkspace(meta=>({...meta,cards:{...meta.cards,[id]:{...meta.cards[id],starred:!meta.cards[id]?.starred}}}))} onRename={renameCanvas} onMove={setCanvasGroup} onTrash={moveCanvasesToTrash} onRestore={restoreBrowserCanvases} onDuplicate={duplicateBrowserCanvas} onExport={exportCanvases} canReturn={Boolean(activeCanvasId)&&!workspaceMeta.cards[activeCanvasId]?.trashedAt} onClose={()=>{if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)void switchCanvas(activeCanvasId);}} onGroupRename={(id,name)=>changeWorkspace(meta=>({...meta,groups:meta.groups.map(g=>g.id===id?{...g,name:name.trim().slice(0,60)}:g)}))} onGroupDelete={removeCanvasGroup} onGroupCreate={createCanvasGroup} activeId={activeCanvasId} autosaveEnabled={autosavePolicy[activeCanvasId]===true} publicWeb={PUBLIC_WEB} archives={PUBLIC_WEB?[]:savedCanvases} archiveTrash={PUBLIC_WEB?[]:trashCanvases} onArchiveOpen={openSavedCanvas} onArchiveTrash={deleteSavedCanvas} onArchiveRestore={restoreSavedCanvas} say={say} time={value=>formatCanvasTime(value,uiLanguage)}/>}

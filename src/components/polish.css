@@ -1,0 +1,282 @@
+/* Visual pass for the app chrome and floating panels.
+ *
+ * Everything reads the --sx-* tokens (settings.css), so each theme is covered by
+ * one set of rules.  The `:root .app-shell` prefix outranks the older per-theme
+ * overrides without !important. */
+
+:root .app-shell {
+  --workspace-bg: var(--sx-bg);
+  --workspace-panel: var(--sx-side);
+  --workspace-text: var(--sx-text);
+  --workspace-muted: var(--sx-muted);
+  --workspace-border: var(--sx-line);
+  --workspace-hover: var(--sx-sunken);
+  --workspace-active: var(--sx-accent-soft);
+  --workspace-accent: var(--sx-accent);
+  --ui-muted: var(--sx-muted);
+  --ui-focus: var(--sx-accent);
+  --surface: var(--sx-bg);
+  --text: var(--sx-text);
+}
+
+/* ---------- icons ---------- */
+
+.app-icon { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- top bar ---------- */
+
+:root .app-shell .topbar .project-block strong { font-size: 15px; letter-spacing: -0.01em; color: var(--sx-text); }
+:root .app-shell .topbar .project-block span { font-size: 11.5px; color: var(--sx-muted); }
+
+:root .app-shell .topbar .quiet-button,
+:root .app-shell .topbar .new-tab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 13px;
+  border: 1px solid var(--sx-line); border-radius: 12px; background: color-mix(in srgb, var(--sx-bg) 88%, transparent);
+  color: var(--sx-text); font-size: 13px; font-weight: 500; backdrop-filter: blur(10px);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sx-text) 6%, transparent);
+  transition: transform 0.35s var(--ease-spring), background-color 0.25s var(--ease-out), border-color 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out), color 0.25s var(--ease-out);
+}
+:root .app-shell .topbar .quiet-button:hover:not(:disabled),
+:root .app-shell .topbar .new-tab:hover {
+  transform: translateY(-1px); border-color: var(--sx-line-strong); background: var(--sx-raised);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--sx-text) 10%, transparent);
+}
+:root .app-shell .topbar .quiet-button:active:not(:disabled), :root .app-shell .topbar .new-tab:active { transform: scale(0.96); box-shadow: none; }
+:root .app-shell .topbar .quiet-button.active { border-color: color-mix(in srgb, var(--sx-accent) 45%, transparent); background: var(--sx-accent-soft); color: var(--sx-accent); }
+:root .app-shell .topbar .quiet-button:disabled { opacity: 0.4; }
+:root .app-shell .topbar .quiet-button:focus-visible, :root .app-shell .rail-button:focus-visible, :root .app-shell .canvas-tabs button:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+:root .app-shell .topbar .history-button { width: 36px; padding: 0; }
+:root .app-shell .topbar .save-button.saved { background: var(--sx-accent-soft); color: var(--sx-accent); border-color: color-mix(in srgb, var(--sx-accent) 35%, transparent); }
+:root .app-shell .topbar .save-button.failed { color: var(--sx-danger); border-color: color-mix(in srgb, var(--sx-danger) 45%, transparent); }
+:root .app-shell .topbar .save-button.unsaved::before { background: var(--sx-accent); }
+
+/* ---------- tabs ---------- */
+
+:root .app-shell .canvas-tabs { gap: 6px; padding: 2px; }
+:root .app-shell .canvas-tabs button:not(.new-tab) {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px; max-width: 190px; padding: 0 8px 0 13px;
+  border: 1px solid var(--sx-line); border-radius: 12px; background: color-mix(in srgb, var(--sx-bg) 70%, transparent);
+  color: var(--sx-muted); font-size: 13px; font-weight: 500; white-space: nowrap;
+  animation: tab-in 0.5s var(--ease-out) both;
+  transition: transform 0.35s var(--ease-spring), background-color 0.25s var(--ease-out), color 0.25s var(--ease-out), border-color 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
+}
+:root .app-shell .canvas-tabs button:not(.new-tab) span { overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+:root .app-shell .canvas-tabs button:not(.new-tab):hover { color: var(--sx-text); transform: translateY(-1px); border-color: var(--sx-line-strong); }
+:root .app-shell .canvas-tabs button.active {
+  border-color: color-mix(in srgb, var(--sx-accent) 40%, transparent); background: var(--sx-accent-soft); color: var(--sx-accent); font-weight: 600;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--sx-accent) 16%, transparent);
+}
+:root .app-shell .canvas-tabs button i {
+  display: grid; place-items: center; width: 20px; height: 20px; flex: none; border-radius: 50%; font-size: 14px; font-style: normal; line-height: 1;
+  opacity: 0.6; transition: background-color 0.2s var(--ease-out), opacity 0.2s var(--ease-out), transform 0.35s var(--ease-spring);
+}
+:root .app-shell .canvas-tabs button i:hover { opacity: 1; background: color-mix(in srgb, var(--sx-text) 12%, transparent); transform: rotate(90deg); }
+
+/* ---------- left rail ---------- */
+
+:root .app-shell .rail-button {
+  display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 1px solid var(--sx-line); border-radius: 14px;
+  background: color-mix(in srgb, var(--sx-bg) 88%, transparent); color: var(--sx-muted); backdrop-filter: blur(10px);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sx-text) 6%, transparent);
+  transition: transform 0.35s var(--ease-spring), background-color 0.25s var(--ease-out), color 0.25s var(--ease-out), border-color 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
+}
+:root .app-shell .rail-button .app-icon, :root .app-shell .rail-button svg { width: 19px; height: 19px; }
+:root .app-shell .rail-button:hover { transform: translateY(-2px); color: var(--sx-text); border-color: var(--sx-line-strong); box-shadow: 0 10px 22px color-mix(in srgb, var(--sx-text) 12%, transparent); }
+:root .app-shell .rail-button:active { transform: scale(0.94); }
+:root .app-shell .rail-button.active { color: var(--sx-accent); background: var(--sx-accent-soft); border-color: color-mix(in srgb, var(--sx-accent) 40%, transparent); }
+
+/* ---------- canvas hint ---------- */
+
+:root .app-shell .canvas-hint {
+  right: auto; width: fit-content; max-width: calc(100% - 180px); padding: 6px 14px; border: 1px solid var(--sx-line); border-radius: 999px;
+  background: color-mix(in srgb, var(--sx-bg) 78%, transparent); backdrop-filter: blur(10px);
+  color: var(--sx-muted); font-size: 12px; line-height: 1.4; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------- floating panels: search, library, notifications ---------- */
+
+:root .app-shell :is(.search-panel, .library-panel, .notification-center) {
+  border: 1px solid var(--sx-line); border-radius: 20px; background: var(--sx-bg); color: var(--sx-text);
+  box-shadow: var(--sx-shadow); backdrop-filter: none; font-size: 13px;
+}
+:root .app-shell .search-panel { width: 380px; padding: 12px; }
+:root .app-shell .search-input {
+  display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border: 1px solid var(--sx-line); border-radius: 14px;
+  background: var(--sx-sunken); transition: border-color 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out), background-color 0.25s var(--ease-out);
+}
+:root .app-shell .search-input:focus-within { border-color: var(--sx-accent); background: var(--sx-raised); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sx-accent) 18%, transparent); }
+:root .app-shell .search-input input { flex: 1; min-width: 0; border: 0; background: none; color: var(--sx-text); font: inherit; font-size: 14px; outline: 0; box-shadow: none; }
+:root .app-shell .search-input span { color: var(--sx-muted); }
+:root .app-shell .search-input small { padding: 2px 7px; border: 1px solid var(--sx-line); border-radius: 6px; color: var(--sx-muted); font-size: 11px; }
+:root .app-shell .search-results { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 340px; overflow: auto; }
+:root .app-shell .search-results button {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--sx-text); text-align: left; cursor: pointer;
+  animation: sx-rise 0.4s var(--ease-out) both;
+  transition: background-color 0.2s var(--ease-out), transform 0.3s var(--ease-spring);
+}
+:root .app-shell .search-results button:hover { background: var(--sx-sunken); transform: translateX(2px); }
+:root .app-shell .search-results button strong { display: block; font-size: 13.5px; font-weight: 600; }
+:root .app-shell .search-results button small { display: block; overflow: hidden; color: var(--sx-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+:root .app-shell .search-results button em { padding: 2px 8px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-size: 11px; font-style: normal; }
+:root .app-shell .search-results p { margin: 14px; color: var(--sx-muted); text-align: center; }
+:root .app-shell :is(.search-panel, .library-panel) > footer { margin-top: 8px; padding: 8px 6px 0; border-top: 1px solid var(--sx-line); color: var(--sx-muted); font-size: 12px; }
+
+:root .app-shell .library-panel { width: min(460px, calc(100% - 90px)); padding: 18px; }
+:root .app-shell .library-panel > header { display: flex; align-items: flex-start; justify-content: space-between; }
+:root .app-shell .library-panel > header span { color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .library-panel > header h2 { margin: 2px 0 0; font-size: 20px; font-weight: 700; }
+:root .app-shell .library-panel > header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--sx-sunken); color: var(--sx-muted); font-size: 18px; cursor: pointer; transition: transform 0.35s var(--ease-spring), background-color 0.2s var(--ease-out); }
+:root .app-shell .library-panel > header button:hover { transform: rotate(90deg); background: var(--sx-line); color: var(--sx-text); }
+:root .app-shell .library-upload { display: flex; align-items: center; gap: 12px; margin: 14px 0; padding: 12px; border: 1.5px dashed var(--sx-line-strong); border-radius: 14px; background: var(--sx-sunken); transition: border-color 0.25s var(--ease-out), background-color 0.25s var(--ease-out); }
+:root .app-shell .library-upload:hover { border-color: var(--sx-accent); background: var(--sx-accent-soft); }
+:root .app-shell .library-upload button { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--sx-accent); color: var(--sx-accent-ink); font-size: 13px; font-weight: 600; cursor: pointer; transition: transform 0.3s var(--ease-spring), filter 0.2s var(--ease-out); }
+:root .app-shell .library-upload button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+:root .app-shell .library-upload span { color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .library-list > p { padding: 28px 12px; color: var(--sx-muted); text-align: center; }
+:root .app-shell .library-list article { border: 1px solid var(--sx-line); border-radius: 14px; background: var(--sx-raised); animation: sx-rise 0.4s var(--ease-out) both; }
+
+:root .app-shell .notification-center { width: min(400px, calc(100vw - 32px)); padding: 0; overflow: hidden; }
+:root .app-shell .notification-center > header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--sx-line); }
+:root .app-shell .notification-center > header small { display: block; color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .notification-center > header strong { font-size: 16px; }
+:root .app-shell .notification-center > header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--sx-sunken); color: var(--sx-muted); font-size: 18px; cursor: pointer; transition: transform 0.35s var(--ease-spring); }
+:root .app-shell .notification-center > header button:hover { transform: rotate(90deg); }
+:root .app-shell .notification-list { max-height: 360px; overflow: auto; }
+:root .app-shell .notification-list > p { margin: 0; padding: 36px 24px; color: var(--sx-muted); text-align: center; line-height: 1.6; }
+:root .app-shell .notification-list button { display: flex; gap: 12px; width: 100%; padding: 14px 18px; border: 0; border-bottom: 1px solid var(--sx-line); background: transparent; color: var(--sx-text); text-align: left; cursor: pointer; transition: background-color 0.2s var(--ease-out); }
+:root .app-shell .notification-list button:hover { background: var(--sx-sunken); }
+:root .app-shell .notification-list button.read { opacity: 0.6; }
+:root .app-shell .notification-center > footer { display: flex; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--sx-line); }
+:root .app-shell .notification-center > footer button { height: 32px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 10px; background: var(--sx-raised); color: var(--sx-text); font-size: 12px; cursor: pointer; }
+
+:root .app-shell :is(.notification-toast, .undo-toast) {
+  border: 1px solid var(--sx-line); border-radius: 16px; background: var(--sx-bg); color: var(--sx-text); box-shadow: var(--sx-shadow); font-size: 13px; backdrop-filter: none;
+}
+:root .app-shell .undo-toast button { height: 30px; border: 0; border-radius: 9px; background: var(--sx-accent-soft); color: var(--sx-accent); font-weight: 600; cursor: pointer; }
+
+/* ---------- canvas picker / manager (read --workspace-* tokens above) ---------- */
+
+:root .app-shell :is(.canvas-picker, .canvas-manager) { border-radius: 20px; box-shadow: var(--sx-shadow); font-size: 13px; }
+:root .app-shell .canvas-picker { width: 340px; padding: 12px; }
+:root .app-shell .picker-row-name, :root .app-shell .picker-row-open { font-size: 13.5px; }
+:root .app-shell .picker-section-label { font-size: 12px; }
+:root .app-shell .canvas-manager { padding: 16px; }
+:root .app-shell .canvas-manager :is(button, input, select) { font-size: 13px; }
+
+/* ---------- empty state ---------- */
+
+:root .app-shell .empty-welcome strong { color: var(--sx-text); font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+:root .app-shell .empty-welcome span { color: var(--sx-muted); }
+
+
+/* ---------- new-tab button, quick-thinking switch ---------- */
+
+:root .app-shell .canvas-tabs > .new-tab { width: 34px; height: 34px; padding: 0; border-radius: 12px; font-size: 18px; font-weight: 400; color: var(--sx-muted); }
+:root .app-shell .canvas-tabs > .new-tab:hover { color: var(--sx-accent); }
+:root .app-shell .quick-thought-toggle { gap: 9px; padding: 6px 10px; border-radius: 12px; color: var(--sx-text); font: 500 13px/1 system-ui, sans-serif; transition: background-color 0.25s var(--ease-out); }
+:root .app-shell .quick-thought-toggle:hover { background: var(--sx-sunken); }
+:root .app-shell .quick-switch-track { width: 38px; height: 22px; background: var(--sx-line-strong); transition: background-color 0.3s var(--ease-out); }
+:root .app-shell .quick-switch-track i { width: 18px; height: 18px; margin: 2px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28); transition: transform 0.45s var(--ease-spring); }
+:root .app-shell .quick-thought-toggle[aria-checked="true"] .quick-switch-track { background: var(--sx-accent); }
+:root .app-shell .quick-thought-toggle[aria-checked="true"] .quick-switch-track i { transform: translateX(16px); }
+
+/* ---------- composer ---------- */
+
+:root .app-shell .composer {
+  padding: 14px 16px 12px; border: 1px solid var(--sx-line); border-radius: 24px; background: color-mix(in srgb, var(--sx-bg) 92%, transparent);
+  box-shadow: var(--sx-shadow); backdrop-filter: blur(24px) saturate(150%); color: var(--sx-text);
+  transition: border-color 0.3s var(--ease-out), box-shadow 0.4s var(--ease-out);
+}
+:root .app-shell .composer:focus-within { border-color: color-mix(in srgb, var(--sx-accent) 55%, var(--sx-line)); box-shadow: var(--sx-shadow), 0 0 0 4px color-mix(in srgb, var(--sx-accent) 14%, transparent); }
+:root .app-shell .composer textarea { color: var(--sx-text); font-size: 15px; line-height: 1.55; }
+:root .app-shell .composer textarea::placeholder { color: color-mix(in srgb, var(--sx-muted) 75%, transparent); }
+:root .app-shell .composer .attach-button, :root .app-shell .composer .parallel-toggle {
+  height: 32px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 10px; background: var(--sx-sunken); color: var(--sx-muted); font-size: 12.5px; font-weight: 500;
+  transition: transform 0.3s var(--ease-spring), background-color 0.2s var(--ease-out), color 0.2s var(--ease-out), border-color 0.2s var(--ease-out);
+}
+:root .app-shell .composer .attach-button:hover, :root .app-shell .composer .parallel-toggle:hover { color: var(--sx-text); border-color: var(--sx-line-strong); transform: translateY(-1px); }
+:root .app-shell .composer .parallel-toggle.active { background: var(--sx-accent-soft); color: var(--sx-accent); border-color: color-mix(in srgb, var(--sx-accent) 40%, transparent); }
+:root .app-shell .composer .segmented { padding: 3px; border: 1px solid var(--sx-line); border-radius: 12px; background: var(--sx-sunken); }
+:root .app-shell .composer .segmented::before { top: 3px; left: 3px; width: calc((100% - 6px) / 3); height: calc(100% - 6px); border-radius: 9px; background: var(--sx-raised); box-shadow: 0 2px 8px color-mix(in srgb, var(--sx-text) 14%, transparent), inset 0 0 0 1px var(--sx-line); transition: transform 0.5s var(--ease-spring); }
+:root .app-shell .composer .segmented button { height: 28px; min-width: 44px; padding: 0 10px; border-radius: 9px; background: transparent; color: var(--sx-muted); font-size: 12.5px; font-weight: 500; transition: color 0.25s var(--ease-out); }
+:root .app-shell .composer .segmented button.selected { color: var(--sx-accent); font-weight: 700; }
+:root .app-shell .composer .shortcut { color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .composer .send-button { width: 38px; height: 38px; border: 0; border-radius: 13px; background: var(--sx-accent); color: var(--sx-accent-ink); font-size: 18px; transition: transform 0.35s var(--ease-spring), box-shadow 0.3s var(--ease-out), filter 0.2s var(--ease-out); }
+:root .app-shell .composer .send-button:hover { filter: brightness(1.08); box-shadow: 0 10px 22px color-mix(in srgb, var(--sx-accent) 38%, transparent); }
+:root .app-shell .composer .send-button:active { transform: scale(0.92); }
+:root .app-shell .composer .composer-label, :root .app-shell .composer > small, :root .app-shell .composer > span:first-child { color: var(--sx-accent); font-size: 12px; font-weight: 600; }
+
+/* ---------- small text fixes ---------- */
+
+:root .app-shell .search-input > span { font-size: 18px; line-height: 1; }
+:root .app-shell .search-results p { font-size: 13px; }
+
+/* ---------- shortcut help ---------- */
+
+.sx-help-backdrop { z-index: 150; }
+.sx-help {
+  display: flex; flex-direction: column; width: min(680px, calc(100% - 32px)); max-height: min(720px, calc(100% - 48px)); padding: 0;
+  border: 1px solid var(--sx-line); border-radius: 24px; background: var(--sx-bg); color: var(--sx-text); box-shadow: var(--sx-shadow);
+  animation: sx-card-in 0.5s var(--sx-ease) both; overflow: hidden;
+}
+.sx-help > header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 16px; border-bottom: 1px solid var(--sx-line); background: var(--sx-side); }
+.sx-help h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.sx-help .help-close {
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: var(--sx-sunken); color: var(--sx-muted); cursor: pointer;
+  transition: transform 0.35s var(--sx-spring), background-color 0.2s var(--ease-out), color 0.2s var(--ease-out);
+}
+.sx-help .help-close svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.sx-help .help-close:hover { transform: rotate(90deg); background: var(--sx-line); color: var(--sx-text); }
+.sx-help .help-close:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+.sx-help .help-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 24px 8px; scrollbar-width: thin; scrollbar-color: var(--sx-line-strong) transparent; }
+.sx-help .help-group { padding: 14px 0 6px; animation: sx-rise 0.5s var(--sx-ease) both; animation-delay: var(--d, 0ms); }
+.sx-help .help-group h3 { margin: 0 0 6px; color: var(--sx-accent); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.sx-help dl { margin: 0; }
+.sx-help dl > div { display: grid; grid-template-columns: minmax(180px, 250px) 1fr; align-items: center; gap: 18px; padding: 9px 0; border-bottom: 1px solid var(--sx-line); font-size: 13px; }
+.sx-help dl > div:last-child { border-bottom: 0; }
+.sx-help dt, .sx-help dd { margin: 0; }
+.sx-help dd { color: var(--sx-muted); }
+.sx-help .help-keys { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.sx-help .help-keys i { color: var(--sx-muted); font-size: 12px; font-style: normal; }
+.sx-help kbd {
+  min-width: 26px; padding: 3px 8px; border: 1px solid var(--sx-line-strong); border-bottom-width: 2px; border-radius: 8px; background: var(--sx-raised);
+  color: var(--sx-text); font: inherit; font-size: 12px; font-weight: 600; text-align: center;
+}
+.sx-help .gesture { color: var(--sx-text); font-weight: 600; }
+.sx-help .help-toggle { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid var(--sx-line); background: var(--sx-side); color: var(--sx-muted); font-size: 13px; cursor: pointer; }
+.sx-help .help-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.sx-help .help-toggle i { position: relative; width: 40px; height: 24px; flex: none; border-radius: 999px; background: var(--sx-line-strong); transition: background-color 0.3s var(--ease-out); }
+.sx-help .help-toggle i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28); transition: transform 0.45s var(--sx-spring); }
+.sx-help .help-toggle input:checked + i { background: var(--sx-accent); }
+.sx-help .help-toggle input:checked + i::after { transform: translateX(16px); }
+.sx-help .help-toggle input:focus-visible + i { outline: 2px solid var(--sx-accent); outline-offset: 3px; }
+
+/* ---------- motion ---------- */
+
+@keyframes tab-in { from { opacity: 0; transform: translateY(-6px) scale(0.92); } to { opacity: 1; transform: none; } }
+
+/* Colour changes while the theme switches (class is added briefly from JS). */
+:root.theme-fading, :root.theme-fading *, :root.theme-fading *::before, :root.theme-fading *::after {
+  transition: background-color 0.45s var(--ease-out), color 0.45s var(--ease-out), border-color 0.45s var(--ease-out), fill 0.45s var(--ease-out), stroke 0.45s var(--ease-out), box-shadow 0.45s var(--ease-out) !important;
+}
+
+@media (max-width: 700px) {
+  :root .app-shell .search-panel { width: min(380px, calc(100% - 90px)); }
+  .sx-help dl > div { grid-template-columns: 1fr; gap: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .app-shell *, .sx-help, .sx-help * { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; }
+}
+
+:root .app-shell .topbar .notification-button { position: relative; width: 36px; padding: 0; }
+:root .app-shell .topbar .notification-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* High-contrast themes keep their strong outlines but lose the hard offset shadow
+ * and square corners, so cards sit in the same soft visual language as the panels. */
+:root[data-theme^="contrast-"] .app-shell .node {
+  border-width: 1.75px; border-radius: 14px;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--sx-text) 14%, transparent);
+}
+:root[data-theme^="contrast-"] .app-shell .node.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sx-accent) 35%, transparent), 0 14px 30px color-mix(in srgb, var(--sx-text) 16%, transparent); }

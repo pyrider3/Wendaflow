@@ -1,6 +1,6 @@
 /* Settings dialog. Every colour is a --sx-* token; themes only set tokens. */
 
-.sx {
+.sx, .app-shell {
   --sx-bg: #fbfcfb;
   --sx-side: #f1f5f2;
   --sx-raised: #ffffff;
@@ -19,59 +19,59 @@
   --sx-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
-:root[data-theme="paper"] .sx {
+:root[data-theme="paper"] :is(.sx, .app-shell) {
   --sx-bg: #fffcf6; --sx-side: #f6f0e5; --sx-raised: #ffffff; --sx-sunken: #f6f0e5;
   --sx-line: #e8dfcf; --sx-line-strong: #d6c9b2; --sx-text: #302d28; --sx-muted: #7a7264;
   --sx-accent: #8f5a2a; --sx-accent-ink: #ffffff; --sx-accent-soft: #f3e6d4;
 }
-:root[data-theme="contrast-light"] .sx {
+:root[data-theme="contrast-light"] :is(.sx, .app-shell) {
   --sx-bg: #ffffff; --sx-side: #f1f3f4; --sx-raised: #ffffff; --sx-sunken: #f1f3f4;
   --sx-line: #cfd6d9; --sx-line-strong: #9aa5aa; --sx-text: #101214; --sx-muted: #4a555b;
   --sx-accent: #0b6b4f; --sx-accent-ink: #ffffff; --sx-accent-soft: #dcefe7;
 }
-:root[data-theme="midnight"] .sx {
+:root[data-theme="midnight"] :is(.sx, .app-shell) {
   --sx-bg: #171c24; --sx-side: #12161d; --sx-raised: #1e2530; --sx-sunken: #12161d;
   --sx-line: #2c3644; --sx-line-strong: #3c4859; --sx-text: #edf2fc; --sx-muted: #9aa7b8;
   --sx-accent: #5fc9a0; --sx-accent-ink: #0a1a13; --sx-accent-soft: rgba(95, 201, 160, 0.14);
   --sx-danger: #f08a7e; --sx-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
 }
-:root[data-theme="graphite"] .sx {
+:root[data-theme="graphite"] :is(.sx, .app-shell) {
   --sx-bg: #1c1d1f; --sx-side: #161718; --sx-raised: #242628; --sx-sunken: #161718;
   --sx-line: #34373a; --sx-line-strong: #4a4e52; --sx-text: #eceef0; --sx-muted: #9a9fa4;
   --sx-accent: #7fd1b0; --sx-accent-ink: #0a1a13; --sx-accent-soft: rgba(127, 209, 176, 0.14);
   --sx-danger: #f08a7e; --sx-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
 }
-:root[data-theme="contrast-black"] .sx {
+:root[data-theme="contrast-black"] :is(.sx, .app-shell) {
   --sx-bg: #151515; --sx-side: #0d0d0d; --sx-raised: #1f1f1f; --sx-sunken: #0d0d0d;
   --sx-line: #3f3f3f; --sx-line-strong: #6a6a6a; --sx-text: #f2f2f2; --sx-muted: #b4b4b4;
   --sx-accent: #8fe0c0; --sx-accent-ink: #06150e; --sx-accent-soft: rgba(143, 224, 192, 0.16);
   --sx-danger: #ff9488; --sx-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
 }
-:root[data-theme="starlight"] .sx {
+:root[data-theme="starlight"] :is(.sx, .app-shell) {
   --sx-bg: #131a29; --sx-side: #0e1420; --sx-raised: #1b2438; --sx-sunken: #0e1420;
   --sx-line: #2d3a56; --sx-line-strong: #43547a; --sx-text: #edf2fc; --sx-muted: #9eacc4;
   --sx-accent: #8fb4ff; --sx-accent-ink: #0a1430; --sx-accent-soft: rgba(143, 180, 255, 0.15);
   --sx-danger: #f59a90; --sx-shadow: 0 30px 80px rgba(0, 0, 8, 0.6);
 }
-:root[data-theme="contrast-blue"] .sx {
+:root[data-theme="contrast-blue"] :is(.sx, .app-shell) {
   --sx-bg: #0b1d2a; --sx-side: #071622; --sx-raised: #11293a; --sx-sunken: #071622;
   --sx-line: #25506b; --sx-line-strong: #3d7899; --sx-text: #f5fbff; --sx-muted: #9fc2d8;
   --sx-accent: #6bcaf1; --sx-accent-ink: #04202e; --sx-accent-soft: rgba(107, 202, 241, 0.15);
   --sx-danger: #ff9a8e; --sx-shadow: 0 30px 80px rgba(0, 8, 16, 0.6);
 }
-:root[data-theme="contrast-amber"] .sx {
+:root[data-theme="contrast-amber"] :is(.sx, .app-shell) {
   --sx-bg: #2a1b06; --sx-side: #1f1404; --sx-raised: #35230a; --sx-sunken: #1f1404;
   --sx-line: #5c4216; --sx-line-strong: #8a6624; --sx-text: #fff7df; --sx-muted: #d2b987;
   --sx-accent: #ffca42; --sx-accent-ink: #2a1b06; --sx-accent-soft: rgba(255, 202, 66, 0.15);
   --sx-danger: #ff9a8e; --sx-shadow: 0 30px 80px rgba(16, 8, 0, 0.6);
 }
-:root[data-theme="contrast-plum"] .sx {
+:root[data-theme="contrast-plum"] :is(.sx, .app-shell) {
   --sx-bg: #281039; --sx-side: #1d0a2a; --sx-raised: #331649; --sx-sunken: #1d0a2a;
   --sx-line: #55307a; --sx-line-strong: #7d4cae; --sx-text: #fff5ff; --sx-muted: #cfa9e6;
   --sx-accent: #d98cff; --sx-accent-ink: #28103a; --sx-accent-soft: rgba(217, 140, 255, 0.16);
   --sx-danger: #ff9a9a; --sx-shadow: 0 30px 80px rgba(12, 0, 20, 0.6);
 }
-:root[data-theme="custom"] .sx {
+:root[data-theme="custom"] :is(.sx, .app-shell) {
   --sx-bg: var(--custom-surface);
   --sx-side: color-mix(in srgb, var(--custom-surface) 94%, var(--custom-text));
   --sx-raised: color-mix(in srgb, var(--custom-surface) 97%, var(--custom-text));
