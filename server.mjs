@@ -279,6 +279,7 @@ async function harnessRpc(origin, method, payload, signal) {
   });
   if (!response.ok) {
     const detail = (await response.text()).replace(/\s+/g, ' ').slice(0, 240);
+    if (response.status === 404 && method === 'session.create') throw new Error('已启动 DeepSeek Harness，但它的网页接口与 Wendaflow 当前使用的协议不兼容（session.create 不存在）。请使用 Wendaflow 支持的 Harness 版本。');
     throw new Error(`Harness API ${method} 返回 ${response.status}${detail ? `：${detail}` : ''}`);
   }
   const body = await response.json();
