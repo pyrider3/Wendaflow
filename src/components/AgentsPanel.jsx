@@ -3,7 +3,7 @@ import { AGENT_IDS, AGENT_LABELS } from "../agents/catalog.mjs";
 import { Button, Empty, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
 import { PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue } from "./PiOptions.jsx";
 
-export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, onReloadPi, tr }) {
+export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, tr }) {
   const hints = {
     pi: tr("可自己配置命令、模型和参数的编程智能体。", "A coding agent whose command, model and arguments you configure yourself."),
     codex: tr("OpenAI 的 Codex 命令行。", "OpenAI's Codex command line."),
@@ -41,11 +41,12 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
             {noThinking && <span className="sx-hint">{tr("这个模型不支持思考", "This model does not support thinking")}</span>}
           </Field>
           <Field label={tr("权限", "Permissions")}>
-            <Select value={o.readOnly ? "read" : "full"} onChange={(e) => update({ readOnly: e.target.value === "read" })}>
+            <Select value={o.permission || (o.readOnly ? "read" : "full")} onChange={(e) => update({ permission: e.target.value, readOnly: e.target.value === "read" })}>
+              <option value="ask">{tr("执行前询问", "Ask before acting")}</option>
               <option value="full">{tr("完全信任", "Full trust")}</option>
               <option value="read">{tr("只读（读取与搜索）", "Read-only (read and search)")}</option>
             </Select>
-            <span className="sx-hint">{tr("Pi 自己不会在执行前询问，只能限制它可用的工具。", "Pi never asks before acting; this only limits which tools it may use.")}</span>
+            <span className="sx-hint">{tr("Pi 自己不会在执行前询问。选“执行前询问”后，Wendaflow 会在编辑、写入和运行命令前请你批准；“只读”只开放读取和搜索。", "Pi never asks before acting by itself. “Ask before acting” makes Wendaflow ask you before edits, writes and commands; “Read-only” offers only read and search.")}</span>
           </Field>
           <Field label={tr("保存会话", "Save sessions")} span>
             <Switch checked={o.saveSession !== false} onChange={(value) => update({ saveSession: value })} label={tr("保存会话", "Save sessions")} onLabel={tr("保存到 Pi，可继续和分叉", "Saved in Pi; can continue and fork")} offLabel={tr("不保存", "Not saved")} />
@@ -53,6 +54,16 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           <Field label={tr("额外参数", "Extra arguments")} span>
             <Input value={o.extraArgs} onChange={(e) => update({ extraArgs: e.target.value })} placeholder="--append-system-prompt ./notes.md" spellCheck={false} />
           </Field>
+          {piResources && (
+            <Field label={tr("技能与 MCP 服务器", "Skills and MCP servers")} span>
+              <div className="sx-tags">
+                {piResources.skills.map((skill) => <span key={`s-${skill.name}`} title={skill.description}>{skill.name}</span>)}
+                {piResources.mcp.map((server) => <span key={`m-${server.name}`} className={`mcp ${server.enabled ? "" : "off"}`} title={server.description}>{server.name}{server.enabled ? "" : ` · ${tr("已关闭", "Off")}`}</span>)}
+                {!piResources.skills.length && !piResources.mcp.length && <span className="sx-hint">{tr("没有", "None")}</span>}
+              </div>
+              <span className="sx-hint">{tr("只读显示。要增减或开关它们，请在 Pi 里用 pi config 和 pi mcp。", "Read-only. To add, remove or switch them, use pi config and pi mcp in Pi.")}</span>
+            </Field>
+          )}
         </Fields>
       );
     },

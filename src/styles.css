@@ -670,3 +670,17 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 .workspace-path p { margin: 5px 2px 0; color: var(--sx-danger, #a34f45); font-size: 11.5px; }
 .agent-setup-button { height: 34px; padding: 0 14px; border: 1px dashed color-mix(in srgb, var(--sx-accent, #247b56) 55%, transparent); border-radius: 11px; background: transparent; color: var(--sx-accent, #176348); font: inherit; font-size: 13px; cursor: pointer; transition: background-color .2s var(--ease-out), border-color .2s var(--ease-out); }
 .agent-setup-button:hover { background: color-mix(in srgb, var(--sx-accent, #247b56) 10%, transparent); border-style: solid; }
+.action-control { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.approval-request { padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--sx-warn, #c18401) 55%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--sx-warn, #c18401) 10%, transparent); }
+.approval-request strong { display: block; font-size: 12px; }
+.approval-request pre { margin: 6px 0 8px; max-height: 120px; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 11px/1.5 ui-monospace, monospace; }
+.approval-request div { display: flex; gap: 8px; }
+.approval-request button, .steer-box button { height: 28px; padding: 0 12px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; transition: background-color .2s var(--ease-out), opacity .2s var(--ease-out); }
+.approval-request .approve { border-color: transparent; background: var(--sx-accent, #247b56); color: var(--sx-accent-ink, #fff); }
+.approval-request button:hover, .steer-box button:hover:not(:disabled) { filter: brightness(1.06); }
+.live-latest { margin: 0; max-height: 4.6em; overflow: hidden; color: var(--sx-muted, #6f7e76); font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; }
+.live-latest.command { font-family: ui-monospace, monospace; font-size: 11px; }
+.steer-box { display: flex; gap: 6px; }
+.steer-box input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
+.steer-box button:disabled { opacity: .45; cursor: default; }
+.steer-error { margin: 0; color: var(--sx-danger, #a34f45); font-size: 11.5px; }

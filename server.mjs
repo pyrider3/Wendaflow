@@ -4,6 +4,7 @@ import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile, realpath } from 'node:fs/promises';
@@ -256,8 +257,16 @@ function piToolArgs(args) {
   return direct ? String(direct) : (Object.keys(args).length ? JSON.stringify(args) : '');
 }
 
-// Pi (https://github.com/earendil-works/pi) runs one task with `pi -p --mode json`;
-// it reads the task from stdin, so stdin must be closed after writing it.
+const PI_APPROVAL_EXTENSION = fileURLToPath(new URL('./src/agents/pi-approval.mjs', import.meta.url));
+
+function piToolSummary(args) {
+  const text = piToolArgs(args);
+  return text.length > 4000 ? `${text.slice(0, 4000)}…` : text;
+}
+
+// Pi (https://github.com/earendil-works/pi) runs as a `pi --mode rpc` process for the length of one
+// card: it streams text, thinking and tool output while it works, takes steering messages and
+// approvals back on stdin, and exits once the run has settled.
 async function runPiAgent(prompt, images = [], files = [], workspace = process.cwd(), hooks = {}, options = {}) {
   const resolvedWorkspace = path.resolve(workspace || process.cwd());
   if (!(await stat(resolvedWorkspace)).isDirectory()) throw new Error('行动工作目录不是有效文件夹');
@@ -274,45 +283,88 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
   // Every run gets a session id of its own, so a card can later be forked from the one it ended with.
   const sessionId = options.saveSession === false ? '' : randomUUID();
   const sessionArgs = !sessionId ? ['--no-session'] : parentSession ? ['--fork', parentSession, '--session-id', sessionId] : ['--session-id', sessionId];
-  const args = ['-p', '--mode', 'json', ...sessionArgs,
+  const permission = ['full', 'ask', 'read'].includes(options.permission) ? options.permission : options.readOnly ? 'read' : 'full';
+  const args = ['--mode', 'rpc', ...sessionArgs,
     ...(provider ? ['--provider', provider] : []),
     ...(modelId ? ['--model', modelId] : []),
     ...(thinking ? ['--thinking', thinking] : []),
-    ...(options.readOnly ? ['--tools', 'read,grep,find,ls'] : []),
+    ...(permission === 'read' ? ['--tools', 'read,grep,find,ls'] : []),
+    ...(permission === 'ask' ? ['-e', PI_APPROVAL_EXTENSION] : []),
     ...extra];
   try {
     return await new Promise((resolve, reject) => {
       const child = spawn(command, args, { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
       hooks.onChild?.(child);
-      let buffer = '', stderr = '', answer = '', failure = '', aborted = false;
-      const timer = setTimeout(() => { failure ||= 'Pi 任务超时（15 分钟）'; child.kill('SIGTERM'); }, 15 * 60_000);
-      const handle = (line) => {
-        let event;
-        try { event = JSON.parse(line); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); return; }
-        if (event.type === 'message_end' && event.message?.role === 'assistant') {
-          const thought = piMessageText(event.message.content, 'thinking');
-          const text = piMessageText(event.message.content, 'text');
-          if (thought) hooks.onEvent?.('thinking', thought);
-          if (text) { hooks.onEvent?.('message', text); answer = text; }
-          if (event.message.stopReason === 'error') failure ||= event.message.errorMessage || 'Pi 请求模型时出错';
-        } else if (event.type === 'tool_execution_start') {
-          const detail = piToolArgs(event.args);
-          hooks.onEvent?.('command', `${event.toolName || '工具'}${detail ? `\n${detail}` : ''}`);
-        } else if (event.type === 'tool_execution_end') {
-          const text = piMessageText(event.result?.content) || (typeof event.result === 'string' ? event.result : '');
-          hooks.onEvent?.('command', text ? `${event.isError ? '失败：' : ''}${text}` : '工具已返回结果');
-        } else if (event.type === 'agent_settled') aborted = event.aborted === true;
+      let buffer = '', stderr = '', answer = '', failure = '', aborted = false, settled = false, closed = false, messageNo = 0;
+      const streamed = new Map();
+      const send = (record) => { try { child.stdin.write(`${JSON.stringify(record)}\n`); } catch {} };
+      const settle = () => { if (settled) return; settled = true; try { child.stdin.end(); } catch {} };
+      const timer = setTimeout(() => { failure ||= 'Pi 任务超时（30 分钟）'; child.kill('SIGTERM'); }, 30 * 60_000);
+      const update = hooks.onEventUpdate || ((key, type, text) => hooks.onEvent?.(type, text));
+      const blocks = (message) => (Array.isArray(message?.content) ? message.content : []);
+      const toolKey = (id) => `tool:${id}`;
+      const toolLine = (name, args, tail) => `${name || '工具'}${piToolSummary(args) ? `\n${piToolSummary(args)}` : ''}${tail ? `\n${tail}` : ''}`;
+      const toolArgs = new Map();
+
+      hooks.onControl?.({
+        steer: (message, behavior) => { send({ type: behavior === 'followUp' ? 'follow_up' : 'steer', message }); hooks.onEvent?.('user', message); },
+        respond: (requestId, approved) => { send({ type: 'extension_ui_response', id: requestId, confirmed: !!approved }); hooks.onPending?.('remove', { id: requestId }, approved); },
+        abort: () => { send({ type: 'abort' }); setTimeout(() => { if (!closed) child.kill('SIGTERM'); }, 4000); },
+      });
+
+      const handle = (record) => {
+        if (record.type === 'response') {
+          if (record.id === 'prompt') {
+            if (!record.success) { failure ||= record.error || 'Pi 没有接受这个任务'; settle(); }
+            else if (record.data?.disposition === 'handled') settle();
+          } else if (!record.success) hooks.onEvent?.('stderr', `Pi 没有接受指令：${record.error || ''}`);
+        } else if (record.type === 'message_start' && record.message?.role === 'assistant') messageNo += 1;
+        else if (record.type === 'message_update') {
+          const u = record.assistantMessageEvent || {};
+          if (u.type === 'text_delta' || u.type === 'thinking_delta') {
+            const key = `${u.type === 'text_delta' ? 'text' : 'think'}:${messageNo}:${u.contentIndex}`;
+            const text = (streamed.get(key) || '') + (u.delta || '');
+            streamed.set(key, text);
+            update(key, u.type === 'text_delta' ? 'message' : 'thinking', text);
+          }
+        } else if (record.type === 'message_end' && record.message?.role === 'assistant') {
+          blocks(record.message).forEach((block, index) => {
+            if (block?.type === 'text' && block.text) { update(`text:${messageNo}:${index}`, 'message', block.text, { final: true }); answer = block.text; }
+            if (block?.type === 'thinking' && (block.thinking || block.text)) update(`think:${messageNo}:${index}`, 'thinking', block.thinking || block.text, { final: true });
+          });
+          if (record.message.stopReason === 'error') failure ||= record.message.errorMessage || 'Pi 请求模型时出错';
+        } else if (record.type === 'tool_execution_start') {
+          toolArgs.set(record.toolCallId, record.args);
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, record.args));
+        } else if (record.type === 'tool_execution_update') {
+          const partial = piMessageText(record.partialResult?.content);
+          if (partial) update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), partial));
+        } else if (record.type === 'tool_execution_end') {
+          const text = piMessageText(record.result?.content) || (typeof record.result === 'string' ? record.result : '');
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), text ? `${record.isError ? '失败：' : ''}${text}` : '工具已返回结果'), { final: true });
+        } else if (record.type === 'extension_ui_request') {
+          if (record.method === 'confirm' || record.method === 'select') {
+            let detail = {};
+            try { detail = JSON.parse(record.message || '{}'); } catch {}
+            hooks.onPending?.('add', { id: record.id, tool: detail.tool || record.title || '工具', input: piToolSummary(detail.input) || String(record.message || ''), at: new Date().toISOString() });
+          } else if (['input', 'editor'].includes(record.method)) send({ type: 'extension_ui_response', id: record.id, cancelled: true });
+        } else if (record.type === 'agent_settled') { aborted = record.aborted === true; settle(); }
       };
-      child.stdout.on('data', (chunk) => { buffer += chunk; const lines = buffer.split('\n'); buffer = lines.pop() || ''; lines.forEach((line) => handle(line.replace(/\r$/, ''))); });
+
+      child.stdout.on('data', (chunk) => {
+        buffer += chunk;
+        const lines = buffer.split('\n'); buffer = lines.pop() || '';
+        for (const line of lines) { try { handle(JSON.parse(line.replace(/\r$/, ''))); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); } }
+      });
       child.stderr.on('data', (chunk) => { const text = chunk.toString(); if (text.replace(/[\x00-\x1f\x7f]/g, '').trim()) hooks.onEvent?.('stderr', text); stderr = (stderr + text).slice(-2000); });
       child.on('error', (error) => { clearTimeout(timer); reject(new Error(`Pi 无法启动：${error.message}`)); });
       child.on('close', (code) => {
-        clearTimeout(timer);
-        if (buffer.trim()) handle(buffer.replace(/\r$/, ''));
-        if (code === 0 && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: sessionId ? `Pi session: ${sessionId}` : 'Pi（未保存会话）', sessionId });
-        else reject(new Error(failure || (aborted ? 'Pi 任务已中止' : '') || stderr.trim() || `Pi 退出码 ${code}`));
+        closed = true; clearTimeout(timer);
+        if (buffer.trim()) { try { handle(JSON.parse(buffer.replace(/\r$/, ''))); } catch {} }
+        if (settled && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: sessionId ? `Pi session: ${sessionId}` : 'Pi（未保存会话）', sessionId });
+        else reject(new Error(failure || (aborted ? 'Pi 任务已中止' : '') || stderr.trim() || `Pi 在完成前退出（退出码 ${code}）`));
       });
-      child.stdin.end(`${prompt}${attachmentNotice}`);
+      send({ id: 'prompt', type: 'prompt', message: `${prompt}${attachmentNotice}` });
     });
   } finally {
     if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true }).catch(() => {});
@@ -378,6 +430,28 @@ async function piThinkingLevels(configuredCommand, provider, modelId) {
   const reply = answers.get('levels');
   if (!reply?.success) throw new Error(reply?.error || 'Pi 没有返回思考档位');
   return reply.data?.levels || ['off'];
+}
+
+// Names, descriptions and on/off only; MCP entries also hold commands and env values, which are never read out.
+async function piResources() {
+  const root = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
+  const skills = [];
+  try {
+    for (const entry of await readdir(path.join(root, 'skills'), { withFileTypes: true })) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      try {
+        const text = await readFile(path.join(root, 'skills', entry.name, 'SKILL.md'), 'utf8');
+        const description = (text.match(/^description:\s*(.+)$/m)?.[1] || '').replace(/^["']|["']$/g, '').slice(0, 160);
+        skills.push({ name: entry.name, description });
+      } catch {}
+    }
+  } catch {}
+  let mcp = [];
+  try {
+    const config = JSON.parse(await readFile(path.join(root, 'mcp.json'), 'utf8'));
+    mcp = Object.entries(config.mcpServers || {}).map(([name, value]) => ({ name, enabled: value?.enabled !== false, description: typeof value?.description === 'string' ? value.description.slice(0, 160) : '' }));
+  } catch {}
+  return { skills: skills.sort((a, b) => a.name.localeCompare(b.name)), mcp: mcp.sort((a, b) => a.name.localeCompare(b.name)) };
 }
 
 async function probeAgent(command, args = ['--version'], via = null) {
@@ -637,7 +711,7 @@ async function collectJobArtifacts(workspace, after = {}, output = '', startedAt
 }
 
 function publicJob(job) {
-  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
+  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
 const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
@@ -741,6 +815,10 @@ const server = http.createServer(async (req, res) => {
     try { const { command = '' } = await readJson(req); reply(res, 200, await piModels(command)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'POST' && req.url === '/agents/pi/resources') {
+    try { reply(res, 200, await piResources()); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agents/pi/thinking') {
     try { const { command = '', provider = '', model = '' } = await readJson(req); reply(res, 200, { levels: await piThinkingLevels(command, provider, model) }); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -785,10 +863,23 @@ const server = http.createServer(async (req, res) => {
       reply(res, 202, publicJob(job));
       void (async () => {
         const addEvent = (type, text) => { const clean = String(text); job.events.push({ id: job.events.length + 1, type, text: clean.slice(-12000), at: new Date().toISOString() }); job.terminal = `${job.terminal || ''}${clean}`.slice(-180000); };
+        // A streamed entry (text, thinking, one tool call) grows in place instead of adding a row per chunk.
+        const eventByKey = new Map();
+        const updateEvent = (key, type, text, { final = false } = {}) => {
+          const clean = String(text).slice(-12000);
+          const existing = eventByKey.get(key);
+          if (existing) { existing.text = clean; existing.at = new Date().toISOString(); }
+          else { const event = { id: job.events.length + 1, type, text: clean, at: new Date().toISOString() }; job.events.push(event); eventByKey.set(key, event); }
+          if (final) job.terminal = `${job.terminal || ''}${clean}\n`.slice(-180000);
+        };
+        const onPending = (action, entry, approved) => {
+          if (action === 'add') { job.pending = [...(job.pending || []), entry]; addEvent('status', `等待你批准：${entry.tool}`); }
+          else { job.pending = (job.pending || []).filter((item) => item.id !== entry.id); addEvent('status', approved ? '已批准' : '已拒绝'); }
+        };
         try {
           job.before = await gitWorkspaceState(workspace);
           addEvent('status', '已记录执行前的工作区状态');
-          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent };
+          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onPending, onControl: (control) => { job.control = control; } };
           addEvent('config', `执行配置：${JSON.stringify(options)}`);
           const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
           const result = runner === 'codex' ? await runCodex(prompt.trim(), safeImages, safeFiles, workspace, hooks, options) : await runCliAgent(runner, prompt.trim(), safeImages, safeFiles, workspace, hooks, options);
@@ -797,7 +888,7 @@ const server = http.createServer(async (req, res) => {
         } catch (error) {
           if (job.status === 'stopped') return;
           job.status = 'failed'; job.error = error.message; job.completedAt = new Date().toISOString(); addEvent('error', error.message);
-        } finally { job.child = null; }
+        } finally { job.child = null; job.control = null; job.pending = []; }
       })();
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -836,11 +927,34 @@ const server = http.createServer(async (req, res) => {
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'POST' && req.url === '/agent/steer') {
+    try {
+      const { id, message = '', behavior = 'steer' } = await readJson(req);
+      const job = agentJobs.get(id);
+      if (!job || job.status !== 'running' || !job.control?.steer) throw new Error('这个任务现在不能追加指令');
+      if (!String(message).trim()) throw new Error('指令不能为空');
+      job.control.steer(String(message).trim(), behavior === 'followUp' ? 'followUp' : 'steer');
+      reply(res, 200, publicJob(job));
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agent/respond') {
+    try {
+      const { id, requestId, approved } = await readJson(req);
+      const job = agentJobs.get(id);
+      if (!job?.control?.respond || !(job.pending || []).some((item) => item.id === requestId)) throw new Error('没有等待你回答的请求');
+      job.control.respond(requestId, approved === true);
+      reply(res, 200, publicJob(job));
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agent/stop') {
     try {
       const { id } = await readJson(req); const job = agentJobs.get(id); if (!job) throw new Error('找不到任务');
       job.status = 'stopped'; job.completedAt = new Date().toISOString(); job.events.push({ id: job.events.length + 1, type: 'status', text: '用户已停止任务', at: job.completedAt });
-      job.abort?.(); job.child?.kill(); reply(res, 200, publicJob(job));
+      job.pending = [];
+      if (job.control?.abort) job.control.abort(); else { job.abort?.(); job.child?.kill(); }
+      reply(res, 200, publicJob(job));
     } catch (error) { reply(res, 404, { error: error.message }); }
     return;
   }

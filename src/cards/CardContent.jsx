@@ -1,6 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { AgentControls } from "./AgentControls.jsx";
 
 // Content is separate from the canvas gesture and position shell.
 export function CardContent({
@@ -34,6 +35,8 @@ export function CardContent({
     openLibraryItem,
     toggleActivity,
     stopAgentJob,
+    respondAgentApproval,
+    steerAgent,
     stopGeneration,
     beginResize,
     beginRelationDrag,
@@ -267,6 +270,9 @@ export function CardContent({
           )}
         </div>
       )}
+      {node.type === "action" && node.status === "running" && node.actionRunner === "pi" && (
+        <AgentControls node={node} tr={tr} respondAgentApproval={respondAgentApproval} steerAgent={steerAgent} />
+      )}
       {node.type === "action" && liveEvents.length > 0 && (
         <section
           className={`action-live-feed ${activityCollapsed ? "collapsed" : ""}`}
@@ -307,7 +313,9 @@ export function CardContent({
                         ? tr("文", "FI")
                         : event.type === "message"
                           ? tr("答", "RE")
-                          : "·"}
+                          : event.type === "user"
+                            ? tr("你", "YOU")
+                            : "·"}
                 </i>
                 <span>
                   <strong>
@@ -319,6 +327,8 @@ export function CardContent({
                           ? tr("修改文件", "Changing files")
                           : event.type === "message"
                             ? tr("阶段结果", "Step result")
+                            : event.type === "user"
+                              ? tr("你追加了指令", "You added an instruction")
                             : event.type === "stderr"
                               ? tr("终端错误", "Terminal error")
                               : tr("终端输出", "Terminal output")}
