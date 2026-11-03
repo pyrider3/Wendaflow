@@ -1,10 +1,9 @@
 import React from "react";
 import { AGENT_IDS, AGENT_LABELS } from "../agents/catalog.mjs";
-import { Button, Empty, Field, Fields, Group, Input, Page, Select, Status, Switch } from "./settings/ui.jsx";
+import { Button, Empty, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
+import { PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue } from "./PiOptions.jsx";
 
-const PI_THINKING = ["", "off", "minimal", "low", "medium", "high", "xhigh", "max"];
-
-export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, tr }) {
+export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, onReloadPi, tr }) {
   const hints = {
     pi: tr("可自己配置命令、模型和参数的编程智能体。", "A coding agent whose command, model and arguments you configure yourself."),
     codex: tr("OpenAI 的 Codex 命令行。", "OpenAI's Codex command line."),
@@ -21,30 +20,42 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
   };
 
   const fields = {
-    pi: (o, update) => (
-      <Fields>
-        <Field label={tr("命令或完整路径", "Command or full path")} span>
-          <Input value={o.command} onChange={(e) => update({ command: e.target.value })} onBlur={onRedetect} placeholder={tr("留空则使用 PATH 里的 pi", "Leave empty to use pi from PATH")} spellCheck={false} />
-        </Field>
-        <Field label={tr("提供方", "Provider")}>
-          <Input value={o.provider} onChange={(e) => update({ provider: e.target.value })} placeholder={tr("使用 Pi 的默认设置", "Use Pi's default")} spellCheck={false} />
-        </Field>
-        <Field label={tr("模型", "Model")}>
-          <Input value={o.model} onChange={(e) => update({ model: e.target.value })} placeholder={tr("使用 Pi 的默认设置", "Use Pi's default")} spellCheck={false} />
-        </Field>
-        <Field label={tr("思考强度", "Thinking level")}>
-          <Select value={o.thinking} onChange={(e) => update({ thinking: e.target.value })}>
-            {PI_THINKING.map((level) => <option key={level} value={level}>{level || tr("默认", "Default")}</option>)}
-          </Select>
-        </Field>
-        <Field label={tr("只读模式", "Read-only mode")}>
-          <Switch checked={!!o.readOnly} onChange={(value) => update({ readOnly: value })} label={tr("只读模式", "Read-only mode")} onLabel={tr("只能读取和搜索", "Read and search only")} offLabel={tr("可读写和执行命令", "Can edit and run commands")} />
-        </Field>
-        <Field label={tr("额外参数", "Extra arguments")} span>
-          <Input value={o.extraArgs} onChange={(e) => update({ extraArgs: e.target.value })} placeholder="--append-system-prompt ./notes.md" spellCheck={false} />
-        </Field>
-      </Fields>
-    ),
+    pi: (o, update) => {
+      const noThinking = piLevels?.levels?.length === 1 && piLevels.levels[0] === "off";
+      return (
+        <Fields>
+          <Field label={tr("命令或完整路径", "Command or full path")} span>
+            <Input value={o.command} onChange={(e) => update({ command: e.target.value })} onBlur={onRedetect} placeholder={tr("留空则使用 PATH 里的 pi", "Leave empty to use pi from PATH")} spellCheck={false} />
+          </Field>
+          <Field label={tr("模型", "Model")} span>
+            <Select value={piSelectionValue(o)} onChange={(e) => update({ ...parsePiSelection(e.target.value), thinking: "" })}>
+              <PiModelOptions info={piInfo} selection={piSelectionValue(o)} tr={tr} />
+            </Select>
+            {piInfo?.error && <span className="sx-hint">{tr("无法读取 Pi 的模型列表：{0}", "Could not load Pi's model list: {0}").replace("{0}", piInfo.error)} <Button onClick={onReloadPi}>{tr("重试", "Retry")}</Button></span>}
+            {!piInfo && <span className="sx-hint">{tr("正在读取 Pi 的模型列表…", "Loading Pi's model list…")}</span>}
+          </Field>
+          <Field label={tr("思考强度", "Thinking level")}>
+            <Select value={o.thinking || ""} disabled={noThinking} onChange={(e) => update({ thinking: e.target.value })}>
+              <PiThinkingOptions levels={piLevels} current={o.model ? undefined : piInfo?.current?.thinkingLevel} tr={tr} />
+            </Select>
+            {noThinking && <span className="sx-hint">{tr("这个模型不支持思考", "This model does not support thinking")}</span>}
+          </Field>
+          <Field label={tr("权限", "Permissions")}>
+            <Select value={o.readOnly ? "read" : "full"} onChange={(e) => update({ readOnly: e.target.value === "read" })}>
+              <option value="full">{tr("完全信任", "Full trust")}</option>
+              <option value="read">{tr("只读（读取与搜索）", "Read-only (read and search)")}</option>
+            </Select>
+            <span className="sx-hint">{tr("Pi 自己不会在执行前询问，只能限制它可用的工具。", "Pi never asks before acting; this only limits which tools it may use.")}</span>
+          </Field>
+          <Field label={tr("保存会话", "Save sessions")} span>
+            <Switch checked={o.saveSession !== false} onChange={(value) => update({ saveSession: value })} label={tr("保存会话", "Save sessions")} onLabel={tr("保存到 Pi，可继续和分叉", "Saved in Pi; can continue and fork")} offLabel={tr("不保存", "Not saved")} />
+          </Field>
+          <Field label={tr("额外参数", "Extra arguments")} span>
+            <Input value={o.extraArgs} onChange={(e) => update({ extraArgs: e.target.value })} placeholder="--append-system-prompt ./notes.md" spellCheck={false} />
+          </Field>
+        </Fields>
+      );
+    },
     codex: (o, update) => (
       <Fields>
         <Field label={tr("模型", "Model")}>
@@ -115,7 +126,7 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           action={<Switch checked={enabled.includes(id)} onChange={(value) => onToggle(id, value)} label={tr(`启用 ${AGENT_LABELS[id]}`, `Enable ${AGENT_LABELS[id]}`)} onLabel={tr("已启用", "Enabled")} offLabel={tr("未启用", "Off")} />}
         >
           <div className="sx-row">
-            <div className="sx-row-text"><strong>{tr("本机状态", "On this computer")}</strong></div>
+            <div className="sx-row-text"><strong>{tr("本机状态", "On this computer")}</strong>{detection?.[id]?.path && <span>{detection[id].path}</span>}</div>
             <div className="sx-row-control">{status(id)} <Button onClick={onRedetect}>{tr("重新检测", "Re-check")}</Button></div>
           </div>
           {enabled.includes(id) && fields[id](settings[id] || {}, set(id))}

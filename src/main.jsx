@@ -22,6 +22,7 @@ import {CanvasCard} from './cards/CanvasCard.jsx';
 import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs';
 import {AppearancePanel} from './components/AppearancePanel.jsx';
 import {AgentsPanel} from './components/AgentsPanel.jsx';
+import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} from './components/PiOptions.jsx';
 import {AGENT_LABELS} from './agents/catalog.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
 import './styles.css';
@@ -129,7 +130,7 @@ const DEFAULT_AGENT_SETTINGS = {
   codex: { model: '', reasoning: 'high', accessMode: 'workspace-write', profile: '', ephemeral: true, addDir: '' },
   claude: { model: '', permissionMode: 'default', maxTurns: '', verbose: false },
   deepseek: { profile: 'headless', reasoning: 'high', thinking: true },
-  pi: { command: '', provider: '', model: '', thinking: '', readOnly: false, extraArgs: '', ephemeral: true },
+  pi: { command: '', provider: '', model: '', thinking: '', readOnly: false, extraArgs: '', saveSession: true },
 };
 const DEFAULT_CUSTOM_THEME = { background: '#f4f6f2', surface: '#ffffff', text: '#18231d', accent: '#267c5b', grid: '#c8d4cd' };
 const UI_LANGUAGES = [
@@ -422,6 +423,8 @@ function App() {
     try { const saved = JSON.parse(localStorage.getItem('wendaflow-enabled-agents')); return Array.isArray(saved) ? saved.filter((id) => AGENT_LABELS[id]) : []; } catch { return []; }
   });
   const [agentDetection, setAgentDetection] = useState(null);
+  const [piInfo, setPiInfo] = useState(null);
+  const [piLevels, setPiLevels] = useState(null);
   const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || '');
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
@@ -840,6 +843,18 @@ function App() {
   useEffect(() => localStorage.setItem('wonderful-action-runner', actionRunner), [actionRunner]);
   useEffect(() => localStorage.setItem('wendaflow-enabled-agents', JSON.stringify(enabledAgents)), [enabledAgents]);
   useEffect(() => { if (settingsOpen && settingsSection === 'agents') void detectAgents(); }, [settingsOpen, settingsSection]);
+  const piPanelOpen = enabledAgents.includes('pi') && ((settingsOpen && settingsSection === 'agents') || (actionOptionsOpen && actionRunner === 'pi'));
+  const piSelection = actionOptionsOpen ? taskAgentSettings.pi : agentSettings.pi;
+  useEffect(() => { if (piPanelOpen) void loadPiInfo(); }, [piPanelOpen]);
+  // Which thinking levels exist depends on the model, so ask Pi about the chosen one.
+  useEffect(() => {
+    if (!piPanelOpen || PUBLIC_WEB) return;
+    let stale = false;
+    setPiLevels(null);
+    fetch(`${LOCAL_PROXY_URL}/agents/pi/thinking`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: agentSettings.pi?.command || '', provider: piSelection?.provider || '', model: piSelection?.model || '' }) })
+      .then((response) => response.json()).then((result) => { if (!stale && Array.isArray(result.levels)) setPiLevels(result); }).catch(() => {});
+    return () => { stale = true; };
+  }, [piPanelOpen, piSelection?.provider, piSelection?.model]);
   // Action mode only offers enabled agents; keep the selection on one of them.
   useEffect(() => { if (enabledAgents.length && !enabledAgents.includes(actionRunner)) setActionRunner(enabledAgents[0]); }, [enabledAgents, actionRunner]);
   useEffect(() => localStorage.setItem('wonderful-agent-settings', JSON.stringify(agentSettings)), [agentSettings]);
@@ -2731,6 +2746,15 @@ function App() {
     } catch { setAgentDetection({}); }
   }
 
+  async function loadPiInfo() {
+    if (PUBLIC_WEB) return;
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/agents/pi/models`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: agentSettings.pi?.command || '' }) });
+      const result = await response.json();
+      setPiInfo(response.ok ? result : { error: result.error || String(response.status) });
+    } catch (error) { setPiInfo({ error: error.message }); }
+  }
+
   function openAgentSettings() {
     setSettingsSection('agents');
     openSettings();
@@ -2856,7 +2880,23 @@ function App() {
     // Actions share the same explicit context plan as conversations, including
     // temporary merge/reference context without mutating source nodes.
     const inherited = contextPlan(sourceNodes, actionNode.id, [...excluded], actionNode.contextRelations || []).map(({ node }) => node);
-    const context = inherited.map((node, index) => {
+    // A Pi card branched from another Pi card continues a fork of that card's Pi session, so the
+    // cards already inside that session are not sent again as pasted context.
+    const piFork = (() => {
+      if ((actionNode.actionRunner || 'codex') !== 'pi') return null;
+      const isPiRun = (node) => node?.type === 'action' && node.actionRunner === 'pi' && node.execution?.sessionId;
+      let parent = sourceNodes.find((node) => node.id === actionNode.parentId);
+      if (!isPiRun(parent) || excluded.has(parent.id)) return null;
+      const covered = new Set([parent.id]);
+      const sessionId = parent.execution.sessionId;
+      for (let current = parent; ;) {
+        const above = sourceNodes.find((node) => node.id === current.parentId);
+        if (!isPiRun(above) || current.execution.forkedFrom !== above.execution.sessionId) break;
+        covered.add(above.id); current = above;
+      }
+      return { sessionId, covered };
+    })();
+    const context = inherited.filter((node) => !piFork?.covered.has(node.id)).map((node, index) => {
       const label = node.type === 'thought' ? '用户想法' : node.type === 'conversation' ? '对话节点' : '行动记录';
       const question = node.prompt ? `\n用户问题：${node.prompt}` : '';
       return `[${index + 1}] ${label}「${node.title}」${question}\n内容：${node.content}`;
@@ -2871,7 +2911,7 @@ function App() {
       const taskAttachments = [...inheritedAttachments, ...(actionNode.attachments || [])].filter((item) => item.dataUrl || item.sourcePath).map((item) => ({ name: item.name, type: item.type, dataUrl: item.dataUrl, sourcePath: item.sourcePath || '' }));
       const images = taskAttachments.filter((item) => item.dataUrl?.startsWith('data:image/'));
       const files = taskAttachments.filter((item) => !item.dataUrl?.startsWith('data:image/'));
-      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', options: actionNode.actionOptions || agentSettings[runner] }) });
+      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', options: { ...(actionNode.actionOptions || agentSettings[runner]), ...(piFork ? { parentSession: piFork.sessionId } : {}) } }) });
       let result = await response.json();
       if (!response.ok) throw new Error(result.error || tr(`Codex 返回 ${response.status}`,`Codex returned ${response.status}`));
       const jobId = result.id;
@@ -2884,7 +2924,7 @@ function App() {
         if (!statusResponse.ok) throw new Error(result.error);
       }
       const finalStatus = result.status === 'done' ? 'done' : result.status === 'stopped' ? 'stopped' : 'failed';
-      updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, status: finalStatus, content: result.output ? `${task}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${result.output}` : node.content, error: result.error || null, execution: { ...(node.execution || {}), jobId, runner, completedAt: result.completedAt, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], inheritedNodeIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', output: result.output } }));
+      updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, status: finalStatus, content: result.output ? `${task}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${result.output}` : node.content, error: result.error || null, execution: { ...(node.execution || {}), jobId, runner, sessionId: result.sessionId || '', forkedFrom: piFork?.sessionId || '', completedAt: result.completedAt, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], inheritedNodeIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', output: result.output } }));
     } catch (error) {
       updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, status: 'failed', content: `${task}\n\n---\n\n${tr(`${runnerName} 执行失败：${systemText(error.message)}`,`${runnerName} execution failed: ${systemText(error.message)}`)}`, error: error.message }));
     }
@@ -2985,9 +3025,9 @@ function App() {
           <label className="inline-checkbox"><input type="checkbox" checked={!!options.verbose} onChange={(event) => updateAgentSetting('claude', { verbose: event.target.checked })} />{tr('详细日志','Verbose logs')}</label>
         </div>}
         {actionRunner === 'pi' && <div className="inline-option-grid two-column">
-          <label>{tr('模型','Model')}<input value={options.model} onChange={(event) => updateAgentSetting('pi', { model: event.target.value })} placeholder={tr('使用 Pi 的默认设置','Use Pi\'s default')} /></label>
-          <label>{tr('思考强度','Thinking level')}<select value={options.thinking} onChange={(event) => updateAgentSetting('pi', { thinking: event.target.value })}>{['', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map((level) => <option key={level} value={level}>{level || tr('默认','Default')}</option>)}</select></label>
-          <label className="inline-checkbox full-row"><input type="checkbox" checked={!!options.readOnly} onChange={(event) => updateAgentSetting('pi', { readOnly: event.target.checked })} />{tr('只读模式','Read-only mode')}</label>
+          <label className="full-row">{tr('模型','Model')}<select value={piSelectionValue(options)} onChange={(event) => updateAgentSetting('pi', { ...parsePiSelection(event.target.value), thinking: '' })}><PiModelOptions info={piInfo} selection={piSelectionValue(options)} tr={tr} /></select></label>
+          <label>{tr('思考强度','Thinking level')}<select value={options.thinking || ''} disabled={piLevels?.levels?.length === 1 && piLevels.levels[0] === 'off'} onChange={(event) => updateAgentSetting('pi', { thinking: event.target.value })}><PiThinkingOptions levels={piLevels} current={options.model ? undefined : piInfo?.current?.thinkingLevel} tr={tr} /></select></label>
+          <label>{tr('权限','Permissions')}<select value={options.readOnly ? 'read' : 'full'} onChange={(event) => updateAgentSetting('pi', { readOnly: event.target.value === 'read' })}><option value="full">{tr('完全信任','Full trust')}</option><option value="read">{tr('只读（读取与搜索）','Read-only (read and search)')}</option></select></label>
         </div>}
         {actionRunner === 'deepseek' && <div className="inline-option-grid two-column">
           <label>{tr('配置档','Profile')}<input value={options.profile} disabled /></label>
@@ -3359,7 +3399,7 @@ function App() {
             </Page>
           )}
           {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
-          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} tr={tr} />}
+          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} onReloadPi={loadPiInfo} tr={tr} />}
           {settingsSection === 'license' && (
             <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
               {license ? (

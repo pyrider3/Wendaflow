@@ -3,6 +3,7 @@ import {validatePublicEndpoint,publicRequestAllowed} from './deployment/public-p
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile, realpath } from 'node:fs/promises';
@@ -269,10 +270,13 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
   const thinking = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(options.thinking) ? options.thinking : '';
   const clean = (value) => String(value || '').trim();
   const extra = clean(options.extraArgs).split(/\s+/).filter(Boolean);
-  const args = ['-p', '--mode', 'json',
-    ...(options.ephemeral === false ? [] : ['--no-session']),
-    ...(clean(options.provider) ? ['--provider', clean(options.provider)] : []),
-    ...(clean(options.model) ? ['--model', clean(options.model)] : []),
+  const provider = piToken(options.provider), modelId = piToken(options.model), parentSession = piToken(options.parentSession);
+  // Every run gets a session id of its own, so a card can later be forked from the one it ended with.
+  const sessionId = options.saveSession === false ? '' : randomUUID();
+  const sessionArgs = !sessionId ? ['--no-session'] : parentSession ? ['--fork', parentSession, '--session-id', sessionId] : ['--session-id', sessionId];
+  const args = ['-p', '--mode', 'json', ...sessionArgs,
+    ...(provider ? ['--provider', provider] : []),
+    ...(modelId ? ['--model', modelId] : []),
     ...(thinking ? ['--thinking', thinking] : []),
     ...(options.readOnly ? ['--tools', 'read,grep,find,ls'] : []),
     ...extra];
@@ -280,13 +284,12 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
     return await new Promise((resolve, reject) => {
       const child = spawn(command, args, { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
       hooks.onChild?.(child);
-      let buffer = '', stderr = '', sessionId = '', answer = '', failure = '', aborted = false;
+      let buffer = '', stderr = '', answer = '', failure = '', aborted = false;
       const timer = setTimeout(() => { failure ||= 'Pi 任务超时（15 分钟）'; child.kill('SIGTERM'); }, 15 * 60_000);
       const handle = (line) => {
         let event;
         try { event = JSON.parse(line); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); return; }
-        if (event.type === 'session') sessionId = event.id || sessionId;
-        else if (event.type === 'message_end' && event.message?.role === 'assistant') {
+        if (event.type === 'message_end' && event.message?.role === 'assistant') {
           const thought = piMessageText(event.message.content, 'thinking');
           const text = piMessageText(event.message.content, 'text');
           if (thought) hooks.onEvent?.('thinking', thought);
@@ -306,7 +309,7 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
       child.on('close', (code) => {
         clearTimeout(timer);
         if (buffer.trim()) handle(buffer.replace(/\r$/, ''));
-        if (code === 0 && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: `Pi session: ${sessionId}` });
+        if (code === 0 && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: sessionId ? `Pi session: ${sessionId}` : 'Pi（未保存会话）', sessionId });
         else reject(new Error(failure || (aborted ? 'Pi 任务已中止' : '') || stderr.trim() || `Pi 退出码 ${code}`));
       });
       child.stdin.end(`${prompt}${attachmentNotice}`);
@@ -314,6 +317,67 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
   } finally {
     if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+// Values handed to Pi as option arguments: no leading dash (never a flag), no whitespace or control characters.
+function piToken(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length > 200 || text.startsWith('-') || /[\s\x00-\x1f]/.test(text)) throw new Error(`无效的 Pi 参数：${text.slice(0, 40)}`);
+  return text;
+}
+
+// Ask a short-lived `pi --mode rpc` process a few questions and stop it. It never calls
+// set_model, so the user's own Pi defaults are left alone.
+async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 30_000) {
+  const command = await resolveAgentCommand(configuredCommand, 'pi');
+  if (!command) throw new Error('找不到 Pi');
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, ['--mode', 'rpc', '--no-session', ...selectArgs], { cwd: os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+    const answers = new Map();
+    let buffer = '', stderr = '', done = false;
+    const finish = (error) => { if (done) return; done = true; clearTimeout(timer); try { child.kill('SIGTERM'); } catch {} error ? reject(error) : resolve(answers); };
+    const timer = setTimeout(() => finish(new Error('Pi 没有在时限内响应')), timeoutMs);
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      const lines = buffer.split('\n'); buffer = lines.pop() || '';
+      for (const line of lines) {
+        let record; try { record = JSON.parse(line.replace(/\r$/, '')); } catch { continue; }
+        if (record.type !== 'response' || !record.id) continue;
+        answers.set(record.id, record);
+        if (requests.every((request) => answers.has(request.id))) finish();
+      }
+    });
+    child.stderr.on('data', (chunk) => { stderr = (stderr + chunk).slice(-600); });
+    child.on('error', (error) => finish(new Error(`Pi 无法启动：${error.message}`)));
+    child.on('close', () => finish(new Error(stderr.trim() || 'Pi 提前退出')));
+    for (const request of requests) child.stdin.write(`${JSON.stringify(request)}\n`);
+  });
+}
+
+const piInfoCache = new Map();
+async function piModels(configuredCommand) {
+  const key = String(configuredCommand || '');
+  const cached = piInfoCache.get(key);
+  if (cached && Date.now() - cached.at < 60_000) return cached.value;
+  const answers = await piRpcQuery(configuredCommand, [], [{ id: 'models', type: 'get_available_models' }, { id: 'state', type: 'get_state' }]);
+  const list = answers.get('models');
+  if (!list?.success) throw new Error(list?.error || 'Pi 没有返回模型列表');
+  const state = answers.get('state')?.data || {};
+  const value = {
+    models: (list.data?.models || []).map((model) => ({ provider: model.provider, id: model.id, name: model.name || model.id, reasoning: model.reasoning === true, image: (model.input || []).includes('image'), contextWindow: model.contextWindow || 0 })),
+    current: state.model ? { provider: state.model.provider, id: state.model.id, thinkingLevel: state.thinkingLevel || '' } : null,
+  };
+  piInfoCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+async function piThinkingLevels(configuredCommand, provider, modelId) {
+  const select = [...(provider ? ['--provider', piToken(provider)] : []), ...(modelId ? ['--model', piToken(modelId)] : [])];
+  const answers = await piRpcQuery(configuredCommand, select, [{ id: 'levels', type: 'get_available_thinking_levels' }]);
+  const reply = answers.get('levels');
+  if (!reply?.success) throw new Error(reply?.error || 'Pi 没有返回思考档位');
+  return reply.data?.levels || ['off'];
 }
 
 async function probeAgent(command, args = ['--version'], via = null) {
@@ -573,7 +637,7 @@ async function collectJobArtifacts(workspace, after = {}, output = '', startedAt
 }
 
 function publicJob(job) {
-  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
+  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
 const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
@@ -673,6 +737,14 @@ const server = http.createServer(async (req, res) => {
     child.on('close', (code) => code === 0 ? reply(res, 200, { path: output.trim() }) : reply(res, 400, { error: error.trim() || '目录选择已取消' }));
     return;
   }
+  if (req.method === 'POST' && req.url === '/agents/pi/models') {
+    try { const { command = '' } = await readJson(req); reply(res, 200, await piModels(command)); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/thinking') {
+    try { const { command = '', provider = '', model = '' } = await readJson(req); reply(res, 200, { levels: await piThinkingLevels(command, provider, model) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agents/detect') {
     try { const { pi = '' } = await readJson(req); reply(res, 200, await detectAgents(pi)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -721,7 +793,7 @@ const server = http.createServer(async (req, res) => {
           const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
           const result = runner === 'codex' ? await runCodex(prompt.trim(), safeImages, safeFiles, workspace, hooks, options) : await runCliAgent(runner, prompt.trim(), safeImages, safeFiles, workspace, hooks, options);
           if (job.status === 'stopped') return;
-          job.output = result.output; job.terminal = result.terminal; job.after = await gitWorkspaceState(workspace); job.artifacts = await collectJobArtifacts(workspace, job.after, result.output, job.startedAt); job.status = 'done'; job.completedAt = new Date().toISOString(); addEvent('result', result.output); addEvent('status', '执行完成');
+          job.output = result.output; job.terminal = result.terminal; job.sessionId = result.sessionId || ''; job.after = await gitWorkspaceState(workspace); job.artifacts = await collectJobArtifacts(workspace, job.after, result.output, job.startedAt); job.status = 'done'; job.completedAt = new Date().toISOString(); addEvent('result', result.output); addEvent('status', '执行完成');
         } catch (error) {
           if (job.status === 'stopped') return;
           job.status = 'failed'; job.error = error.message; job.completedAt = new Date().toISOString(); addEvent('error', error.message);
