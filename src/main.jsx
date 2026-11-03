@@ -419,6 +419,8 @@ function App() {
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
   const [actionWorkspace, setActionWorkspace] = useState('');
+  const [workspaceDraft, setWorkspaceDraft] = useState('');
+  const [workspaceError, setWorkspaceError] = useState('');
   const [agentSettings, setAgentSettings] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('wonderful-agent-settings')) || {};
@@ -2074,7 +2076,19 @@ function App() {
     setTaskAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }));
   }
 
+  async function applyTypedWorkspace() {
+    const typed = workspaceDraft.trim();
+    if (!typed) return;
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/resolve-directory`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: typed }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setActionWorkspace(result.path); setWorkspaceDraft(''); setWorkspaceError('');
+    } catch (error) { setWorkspaceError(systemText(error.message)); }
+  }
+
   async function pickWorkspaceDirectory(forCurrentAction = false) {
+    setWorkspaceError('');
     try {
       let path='';
       if(typeof window.wonderfulWindow?.pickDirectory==='function'){
@@ -2088,7 +2102,7 @@ function App() {
       if (!path) return;
       if (forCurrentAction) setActionWorkspace(path);
       else setCanvases((items) => items.map((canvas) => canvas.id === activeCanvasId ? { ...canvas, workspace: path } : canvas));
-    } catch (error) { setProjectStatus(tr(`选择目录失败：${error.message}`,`Operation failed: ${error.message}`)); }
+    } catch (error) { setWorkspaceError(systemText(error.message)); setProjectStatus(tr(`选择目录失败：${error.message}`,`Operation failed: ${error.message}`)); }
   }
 
   function updateConversationOptions(patch) {
@@ -2934,7 +2948,8 @@ function App() {
           <label>{tr('推理策略','Reasoning strategy')}<select value={options.reasoning} onChange={(event) => updateAgentSetting('deepseek', { reasoning: event.target.value })}><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option><option value="max">{tr('最高','Max')}</option></select></label>
           <label className="inline-checkbox full-row"><input type="checkbox" checked={options.thinking} onChange={(event) => updateAgentSetting('deepseek', { thinking: event.target.checked })} />{tr('要求充分思考后再执行','Require extended thinking before execution')}</label>
         </div>}
-        <div className="inline-workspace"><div><small>{tr('工作目录','Working directory')}</small><strong title={workspace}>{workspace ? workspace.split(/[\\/]/).pop() : tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</strong></div><button onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button className="clear-workspace" onClick={() => setActionWorkspace('')}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
+        <div className="inline-workspace"><div><small>{tr('工作目录','Working directory')}</small><strong title={workspace}>{workspace ? workspace.split(/[\\/]/).pop() : tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</strong></div><button onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button className="clear-workspace" onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
+        <div className="workspace-path"><input value={workspaceDraft} onChange={(event) => { setWorkspaceDraft(event.target.value); setWorkspaceError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void applyTypedWorkspace(); } }} placeholder={tr('或直接输入文件夹路径，按回车确认','Or type a folder path and press Enter')} aria-label={tr('工作目录路径','Working directory path')} spellCheck={false} />{workspaceError && <p role="alert">{workspaceError}</p>}</div>
         <footer><span>{tr('点击发送即授权并立即执行','Sending authorizes immediate execution')}</span><button onClick={() => setActionOptionsOpen(false)}>{tr('完成','Done')}</button></footer>
       </div>}
     </div>;

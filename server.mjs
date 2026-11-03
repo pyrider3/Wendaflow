@@ -628,7 +628,23 @@ const server = http.createServer(async (req, res) => {
     try { const {token}=await readJson(req);reply(res,200,{canvas:await canvasFiles.restore(token)}); } catch(error) {reply(res,400,{error:error.message});} return;
   }
   if (req.method === 'POST' && req.url === '/pick-directory') {
-    if (!['win32', 'darwin'].includes(process.platform)) { reply(res, 400, { error: '当前目录选择器仅支持桌面版 Windows 或 macOS' }); return; }
+    if (!['win32', 'darwin'].includes(process.platform)) {
+      // Linux has no built-in dialog: use zenity or kdialog when installed.
+      const title = '选择 Wendaflow 行动工作目录';
+      const pickers = [['zenity', ['--file-selection', '--directory', `--title=${title}`]], ['kdialog', ['--getexistingdirectory', os.homedir(), '--title', title]]];
+      for (const [command, args] of pickers) {
+        const outcome = await new Promise((resolve) => {
+          const child = spawn(command, args, { shell: false });
+          let output = '';
+          child.stdout.on('data', (chunk) => { output += chunk; });
+          child.on('error', () => resolve(null));
+          child.on('close', (code) => resolve(code === 0 ? output.trim() : ''));
+        });
+        if (outcome !== null) { reply(res, 200, { path: outcome }); return; }
+      }
+      reply(res, 400, { error: '系统里没有 zenity 或 kdialog，无法弹出选择窗口。请在下方直接输入文件夹路径。' });
+      return;
+    }
     const isMac = process.platform === 'darwin';
     const script = "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='选择 Wendaflow 行动工作目录'; if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){[Console]::OutputEncoding=[Text.Encoding]::UTF8; Write-Output $d.SelectedPath}";
     // Native dialogs avoid a console flash on Windows and use Finder on macOS.
@@ -638,6 +654,21 @@ const server = http.createServer(async (req, res) => {
     let output = '', error = '';
     child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.on('data', (chunk) => { error += chunk; });
     child.on('close', (code) => code === 0 ? reply(res, 200, { path: output.trim() }) : reply(res, 400, { error: error.trim() || '目录选择已取消' }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/resolve-directory') {
+    try {
+      const { path: typed = '' } = await readJson(req);
+      const raw = String(typed).trim();
+      if (!raw) throw new Error('请输入文件夹路径');
+      const expanded = raw === '~' ? os.homedir() : raw.startsWith('~/') ? path.join(os.homedir(), raw.slice(2)) : raw;
+      if (!path.isAbsolute(expanded)) throw new Error('请输入完整路径，例如 /home/你/项目');
+      const resolved = path.resolve(expanded);
+      let info;
+      try { info = await stat(resolved); } catch { throw new Error('找不到这个文件夹'); }
+      if (!info.isDirectory()) throw new Error('这不是一个文件夹');
+      reply(res, 200, { path: resolved });
+    } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
   if (req.method === 'POST' && req.url === '/open-directory') {
