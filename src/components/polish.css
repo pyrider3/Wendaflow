@@ -45,7 +45,10 @@
 :root .app-shell .topbar .quiet-button.active { border-color: color-mix(in srgb, var(--sx-accent) 45%, transparent); background: var(--sx-accent-soft); color: var(--sx-accent); }
 :root .app-shell .topbar .quiet-button:disabled { opacity: 0.4; }
 :root .app-shell .topbar .quiet-button:focus-visible, :root .app-shell .rail-button:focus-visible, :root .app-shell .canvas-tabs button:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
-:root .app-shell .topbar .history-button { width: 36px; padding: 0; }
+:root .app-shell .topbar .history-button,
+:root .app-shell .topbar .icon-only,
+:root .app-shell .topbar .save-button.compact { width: 36px; min-width: 36px; padding: 0; }
+:root .app-shell .topbar .save-button.compact svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 :root .app-shell .topbar .save-button.saved { background: var(--sx-accent-soft); color: var(--sx-accent); border-color: color-mix(in srgb, var(--sx-accent) 35%, transparent); }
 :root .app-shell .topbar .save-button.failed { color: var(--sx-danger); border-color: color-mix(in srgb, var(--sx-danger) 45%, transparent); }
 :root .app-shell .topbar .save-button.unsaved::before { background: var(--sx-accent); }

@@ -3037,14 +3037,15 @@ function App() {
               : text('save');
             const hint = autosaveOn ? tr('修改会自动保存，也可按 Ctrl+S 立即保存。','Changes save automatically. Press Ctrl+S to save now.') : tr('尚未保存。保存一次后，之后的修改会自动保存（Ctrl+S）。','Not saved yet. Save once and later changes save automatically (Ctrl+S).');
             const className = `quiet-button save-button ${state === 'saving' ? 'saving' : state === 'saved' || (autosaveOn && state === 'idle') ? 'saved' : state === 'failed' ? 'failed' : ''} ${!autosaveOn && state === 'dirty' ? 'unsaved' : ''}`;
-            return <button className={className} disabled={state === 'saving'} title={hint} onClick={() => saveCanvas()}>{label}</button>;
-          })()}<button className="quiet-button" onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" />{say('导出 WDF','Export WDF')}</button>
+            const settled = className.includes(' saved');
+            return <button className={`${className} ${settled ? 'compact' : ''}`} disabled={state === 'saving'} title={settled ? `${label} · ${hint}` : hint} aria-label={label} onClick={() => saveCanvas()}>{settled ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg> : label}</button>;
+          })()}<button className="quiet-button icon-only" aria-label={say('导出 WDF','Export WDF')} title={say('导出 WDF','Export WDF')} onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" /></button>
           <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z"><AppIcon name="undo" /></button>
         <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z"><AppIcon name="redo" /></button>
-        <button className="quiet-button" onClick={fitView}><AppIcon name="fit" />{text('fitCanvas')}</button>
-          <button className="quiet-button" onClick={autoLayout}><AppIcon name="arrange" />{text('autoLayout')}</button>
-          <button className={minimapOpen ? 'quiet-button active' : 'quiet-button'} onClick={() => setMinimapOpen((value) => !value)}><AppIcon name="map" />{text('minimap')}</button>
-          <button className={focusMode ? 'quiet-button active' : 'quiet-button'} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" />{text('focusPath')}</button>
+        <button className="quiet-button icon-only" aria-label={text('fitCanvas')} title={text('fitCanvas')} onClick={fitView}><AppIcon name="fit" /></button>
+          <button className="quiet-button icon-only" aria-label={text('autoLayout')} title={text('autoLayout')} onClick={autoLayout}><AppIcon name="arrange" /></button>
+          <button className={minimapOpen ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('minimap')} aria-pressed={minimapOpen} title={text('minimap')} onClick={() => setMinimapOpen((value) => !value)}><AppIcon name="map" /></button>
+          <button className={focusMode ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('focusPath')} aria-pressed={focusMode} title={text('focusPath')} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" /></button>
           {window.wonderfulWindow&&<div className="window-controls"><button aria-label={tr('最小化','Minimize')} onClick={() => window.wonderfulWindow?.minimize?.()}>—</button><button aria-label={tr('切换窗口大小','Toggle window size')} onClick={() => window.wonderfulWindow?.maximize?.()}>□</button><button className="window-close" aria-label={tr('关闭 Wendaflow','Close Wendaflow')} onClick={() => persistCurrentCanvas().then(()=>window.wonderfulWindow?.close?.()).catch(error=>setStorageWarning(error.message))}>×</button></div>}
         </div>
       </header>
