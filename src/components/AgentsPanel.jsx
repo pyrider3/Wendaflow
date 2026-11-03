@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { AGENT_IDS, AGENT_LABELS } from "../agents/catalog.mjs";
 import { Button, Empty, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
 import { PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue } from "./PiOptions.jsx";
 
-export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, tr }) {
+export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, workspaceConfig, onSaveWorkspace, onPickWorkspace, tr }) {
   const hints = {
     pi: tr("可自己配置命令、模型和参数的编程智能体。", "A coding agent whose command, model and arguments you configure yourself."),
     codex: tr("OpenAI 的 Codex 命令行。", "OpenAI's Codex command line."),
@@ -11,6 +11,13 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
     deepseek: tr("DeepSeek Harness，需要 DeepSeek API 密钥。", "DeepSeek Harness; needs a DeepSeek API key."),
   };
   const set = (id) => (patch) => onSettingChange(id, patch);
+  const [folderDraft, setFolderDraft] = useState("");
+  const [folderError, setFolderError] = useState("");
+  const applyFolder = async (value) => {
+    const failure = await onSaveWorkspace(value);
+    setFolderError(failure || "");
+    if (!failure) setFolderDraft("");
+  };
 
   const status = (id) => {
     const found = detection?.[id];
@@ -124,6 +131,22 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
 
   return (
     <Page title={tr("执行器", "Agents")} description={tr("行动模式会把任务交给这里启用的执行器。默认没有启用任何一个，请开启你要用的。", "Action mode hands tasks to the agents enabled here. None is enabled by default; turn on the ones you want.")}>
+      <Group title={tr("默认工作目录", "Default working directory")} hint={tr("没有指定文件夹的行动会在这里运行，而不是在 Wendaflow 自己的程序目录里。", "Actions with no folder chosen run here instead of in Wendaflow's own program folder.")}>
+        <div className="sx-row">
+          <div className="sx-row-text">
+            <strong>{workspaceConfig?.defaultWorkspace || tr("还没有设置", "Not set yet")}</strong>
+            {!workspaceConfig?.defaultWorkspace && <span>{tr("现在会在 Wendaflow 的程序目录里运行，Pi 等执行器可能往里面写文件。", "Actions currently run in Wendaflow's program folder, where agents such as Pi may write files.")}</span>}
+          </div>
+          <div className="sx-row-control">
+            <Button onClick={async () => setFolderError((await onPickWorkspace()) || "")}>{tr("选择文件夹", "Choose folder")}</Button>
+            {workspaceConfig?.defaultWorkspace && <Button onClick={() => applyFolder("")}>{tr("改回程序目录", "Use the program folder")}</Button>}
+          </div>
+        </div>
+        <div className="sx-row stack">
+          <Input value={folderDraft} onChange={(e) => { setFolderDraft(e.target.value); setFolderError(""); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyFolder(folderDraft); } }} placeholder={tr("或直接输入文件夹路径，按回车确认", "Or type a folder path and press Enter")} aria-label={tr("工作目录路径", "Working directory path")} spellCheck={false} />
+          {folderError && <span className="sx-hint" role="alert">{folderError}</span>}
+        </div>
+      </Group>
       {!enabled.length && (
         <Group>
           <Empty icon="⌘" title={tr("还没有启用执行器", "No agent enabled yet")}>{tr("开启下面的一个或几个，行动模式里才能选它们。", "Enable one or more below to use them in Action mode.")}</Empty>

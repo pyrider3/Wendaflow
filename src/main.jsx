@@ -426,6 +426,7 @@ function App() {
   const [piInfo, setPiInfo] = useState(null);
   const [piLevels, setPiLevels] = useState(null);
   const [piResources, setPiResources] = useState(null);
+  const [workspaceConfig, setWorkspaceConfig] = useState(null);
   const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || '');
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
@@ -843,7 +844,8 @@ function App() {
   }, [customTheme]);
   useEffect(() => localStorage.setItem('wonderful-action-runner', actionRunner), [actionRunner]);
   useEffect(() => localStorage.setItem('wendaflow-enabled-agents', JSON.stringify(enabledAgents)), [enabledAgents]);
-  useEffect(() => { if (settingsOpen && settingsSection === 'agents') void detectAgents(); }, [settingsOpen, settingsSection]);
+  useEffect(() => { void loadWorkspaceConfig(); }, []);
+  useEffect(() => { if (settingsOpen && settingsSection === 'agents') { void detectAgents(); void loadWorkspaceConfig(); } }, [settingsOpen, settingsSection]);
   const piPanelOpen = enabledAgents.includes('pi') && ((settingsOpen && settingsSection === 'agents') || (actionOptionsOpen && actionRunner === 'pi'));
   const piSelection = actionOptionsOpen ? taskAgentSettings.pi : agentSettings.pi;
   useEffect(() => { if (piPanelOpen) void loadPiInfo(); }, [piPanelOpen]);
@@ -2747,6 +2749,38 @@ function App() {
     } catch { setAgentDetection({}); }
   }
 
+  async function loadWorkspaceConfig() {
+    if (PUBLIC_WEB) return;
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/agents/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (response.ok) setWorkspaceConfig(await response.json());
+    } catch {}
+  }
+
+  // Returns an error message, or '' when the folder was saved.
+  async function saveDefaultWorkspace(folder) {
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/agents/config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ defaultWorkspace: folder }) });
+      const result = await response.json();
+      if (!response.ok) return systemText(result.error || String(response.status));
+      setWorkspaceConfig(result);
+      return '';
+    } catch (error) { return error.message; }
+  }
+
+  async function pickDefaultWorkspace() {
+    try {
+      let folder = '';
+      if (typeof window.wonderfulWindow?.pickDirectory === 'function') folder = await window.wonderfulWindow.pickDirectory();
+      else {
+        const response = await fetch(`${LOCAL_PROXY_URL}/pick-directory`, { method: 'POST' });
+        const result = await response.json(); if (!response.ok) return systemText(result.error || '');
+        folder = result.path || '';
+      }
+      return folder ? await saveDefaultWorkspace(folder) : '';
+    } catch (error) { return error.message; }
+  }
+
   async function loadPiInfo() {
     if (PUBLIC_WEB) return;
     try {
@@ -3054,7 +3088,7 @@ function App() {
           <label>{tr('推理策略','Reasoning strategy')}<select value={options.reasoning} onChange={(event) => updateAgentSetting('deepseek', { reasoning: event.target.value })}><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option><option value="max">{tr('最高','Max')}</option></select></label>
           <label className="inline-checkbox full-row"><input type="checkbox" checked={options.thinking} onChange={(event) => updateAgentSetting('deepseek', { thinking: event.target.checked })} />{tr('要求充分思考后再执行','Require extended thinking before execution')}</label>
         </div>}
-        <div className="inline-workspace"><div><small>{tr('工作目录','Working directory')}</small><strong title={workspace}>{workspace ? workspace.split(/[\\/]/).pop() : tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</strong></div><button onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button className="clear-workspace" onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
+        <div className="inline-workspace"><div><small>{tr('工作目录','Working directory')}</small><strong title={workspace || workspaceConfig?.defaultWorkspace || ''}>{workspace ? workspace.split(/[\\/]/).pop() : workspaceConfig?.defaultWorkspace ? workspaceConfig.defaultWorkspace.split(/[\\/]/).pop() : tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</strong></div><button onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button className="clear-workspace" onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
         <div className="workspace-path"><input value={workspaceDraft} onChange={(event) => { setWorkspaceDraft(event.target.value); setWorkspaceError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void applyTypedWorkspace(); } }} placeholder={tr('或直接输入文件夹路径，按回车确认','Or type a folder path and press Enter')} aria-label={tr('工作目录路径','Working directory path')} spellCheck={false} />{workspaceError && <p role="alert">{workspaceError}</p>}</div>
         <footer><span>{tr('点击发送即授权并立即执行','Sending authorizes immediate execution')}</span><button onClick={() => setActionOptionsOpen(false)}>{tr('完成','Done')}</button></footer>
       </div>}
@@ -3419,7 +3453,7 @@ function App() {
             </Page>
           )}
           {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
-          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} tr={tr} />}
+          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} />}
           {settingsSection === 'license' && (
             <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
               {license ? (

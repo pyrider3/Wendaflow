@@ -15,6 +15,10 @@ const PORT = Number(process.env.WONDERFUL_PORT || 4318);
 const DATA_ROOT = process.env.WONDERFUL_DATA_DIR || process.cwd();
 const CANVAS_DIR = path.join(DATA_ROOT, 'data', 'canvases');
 const canvasFiles = canvasStorage(DATA_ROOT);
+// Where an action runs when its card names no folder. Kept on the server, so it holds in every browser.
+const AGENT_CONFIG_FILE = path.join(DATA_ROOT, 'agents-config.json');
+let defaultWorkspace = '';
+try { defaultWorkspace = String(JSON.parse(await readFile(AGENT_CONFIG_FILE, 'utf8')).defaultWorkspace || ''); } catch {}
 const DSH_BIN = process.env.DSH_CLI || path.join(os.homedir(), 'Documents', 'Codex', '2026-08-21', 'new-chat', 'work', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js');
 const agentJobs = new Map();
 // The desktop app loads its UI from file://, while the browser build uses Vite.
@@ -479,6 +483,19 @@ async function detectAgents(piCommand = '') {
 }
 
 
+// A typed folder path (absolute, or starting with ~/) that exists and is a directory.
+async function validateDirectory(typed) {
+  const raw = String(typed || '').trim();
+  if (!raw) throw new Error('请输入文件夹路径');
+  const expanded = raw === '~' ? os.homedir() : raw.startsWith('~/') ? path.join(os.homedir(), raw.slice(2)) : raw;
+  if (!path.isAbsolute(expanded)) throw new Error('请输入完整路径，例如 /home/你/项目');
+  const resolved = path.resolve(expanded);
+  let info;
+  try { info = await stat(resolved); } catch { throw new Error('找不到这个文件夹'); }
+  if (!info.isDirectory()) throw new Error('这不是一个文件夹');
+  return resolved;
+}
+
 async function readJson(req, limit = 12_000_000) {
   const chunks = [];
   let size = 0;
@@ -823,6 +840,17 @@ const server = http.createServer(async (req, res) => {
     try { const { command = '', provider = '', model = '' } = await readJson(req); reply(res, 200, { levels: await piThinkingLevels(command, provider, model) }); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'POST' && req.url === '/agents/config') {
+    try {
+      const body = await readJson(req);
+      if (typeof body.defaultWorkspace === 'string') {
+        defaultWorkspace = body.defaultWorkspace.trim() ? await validateDirectory(body.defaultWorkspace) : '';
+        await writeFile(AGENT_CONFIG_FILE, `${JSON.stringify({ defaultWorkspace }, null, 2)}\n`, 'utf8');
+      }
+      reply(res, 200, { defaultWorkspace, programDir: process.cwd() });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agents/detect') {
     try { const { pi = '' } = await readJson(req); reply(res, 200, await detectAgents(pi)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -830,15 +858,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/resolve-directory') {
     try {
       const { path: typed = '' } = await readJson(req);
-      const raw = String(typed).trim();
-      if (!raw) throw new Error('请输入文件夹路径');
-      const expanded = raw === '~' ? os.homedir() : raw.startsWith('~/') ? path.join(os.homedir(), raw.slice(2)) : raw;
-      if (!path.isAbsolute(expanded)) throw new Error('请输入完整路径，例如 /home/你/项目');
-      const resolved = path.resolve(expanded);
-      let info;
-      try { info = await stat(resolved); } catch { throw new Error('找不到这个文件夹'); }
-      if (!info.isDirectory()) throw new Error('这不是一个文件夹');
-      reply(res, 200, { path: resolved });
+      reply(res, 200, { path: await validateDirectory(typed) });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
@@ -855,7 +875,8 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agent/start') {
     try {
-      const { runner = 'codex', prompt, images = [], files = [], workspace, options = {} } = await readJson(req, 90_000_000);
+      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {} } = await readJson(req, 90_000_000);
+      const workspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('任务内容不能为空');
       const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const job = { id, runner, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
@@ -960,7 +981,8 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && (req.url === '/codex' || req.url === '/agent')) {
     try {
-      const { runner = 'codex', prompt, images = [], files = [], workspace, options = {} } = await readJson(req, 90_000_000);
+      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {} } = await readJson(req, 90_000_000);
+      const workspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('任务内容不能为空');
       const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
       const result = runner === 'codex' ? await runCodex(prompt.trim(), safeImages, safeFiles, workspace, {}, options) : await runCliAgent(runner, prompt.trim(), safeImages, safeFiles, workspace, {}, options);
