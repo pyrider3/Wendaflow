@@ -205,6 +205,11 @@
 :root .app-shell .composer .segmented button { height: 28px; min-width: 44px; padding: 0 10px; border-radius: 9px; background: transparent; color: var(--sx-muted); font-size: 12.5px; font-weight: 500; transition: color 0.25s var(--ease-out); }
 :root .app-shell .composer .segmented button.selected { color: var(--sx-accent); font-weight: 700; }
 :root .app-shell .composer .shortcut { color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .composer .composer-bottom { container-type: inline-size; }
+:root .app-shell .composer .shortcut { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:root .app-shell .composer .send-button { flex: none; }
+:root .app-shell .composer .composer-bottom { flex-wrap: wrap; row-gap: 8px; }
+@container (max-width: 940px) { :root .app-shell .composer .shortcut { display: none; } :root .app-shell .composer .send-button { margin-left: auto; } }
 :root .app-shell .composer .send-button { width: 38px; height: 38px; border: 0; border-radius: 13px; background: var(--sx-accent); color: var(--sx-accent-ink); font-size: 18px; transition: transform 0.35s var(--ease-spring), box-shadow 0.3s var(--ease-out), filter 0.2s var(--ease-out); }
 :root .app-shell .composer .send-button:hover { filter: brightness(1.08); box-shadow: 0 10px 22px color-mix(in srgb, var(--sx-accent) 38%, transparent); }
 :root .app-shell .composer .send-button:active { transform: scale(0.92); }
