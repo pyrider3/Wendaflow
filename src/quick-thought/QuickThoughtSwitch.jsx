@@ -6,6 +6,7 @@ export function QuickThoughtSwitch({ enabled, onToggle, labels }) {
       className="quick-thought-toggle"
       role="switch"
       aria-checked={enabled}
+      aria-label={labels.mode}
       title={labels.sliceHint}
       onClick={onToggle}
     >

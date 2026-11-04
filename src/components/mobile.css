@@ -1,0 +1,65 @@
+/* Phone layout. Loaded after the desktop styles, so every rule here is written to win over them. */
+
+/* Desktop keeps the tools inline; the "more" button only exists on a phone. */
+:root .app-shell .topbar-tools { display: contents; }
+:root .app-shell .topbar .more-button { display: none; }
+
+@media (max-width: 700px) {
+  :root .app-shell .topbar { left: 10px; right: 10px; top: calc(8px + env(safe-area-inset-top)); gap: 8px; }
+  :root .app-shell .topbar .project-block { display: none; }
+  :root .app-shell .topbar .canvas-tabs { flex: 1 1 0; min-width: 0; max-width: none; }
+  :root .app-shell .topbar-actions { gap: 6px; }
+  :root .app-shell .quick-thought-toggle > span:not(.quick-switch-track) { display: none; }
+
+  /* The seven secondary buttons live in a panel under the "more" button. */
+  :root .app-shell .topbar .more-button { display: inline-flex; }
+  :root .app-shell .topbar-tools { display: none; }
+  :root .app-shell .topbar-tools.open {
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 10px;
+    position: absolute; top: 52px; right: 0; max-width: calc(100vw - 20px); z-index: 70; pointer-events: auto;
+    border: 1px solid var(--sx-line); border-radius: 18px; background: var(--sx-bg); box-shadow: var(--sx-shadow);
+    animation: sx-rise 0.25s var(--ease-out) both;
+  }
+
+  /* The side rail becomes a bottom bar, the way phone apps do it. */
+  :root .app-shell .rail {
+    left: 0; right: 0; top: auto; bottom: 0; width: auto; flex-direction: row; justify-content: space-around; align-items: center; gap: 0;
+    height: calc(58px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom);
+    border-top: 1px solid var(--sx-line); background: var(--sx-bg); pointer-events: auto; z-index: 25;
+  }
+  :root .app-shell .rail .rail-spacer { display: none; }
+  :root .app-shell .rail .rail-button::after { display: none; }
+
+  :root .app-shell .composer { left: 50%; width: calc(100% - 20px); bottom: calc(68px + env(safe-area-inset-bottom)); }
+  :root .app-shell .composer-bottom { row-gap: 8px; }
+  :root .app-shell .undo-toast { top: calc(60px + env(safe-area-inset-top)); bottom: auto; }
+  :root .app-shell .minimap { right: 10px; top: calc(60px + env(safe-area-inset-top)); bottom: auto; }
+  :root .app-shell .ix { bottom: calc(66px + env(safe-area-inset-bottom)); height: min(62%, 520px); }
+
+  /* Panels that hung off the rail now use the full width. */
+  :root .app-shell .search-panel, :root .app-shell .library-panel, :root .app-shell .canvas-picker {
+    left: 10px; right: 10px; width: auto; max-width: none; top: calc(60px + env(safe-area-inset-top)); max-height: calc(100dvh - 150px);
+  }
+  :root .app-shell .notification-center { position: fixed; left: 10px; right: 10px; top: calc(60px + env(safe-area-inset-top)); width: auto; }
+  :root .app-shell .public-web-note { left: 10px; max-width: calc(100% - 20px); top: calc(60px + env(safe-area-inset-top)); }
+}
+
+/* Fingers need bigger targets than a mouse pointer does. */
+@media (pointer: coarse) {
+  :root .app-shell .topbar .quiet-button, :root .app-shell .topbar .new-tab, :root .app-shell .rail-button { min-width: 44px; height: 44px; }
+  :root .app-shell .topbar .history-button, :root .app-shell .topbar .icon-only, :root .app-shell .topbar .save-button.compact { width: 44px; }
+  :root .app-shell .canvas-tabs { height: 44px; }
+  :root .app-shell .canvas-tabs button { min-height: 38px; }
+  :root .app-shell .composer .segmented button, :root .app-shell .composer .attach-button, :root .app-shell .composer .model-picker > button { min-height: 40px; }
+  :root .app-shell .composer .send-button { width: 44px; height: 44px; }
+  :root .app-shell .sx-btn, :root .app-shell .sx-nav button { min-height: 44px; }
+  :root .app-shell .quick-thought-toggle { min-height: 44px; }
+  :root .app-shell .sx-switch { min-height: 32px; }
+  /* iOS zooms the page when a field under 16px gets focus. */
+  :root .app-shell input, :root .app-shell textarea, :root .app-shell select { font-size: 16px; }
+  /* Small card controls get a generous invisible touch area. */
+  :root .app-shell .node .fork-button::after, :root .app-shell .node .relation-handle::after,
+  :root .app-shell .node .collapse-button::after, :root .app-shell .node .resize-handle::after { content: ""; position: absolute; inset: -12px; }
+  :root .app-shell .resize-edge-x { width: 22px; right: -10px; }
+  :root .app-shell .resize-edge-y { height: 22px; bottom: -10px; }
+}

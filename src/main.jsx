@@ -24,6 +24,7 @@ import {AppearancePanel} from './components/AppearancePanel.jsx';
 import {AgentsPanel} from './components/AgentsPanel.jsx';
 import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} from './components/PiOptions.jsx';
 import {AGENT_LABELS} from './agents/catalog.mjs';
+import {pinchViewport} from './canvas/pinch.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
 import './styles.css';
 import './themes/presets.css';
@@ -43,6 +44,7 @@ import './quick-thought/interaction.css';
 import './cards/selection.css';
 import './themes/black-readability.css';
 import './components/polish.css';
+import './components/mobile.css';
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { chatOptionSupport, contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
@@ -427,6 +429,7 @@ function App() {
   const [piLevels, setPiLevels] = useState(null);
   const [piResources, setPiResources] = useState(null);
   const [workspaceConfig, setWorkspaceConfig] = useState(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || '');
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
@@ -858,6 +861,80 @@ function App() {
       .then((response) => response.json()).then((result) => { if (!stale && Array.isArray(result.levels)) setPiLevels(result); }).catch(() => {});
     return () => { stale = true; };
   }, [piPanelOpen, piSelection?.provider, piSelection?.model]);
+  // On a phone a card that lands off-screen is simply lost, so bring new content into view.
+  const fitViewRef = useRef(null);
+  fitViewRef.current = fitView;
+  const lastFittedCountRef = useRef({ canvas: null, count: 0 });
+  useEffect(() => {
+    if (!window.matchMedia?.('(max-width: 700px)').matches) return undefined;
+    const last = lastFittedCountRef.current;
+    const grew = last.canvas === activeCanvasId && nodes.length > last.count;
+    const opened = last.canvas !== activeCanvasId && nodes.length > 0;
+    lastFittedCountRef.current = { canvas: activeCanvasId, count: nodes.length };
+    if (!grew && !opened) return undefined;
+    const timer = window.setTimeout(() => fitViewRef.current?.(), 160);
+    return () => window.clearTimeout(timer);
+  }, [nodes.length, activeCanvasId]);
+  const pinchApiRef = useRef(null);
+  pinchApiRef.current = { commitViewport, stopZoomAnimation, cancelCanvasGesture };
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return undefined;
+    const fingers = new Map();
+    let pinch = null;
+    const at = (event) => { const rect = el.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
+    const down = (event) => {
+      if (event.pointerType !== 'touch') return;
+      fingers.set(event.pointerId, at(event));
+      if (fingers.size < 2) return;
+      event.stopPropagation(); // the second finger belongs to the pinch, not to what is under it
+      if (pinch) return;
+      const api = pinchApiRef.current;
+      api.stopZoomAnimation();
+      api.cancelCanvasGesture();
+      const ids = [...fingers.keys()].slice(0, 2);
+      pinch = { ids, start: { a: fingers.get(ids[0]), b: fingers.get(ids[1]) }, base: { ...viewportRef.current } };
+      cameraGestureRef.current = true;
+    };
+    const move = (event) => {
+      if (event.pointerType !== 'touch' || !fingers.has(event.pointerId)) return;
+      fingers.set(event.pointerId, at(event));
+      if (!pinch) return;
+      event.stopPropagation();
+      const [a, b] = pinch.ids.map((id) => fingers.get(id));
+      if (!a || !b) return;
+      const next = pinchViewport(pinch.base, pinch.start, { a, b });
+      targetViewportRef.current = next;
+      pinchApiRef.current.commitViewport(next, false);
+    };
+    const up = (event) => {
+      if (event.pointerType !== 'touch') return;
+      fingers.delete(event.pointerId);
+      if (!pinch || !pinch.ids.includes(event.pointerId)) return;
+      event.stopPropagation();
+      pinch = null;
+      cameraGestureRef.current = false;
+      targetViewportRef.current = viewportRef.current;
+      pinchApiRef.current.commitViewport(viewportRef.current, true);
+    };
+    el.addEventListener('pointerdown', down, true);
+    el.addEventListener('pointermove', move, true);
+    el.addEventListener('pointerup', up, true);
+    el.addEventListener('pointercancel', up, true);
+    return () => {
+      el.removeEventListener('pointerdown', down, true);
+      el.removeEventListener('pointermove', move, true);
+      el.removeEventListener('pointerup', up, true);
+      el.removeEventListener('pointercancel', up, true);
+    };
+  }, [activeCanvasId]);
+  // The phone's "more" menu closes when you tap anywhere else.
+  useEffect(() => {
+    if (!toolsOpen) return undefined;
+    const outside = (event) => { if (!event.target.closest?.('.topbar-tools, .more-button')) setToolsOpen(false); };
+    document.addEventListener('pointerdown', outside, true);
+    return () => document.removeEventListener('pointerdown', outside, true);
+  }, [toolsOpen]);
   // Action mode only offers enabled agents; keep the selection on one of them.
   useEffect(() => { if (enabledAgents.length && !enabledAgents.includes(actionRunner)) setActionRunner(enabledAgents[0]); }, [enabledAgents, actionRunner]);
   useEffect(() => localStorage.setItem('wonderful-agent-settings', JSON.stringify(agentSettings)), [agentSettings]);
@@ -1505,6 +1582,14 @@ function App() {
     }, 170);
   }
 
+  // A second finger turns whatever the first one started (pan, card drag, marquee) into a pinch.
+  function cancelCanvasGesture() {
+    if (panInputRef.current) { panFramesRef.current.flush(); panInputRef.current = null; }
+    setPanning(null); setDragging(null); setMarquee(null);
+    marqueeLiveRef.current = null;
+    endHistory();
+  }
+
   function beginPan(event,fromNode=false) {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(editingNode && !event.target.closest('.inline-node-editor,.inspector,.ix') && saveNodeEdit()===false)return;
@@ -1514,7 +1599,7 @@ function App() {
       stopZoomAnimation();
       beginQuickSlice(event);setContextMenu(null);return;
     }
-    if(quickThought && event.button===0 && !quickSpace.current && !event.target.closest('.node,button,textarea,input,select,.composer,.quick-thought-editor')) {
+    if(quickThought && event.button===0 && !quickSpace.current && event.pointerType!=='touch' && !event.target.closest('.node,button,textarea,input,select,.composer,.quick-thought-editor')) {
       event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
@@ -1537,7 +1622,7 @@ function App() {
       setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});
       return;
     }
-    if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
+    if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought || event.pointerType==='touch'))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
     event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture?.(event.pointerId);
     stopZoomAnimation();
     // The DOM transform can be ahead of React state during a wheel zoom.
@@ -1726,10 +1811,12 @@ function App() {
     const maxY = Math.max(...visibleNodes.map((node) => node.y + (nodeSizes.get(node.id)?.height || 110)));
     const graphWidth = Math.max(224, maxX - minX);
     const graphHeight = Math.max(110, maxY - minY);
-    const leftPadding = 86;
-    const rightPadding = selected && inspectorOpen && !quickThought ? 330 : 86;
-    const topPadding = 92;
-    const bottomPadding = 70;
+    // On a phone the navigation is a bar along the bottom, not a rail on the left.
+    const compact = rect.width <= 700;
+    const leftPadding = compact ? 20 : 86;
+    const rightPadding = compact ? 20 : selected && inspectorOpen && !quickThought ? 330 : 86;
+    const topPadding = compact ? 72 : 92;
+    const bottomPadding = compact ? 96 : 70;
     const availableWidth = Math.max(240, rect.width - leftPadding - rightPadding);
     const availableHeight = Math.max(180, rect.height - topPadding - bottomPadding);
     const zoom = Math.min(1, Math.max(0.02, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
@@ -3195,13 +3282,14 @@ function App() {
             const className = `quiet-button save-button ${state === 'saving' ? 'saving' : state === 'saved' || (autosaveOn && state === 'idle') ? 'saved' : state === 'failed' ? 'failed' : ''} ${!autosaveOn && state === 'dirty' ? 'unsaved' : ''}`;
             const settled = className.includes(' saved');
             return <button className={`${className} ${settled ? 'compact' : ''}`} disabled={state === 'saving'} title={settled ? `${label} · ${hint}` : hint} aria-label={label} onClick={() => saveCanvas()}>{settled ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg> : label}</button>;
-          })()}<button className="quiet-button icon-only" aria-label={say('导出 WDF','Export WDF')} title={say('导出 WDF','Export WDF')} onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" /></button>
+          })()}<button className={`quiet-button icon-only more-button ${toolsOpen ? 'active' : ''}`} aria-label={tr('更多','More')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><svg className="app-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg></button>
+          <div className={`topbar-tools ${toolsOpen ? 'open' : ''}`} onClick={() => setToolsOpen(false)}><button className="quiet-button icon-only" aria-label={say('导出 WDF','Export WDF')} title={say('导出 WDF','Export WDF')} onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" /></button>
           <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z"><AppIcon name="undo" /></button>
         <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z"><AppIcon name="redo" /></button>
         <button className="quiet-button icon-only" aria-label={text('fitCanvas')} title={text('fitCanvas')} onClick={fitView}><AppIcon name="fit" /></button>
           <button className="quiet-button icon-only" aria-label={text('autoLayout')} title={text('autoLayout')} onClick={autoLayout}><AppIcon name="arrange" /></button>
           <button className={minimapOpen ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('minimap')} aria-pressed={minimapOpen} title={text('minimap')} onClick={() => setMinimapOpen((value) => !value)}><AppIcon name="map" /></button>
-          <button className={focusMode ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('focusPath')} aria-pressed={focusMode} title={text('focusPath')} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" /></button>
+          <button className={focusMode ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('focusPath')} aria-pressed={focusMode} title={text('focusPath')} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" /></button></div>
           {window.wonderfulWindow&&<div className="window-controls"><button aria-label={tr('最小化','Minimize')} onClick={() => window.wonderfulWindow?.minimize?.()}>—</button><button aria-label={tr('切换窗口大小','Toggle window size')} onClick={() => window.wonderfulWindow?.maximize?.()}>□</button><button className="window-close" aria-label={tr('关闭 Wendaflow','Close Wendaflow')} onClick={() => persistCurrentCanvas().then(()=>window.wonderfulWindow?.close?.()).catch(error=>setStorageWarning(error.message))}>×</button></div>}
         </div>
       </header>
