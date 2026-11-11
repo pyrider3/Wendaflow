@@ -5,7 +5,7 @@
 const READ_ONLY = new Set(["read", "grep", "find", "ls"]);
 const WAIT_MS = 10 * 60_000;
 
-const short = (value) => (typeof value === "string" && value.length > 1500 ? `${value.slice(0, 1500)}…` : value);
+const short = (value) => (typeof value === "string" && value.length > 5000 ? `${value.slice(0, 5000)}…` : value);
 const summarize = (input) => {
   if (!input || typeof input !== "object") return input;
   return Object.fromEntries(Object.entries(input).map(([key, value]) => [key, short(value)]));

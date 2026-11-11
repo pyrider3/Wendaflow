@@ -1,5 +1,10 @@
 import {cloudApi} from './cloud/http.mjs';
 import {validatePublicEndpoint,publicRequestAllowed} from './deployment/public-policy.mjs';
+import { matchesRule, suggestRule, sameRule } from './src/agents/allow-rules.mjs';
+import { expandMentions, listWorkspaceFiles } from './src/agents/mentions.mjs';
+import { listPiSessions, readPiSession } from './src/agents/pi-sessions.mjs';
+import { approvalPreview } from './src/agents/approval-preview.mjs';
+import { takeSnapshot, diffSnapshot, fileDiff, rollbackFiles, removeSnapshot, copyWorkspace, applyChanges } from './src/agents/snapshot.mjs';
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
 import { spawn } from 'node:child_process';
@@ -18,7 +23,14 @@ const canvasFiles = canvasStorage(DATA_ROOT);
 // Where an action runs when its card names no folder. Kept on the server, so it holds in every browser.
 const AGENT_CONFIG_FILE = path.join(DATA_ROOT, 'agents-config.json');
 let defaultWorkspace = '';
-try { defaultWorkspace = String(JSON.parse(await readFile(AGENT_CONFIG_FILE, 'utf8')).defaultWorkspace || ''); } catch {}
+// "Always allow" rules per working folder; the file also holds the default folder.
+const allowRules = new Map();
+try {
+  const stored = JSON.parse(await readFile(AGENT_CONFIG_FILE, 'utf8'));
+  defaultWorkspace = String(stored.defaultWorkspace || '');
+  for (const [folder, rules] of Object.entries(stored.allowRules || {})) if (Array.isArray(rules) && rules.length) allowRules.set(folder, rules);
+} catch {}
+const saveAgentConfig = () => writeFile(AGENT_CONFIG_FILE, `${JSON.stringify({ defaultWorkspace, allowRules: Object.fromEntries(allowRules) }, null, 2)}\n`, 'utf8');
 const DSH_BIN = process.env.DSH_CLI || path.join(os.homedir(), 'Documents', 'Codex', '2026-08-21', 'new-chat', 'work', 'deepseek-harness', 'apps', 'cli', 'lib', 'bin.js');
 const agentJobs = new Map();
 // The desktop app loads its UI from file://, while the browser build uses Vite.
@@ -307,6 +319,14 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
       const update = hooks.onEventUpdate || ((key, type, text) => hooks.onEvent?.(type, text));
       const blocks = (message) => (Array.isArray(message?.content) ? message.content : []);
       const toolKey = (id) => `tool:${id}`;
+      // What this run has used so far (summed per answer), plus how full the model's context window is.
+      const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0, model: '', context: null };
+      const addUsage = (message) => {
+        const used = message.usage || {};
+        usage.input += used.input || 0; usage.output += used.output || 0; usage.cacheRead += used.cacheRead || 0; usage.cacheWrite += used.cacheWrite || 0;
+        usage.cost += used.cost?.total || 0; usage.turns += 1; usage.model = message.model || usage.model;
+        hooks.onUsage?.({ ...usage });
+      };
       const toolLine = (name, args, tail) => `${name || '工具'}${piToolSummary(args) ? `\n${piToolSummary(args)}` : ''}${tail ? `\n${tail}` : ''}`;
       const toolArgs = new Map();
 
@@ -318,7 +338,10 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
 
       const handle = (record) => {
         if (record.type === 'response') {
-          if (record.id === 'prompt') {
+          if (record.id === 'stats') {
+            const context = record.success ? record.data?.contextUsage : null;
+            if (context) { usage.context = { tokens: context.tokens ?? null, window: context.contextWindow || 0, percent: context.percent ?? null }; hooks.onUsage?.({ ...usage }); }
+          } else if (record.id === 'prompt') {
             if (!record.success) { failure ||= record.error || 'Pi 没有接受这个任务'; settle(); }
             else if (record.data?.disposition === 'handled') settle();
           } else if (!record.success) hooks.onEvent?.('stderr', `Pi 没有接受指令：${record.error || ''}`);
@@ -332,6 +355,8 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
             update(key, u.type === 'text_delta' ? 'message' : 'thinking', text);
           }
         } else if (record.type === 'message_end' && record.message?.role === 'assistant') {
+          addUsage(record.message);
+          send({ type: 'get_session_stats', id: 'stats' });
           blocks(record.message).forEach((block, index) => {
             if (block?.type === 'text' && block.text) { update(`text:${messageNo}:${index}`, 'message', block.text, { final: true }); answer = block.text; }
             if (block?.type === 'thinking' && (block.thinking || block.text)) update(`think:${messageNo}:${index}`, 'thinking', block.thinking || block.text, { final: true });
@@ -339,18 +364,18 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
           if (record.message.stopReason === 'error') failure ||= record.message.errorMessage || 'Pi 请求模型时出错';
         } else if (record.type === 'tool_execution_start') {
           toolArgs.set(record.toolCallId, record.args);
-          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, record.args));
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, record.args), { meta: { tool: record.toolName, target: piToolSummary(record.args).slice(0, 300), state: 'running' } });
         } else if (record.type === 'tool_execution_update') {
           const partial = piMessageText(record.partialResult?.content);
-          if (partial) update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), partial));
+          if (partial) update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), partial), { meta: { tool: record.toolName, target: piToolSummary(toolArgs.get(record.toolCallId)).slice(0, 300), state: 'running', result: partial.slice(-3000) } });
         } else if (record.type === 'tool_execution_end') {
           const text = piMessageText(record.result?.content) || (typeof record.result === 'string' ? record.result : '');
-          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), text ? `${record.isError ? '失败：' : ''}${text}` : '工具已返回结果'), { final: true });
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), text ? `${record.isError ? '失败：' : ''}${text}` : '工具已返回结果'), { final: true, meta: { tool: record.toolName, target: piToolSummary(toolArgs.get(record.toolCallId)).slice(0, 300), state: record.isError ? 'error' : 'done', result: String(text || '').slice(-3000) } });
         } else if (record.type === 'extension_ui_request') {
           if (record.method === 'confirm' || record.method === 'select') {
             let detail = {};
             try { detail = JSON.parse(record.message || '{}'); } catch {}
-            hooks.onPending?.('add', { id: record.id, tool: detail.tool || record.title || '工具', input: piToolSummary(detail.input) || String(record.message || ''), at: new Date().toISOString() });
+            hooks.onPending?.('add', { id: record.id, tool: detail.tool || record.title || '工具', input: piToolSummary(detail.input) || String(record.message || ''), preview: approvalPreview(detail.tool, detail.input), raw: detail.input, at: new Date().toISOString() });
           } else if (['input', 'editor'].includes(record.method)) send({ type: 'extension_ui_response', id: record.id, cancelled: true });
         } else if (record.type === 'agent_settled') { aborted = record.aborted === true; settle(); }
       };
@@ -360,7 +385,8 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
         const lines = buffer.split('\n'); buffer = lines.pop() || '';
         for (const line of lines) { try { handle(JSON.parse(line.replace(/\r$/, ''))); } catch { if (line.trim()) hooks.onEvent?.('terminal', line); } }
       });
-      child.stderr.on('data', (chunk) => { const text = chunk.toString(); if (text.replace(/[\x00-\x1f\x7f]/g, '').trim()) hooks.onEvent?.('stderr', text); stderr = (stderr + text).slice(-2000); });
+      child.stderr.on('data', (chunk) => { const text = chunk.toString(); // Pi announces every fresh per-run session id this way; it is not a problem.
+        if (text.replace(/[\x00-\x1f\x7f]/g, '').trim() && !/No project session found with id/.test(text)) hooks.onEvent?.('stderr', text); stderr = (stderr + text).slice(-2000); });
       child.on('error', (error) => { clearTimeout(timer); reject(new Error(`Pi 无法启动：${error.message}`)); });
       child.on('close', (code) => {
         closed = true; clearTimeout(timer);
@@ -385,11 +411,11 @@ function piToken(value) {
 
 // Ask a short-lived `pi --mode rpc` process a few questions and stop it. It never calls
 // set_model, so the user's own Pi defaults are left alone.
-async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 30_000) {
+async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 30_000, cwd = '') {
   const command = await resolveAgentCommand(configuredCommand, 'pi');
   if (!command) throw new Error('找不到 Pi');
   return new Promise((resolve, reject) => {
-    const child = spawn(command, ['--mode', 'rpc', '--no-session', ...selectArgs], { cwd: os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+    const child = spawn(command, ['--mode', 'rpc', '--no-session', ...selectArgs], { cwd: cwd || os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
     const answers = new Map();
     let buffer = '', stderr = '', done = false;
     const finish = (error) => { if (done) return; done = true; clearTimeout(timer); try { child.kill('SIGTERM'); } catch {} error ? reject(error) : resolve(answers); };
@@ -437,6 +463,42 @@ async function piThinkingLevels(configuredCommand, provider, modelId) {
 }
 
 // Names, descriptions and on/off only; MCP entries also hold commands and env values, which are never read out.
+// AGENTS.md / CLAUDE.md files an agent started in this folder picks up: the folder itself, its parents, and Pi's global one.
+async function projectInstructions(folder) {
+  const found = [];
+  const home = os.homedir();
+  const candidates = [];
+  let current = path.resolve(folder);
+  for (let depth = 0; depth < 6; depth += 1) {
+    for (const name of ['AGENTS.md', 'CLAUDE.md']) candidates.push({ file: path.join(current, name), scope: depth === 0 ? 'folder' : 'parent' });
+    const parent = path.dirname(current);
+    if (parent === current || current === home) break;
+    current = parent;
+  }
+  candidates.push({ file: path.join(process.env.PI_CODING_AGENT_DIR || path.join(home, '.pi', 'agent'), 'AGENTS.md'), scope: 'global' });
+  for (const { file, scope } of candidates) {
+    try {
+      const info = await stat(file);
+      if (!info.isFile() || info.size > 400_000) continue;
+      found.push({ path: file, name: path.basename(file), scope, bytes: info.size, head: (await readFile(file, 'utf8')).slice(0, 1500) });
+    } catch { /* not there */ }
+  }
+  return found;
+}
+
+const piCommandCache = new Map();
+// Slash commands Pi would offer in that folder: skills (/skill:name), prompt templates and extension commands.
+async function piCommands(command, cwd) {
+  const key = `${command}|${cwd}`, hit = piCommandCache.get(key);
+  if (hit && Date.now() - hit.at < 60_000) return hit.commands;
+  const answers = await piRpcQuery(command, [], [{ id: 'cmds', type: 'get_commands' }], 30_000, cwd);
+  const reply = answers.get('cmds');
+  if (!reply?.success) throw new Error(reply?.error || 'Pi 没有返回命令列表');
+  const commands = (reply.data?.commands || []).map((item) => ({ name: String(item.name), description: String(item.description || '').slice(0, 200), source: item.source })).sort((a, b) => a.name.localeCompare(b.name));
+  piCommandCache.set(key, { at: Date.now(), commands });
+  return commands;
+}
+
 async function piResources() {
   const root = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
   const skills = [];
@@ -727,8 +789,37 @@ async function collectJobArtifacts(workspace, after = {}, output = '', startedAt
   return artifacts.slice(0, 24);
 }
 
+// Per-run workspace snapshots live in the temp dir: jobs only exist in memory, so they never outlive the server.
+const SNAPSHOT_ROOT = path.join(os.tmpdir(), 'wendaflow-snapshots');
+void rm(SNAPSHOT_ROOT, { recursive: true, force: true }).catch(() => {});
+const MAX_KEPT_SNAPSHOTS = 12;
+async function startJobSnapshot(job, workspace) {
+  try {
+    const snapshot = await takeSnapshot(workspace, path.join(SNAPSHOT_ROOT, job.id));
+    if (snapshot.ok) { job.snapshot = snapshot; return true; }
+    job.changes = { available: false, reason: snapshot.reason, files: [] };
+  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; }
+  return false;
+}
+async function releaseJobFiles(job) {
+  if (job.snapshot) { await removeSnapshot(job.snapshot.dir); job.snapshot = null; }
+  if (job.isolated?.copy) await removeSnapshot(path.dirname(job.isolated.copy));
+}
+async function finalizeJobChanges(job) {
+  if (!job.snapshot || job.changes) return;
+  try {
+    const { files, truncated } = await diffSnapshot(job.snapshot);
+    job.changes = { available: true, files, truncated, rolledBack: [] };
+    if (!files.length) await releaseJobFiles(job);
+    const kept = [...agentJobs.values()].filter((item) => item.snapshot);
+    for (const old of kept.slice(0, Math.max(0, kept.length - MAX_KEPT_SNAPSHOTS))) { await releaseJobFiles(old); if (old.changes) old.changes.available = false; if (old.changes) old.changes.reason = 'expired'; }
+  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; }
+}
+
+function addJobNote(job, text) { job.events.push({ id: job.events.length + 1, type: 'status', text, at: new Date().toISOString() }); }
+
 function publicJob(job) {
-  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
+  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', changes: job.changes || null, usage: job.usage || null, isolated: !!job.isolated, output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
 const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
@@ -832,6 +923,42 @@ const server = http.createServer(async (req, res) => {
     try { const { command = '' } = await readJson(req); reply(res, 200, await piModels(command)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'POST' && req.url === '/agents/allow-rules') {
+    reply(res, 200, { rules: Object.fromEntries([...allowRules].map(([folder, rules]) => [folder, rules.map((rule, index) => ({ index, ...rule }))])) });
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/allow-rules/remove') {
+    try {
+      const { workspace, index } = await readJson(req);
+      const rules = allowRules.get(String(workspace)) || [];
+      if (!Number.isInteger(index) || index < 0 || index >= rules.length) throw new Error('找不到这条规则');
+      const next = rules.filter((_, at) => at !== index);
+      if (next.length) allowRules.set(String(workspace), next); else allowRules.delete(String(workspace));
+      await saveAgentConfig();
+      reply(res, 200, { rules: Object.fromEntries([...allowRules].map(([folder, list]) => [folder, list.map((rule, at) => ({ index: at, ...rule }))])) });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/project-instructions') {
+    try { const { cwd = '' } = await readJson(req); const folder = String(cwd || defaultWorkspace); await validateDirectory(folder); reply(res, 200, { files: await projectInstructions(folder) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/commands') {
+    try { const { command = '', cwd = '' } = await readJson(req); const folder = String(cwd || defaultWorkspace); await validateDirectory(folder); reply(res, 200, { commands: await piCommands(command, folder) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/files') {
+    try { const { cwd = '', query = '' } = await readJson(req); const folder = String(cwd || defaultWorkspace); await validateDirectory(folder); reply(res, 200, { files: await listWorkspaceFiles(folder, String(query), 30) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/sessions') {
+    try { const { cwd = '', query = '' } = await readJson(req); reply(res, 200, { sessions: await listPiSessions({ cwd: String(cwd), query: String(query), limit: 60 }) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/session') {
+    try { const { id } = await readJson(req); reply(res, 200, await readPiSession(String(id))); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agents/pi/resources') {
     try { reply(res, 200, await piResources()); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -845,7 +972,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       if (typeof body.defaultWorkspace === 'string') {
         defaultWorkspace = body.defaultWorkspace.trim() ? await validateDirectory(body.defaultWorkspace) : '';
-        await writeFile(AGENT_CONFIG_FILE, `${JSON.stringify({ defaultWorkspace }, null, 2)}\n`, 'utf8');
+        await saveAgentConfig();
       }
       reply(res, 200, { defaultWorkspace, programDir: process.cwd() });
     } catch (error) { reply(res, 400, { error: error.message }); }
@@ -875,42 +1002,114 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agent/start') {
     try {
-      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {} } = await readJson(req, 90_000_000);
-      const workspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
+      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {}, isolate = false } = await readJson(req, 90_000_000);
+      const realWorkspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('任务内容不能为空');
       const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const job = { id, runner, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
+      const job = { id, runner, realWorkspace, isolated: isolate === true ? { workspace: realWorkspace, copy: path.join(SNAPSHOT_ROOT, `iso-${id}`, 'ws') } : null, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
       agentJobs.set(id, job);
       reply(res, 202, publicJob(job));
       void (async () => {
         const addEvent = (type, text) => { const clean = String(text); job.events.push({ id: job.events.length + 1, type, text: clean.slice(-12000), at: new Date().toISOString() }); job.terminal = `${job.terminal || ''}${clean}`.slice(-180000); };
         // A streamed entry (text, thinking, one tool call) grows in place instead of adding a row per chunk.
         const eventByKey = new Map();
-        const updateEvent = (key, type, text, { final = false } = {}) => {
+        const updateEvent = (key, type, text, { final = false, meta = null } = {}) => {
           const clean = String(text).slice(-12000);
           const existing = eventByKey.get(key);
-          if (existing) { existing.text = clean; existing.at = new Date().toISOString(); }
-          else { const event = { id: job.events.length + 1, type, text: clean, at: new Date().toISOString() }; job.events.push(event); eventByKey.set(key, event); }
+          if (existing) { existing.text = clean; existing.at = new Date().toISOString(); if (meta) existing.meta = meta; }
+          else { const event = { id: job.events.length + 1, type, text: clean, at: new Date().toISOString(), ...(meta ? { meta } : {}) }; job.events.push(event); eventByKey.set(key, event); }
           if (final) job.terminal = `${job.terminal || ''}${clean}\n`.slice(-180000);
         };
         const onPending = (action, entry, approved) => {
-          if (action === 'add') { job.pending = [...(job.pending || []), entry]; addEvent('status', `等待你批准：${entry.tool}`); }
+          if (action === 'add') {
+            const { raw, ...shown } = entry;
+            const suggestion = suggestRule(entry.tool, raw, workspace);
+            job.pending = [...(job.pending || []), { ...shown, ...(suggestion ? { suggestion: { label: suggestion.label, kind: suggestion.kind } } : {}) }];
+            (job.pendingRaw ||= new Map()).set(entry.id, suggestion);
+            addEvent('status', `等待你批准：${entry.tool}`);
+            if (matchesRule(allowRules.get(realWorkspace), entry.tool, raw, workspace)) { addEvent('status', '符合你保存的“以后都允许”规则，已自动批准'); job.control?.respond?.(entry.id, true); }
+          }
           else { job.pending = (job.pending || []).filter((item) => item.id !== entry.id); addEvent('status', approved ? '已批准' : '已拒绝'); }
         };
+        // An isolated run works on a copy; the real folder is only touched when its result is applied.
+        const workspace = job.isolated ? job.isolated.copy : realWorkspace;
+        if (job.isolated) options.saveSession = false; // a throw-away copy has nothing worth resuming
         try {
+          if (job.isolated) {
+            const copied = await copyWorkspace(realWorkspace, workspace);
+            if (!copied.ok) throw new Error('工作目录太大，无法在隔离副本中运行；请缩小目录，或关闭“并排对比”。');
+            addEvent('status', '已复制工作目录，本次在隔离副本中运行，不会改动原目录，直到你选择采用结果');
+          }
           job.before = await gitWorkspaceState(workspace);
           addEvent('status', '已记录执行前的工作区状态');
-          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onPending, onControl: (control) => { job.control = control; } };
+          if (await startJobSnapshot(job, workspace)) addEvent('status', '已为本次运行建立文件快照，可随时查看改动或撤销');
+          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onUsage: (usage) => { job.usage = usage; }, onPending, onControl: (control) => { job.control = control; } };
           addEvent('config', `执行配置：${JSON.stringify(options)}`);
           const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
-          const result = runner === 'codex' ? await runCodex(prompt.trim(), safeImages, safeFiles, workspace, hooks, options) : await runCliAgent(runner, prompt.trim(), safeImages, safeFiles, workspace, hooks, options);
-          if (job.status === 'stopped') return;
+          const taskPrompt = await expandMentions(prompt.trim(), workspace);
+          if (taskPrompt !== prompt.trim()) addEvent('status', '已附上任务里 @ 引用的文件内容');
+          const result = runner === 'codex' ? await runCodex(taskPrompt, safeImages, safeFiles, workspace, hooks, options) : await runCliAgent(runner, taskPrompt, safeImages, safeFiles, workspace, hooks, options);
+          if (job.status === 'stopped') { await finalizeJobChanges(job); return; }
+          await finalizeJobChanges(job);
           job.output = result.output; job.terminal = result.terminal; job.sessionId = result.sessionId || ''; job.after = await gitWorkspaceState(workspace); job.artifacts = await collectJobArtifacts(workspace, job.after, result.output, job.startedAt); job.status = 'done'; job.completedAt = new Date().toISOString(); addEvent('result', result.output); addEvent('status', '执行完成');
         } catch (error) {
-          if (job.status === 'stopped') return;
+          if (job.status === 'stopped') { await finalizeJobChanges(job); return; }
+          await finalizeJobChanges(job);
           job.status = 'failed'; job.error = error.message; job.completedAt = new Date().toISOString(); addEvent('error', error.message);
         } finally { job.child = null; job.control = null; job.pending = []; }
       })();
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agent/changes/diff') {
+    try {
+      const { job: jobId, path: rel } = await readJson(req);
+      const job = agentJobs.get(jobId);
+      if (!job?.snapshot || !job.changes?.files?.some((item) => item.path === rel)) throw new Error('找不到这次改动的快照（可能已过期）');
+      reply(res, 200, await fileDiff(job.snapshot, rel));
+    } catch (error) { reply(res, 404, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agent/changes/rollback') {
+    try {
+      const { job: jobId, paths, force = false } = await readJson(req);
+      const job = agentJobs.get(jobId);
+      if (!job?.snapshot || !job.changes?.available) throw new Error('找不到这次改动的快照（可能已过期）');
+      if (job.status === 'running') throw new Error('任务还在运行，请先停止再撤销');
+      if (job.isolated) throw new Error('这次是在隔离副本里运行的，原目录没有被改动，无需撤销');
+      const only = Array.isArray(paths) && paths.length ? paths.map(String) : null;
+      const result = await rollbackFiles(job.snapshot, job.changes.files, only, { force: force === true });
+      const { files, truncated } = await diffSnapshot(job.snapshot);
+      job.changes = { ...job.changes, files, truncated, rolledBack: [...(job.changes.rolledBack || []), ...result.restored] };
+      addJobNote(job, `已撤销 ${result.restored.length} 个文件的改动${result.skipped.length ? `，${result.skipped.length} 个因之后又被修改而跳过` : ''}`);
+      reply(res, 200, { ...result, job: publicJob(job) });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agent/changes/apply') {
+    try {
+      const { job: jobId, paths, force = false } = await readJson(req);
+      const job = agentJobs.get(jobId);
+      if (!job?.isolated || !job.snapshot || !job.changes?.available) throw new Error('找不到这次隔离运行的结果（可能已过期）');
+      if (job.status === 'running') throw new Error('任务还在运行');
+      const only = Array.isArray(paths) && paths.length ? paths.map(String) : null;
+      const result = await applyChanges(job.snapshot, job.isolated.workspace, job.changes.files, only, { force: force === true });
+      job.changes = { ...job.changes, applied: [...new Set([...(job.changes.applied || []), ...result.applied])] };
+      addJobNote(job, `已把 ${result.applied.length} 个文件的改动应用到工作目录${result.skipped.length ? `，${result.skipped.length} 个因工作目录里又被修改而跳过` : ''}`);
+      reply(res, 200, { ...result, job: publicJob(job) });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agent/changes/discard') {
+    try {
+      const { job: jobId } = await readJson(req);
+      const job = agentJobs.get(jobId);
+      if (!job?.isolated) throw new Error('找不到这次隔离运行');
+      if (job.status === 'running') throw new Error('任务还在运行，请先停止');
+      await releaseJobFiles(job);
+      job.changes = { ...(job.changes || {}), available: false, reason: 'discarded', files: [] };
+      addJobNote(job, '已丢弃这次隔离运行的结果');
+      reply(res, 200, { job: publicJob(job) });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
@@ -961,9 +1160,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agent/respond') {
     try {
-      const { id, requestId, approved } = await readJson(req);
+      const { id, requestId, approved, always = false } = await readJson(req);
       const job = agentJobs.get(id);
       if (!job?.control?.respond || !(job.pending || []).some((item) => item.id === requestId)) throw new Error('没有等待你回答的请求');
+      const suggestion = job.pendingRaw?.get(requestId);
+      if (always === true && approved === true && suggestion) {
+        const rules = allowRules.get(job.realWorkspace) || [];
+        if (!rules.some((rule) => sameRule(rule, suggestion.rule))) { allowRules.set(job.realWorkspace, [...rules, suggestion.rule]); await saveAgentConfig(); addJobNote(job, '已记住这条“以后都允许”规则（可在 设置 → 执行器 里删除）'); }
+      }
       job.control.respond(requestId, approved === true);
       reply(res, 200, publicJob(job));
     } catch (error) { reply(res, 400, { error: error.message }); }

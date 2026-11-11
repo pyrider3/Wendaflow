@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { LOCAL_PROXY_URL } from "../localProxy.js";
 import { AGENT_IDS, AGENT_LABELS } from "../agents/catalog.mjs";
 import { Button, Empty, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
 import { PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue } from "./PiOptions.jsx";
 
-export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, workspaceConfig, onSaveWorkspace, onPickWorkspace, tr }) {
+export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, systemNotifications, onSystemNotificationsChange, workspaceConfig, onSaveWorkspace, onPickWorkspace, tr }) {
   const hints = {
     pi: tr("可自己配置命令、模型和参数的编程智能体。", "A coding agent whose command, model and arguments you configure yourself."),
     codex: tr("OpenAI 的 Codex 命令行。", "OpenAI's Codex command line."),
@@ -18,6 +19,18 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
     setFolderError(failure || "");
     if (!failure) setFolderDraft("");
   };
+
+  const [allowRules, setAllowRules] = useState({});
+  useEffect(() => {
+    fetch(`${LOCAL_PROXY_URL}/agents/allow-rules`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((response) => response.json()).then((result) => setAllowRules(result.rules || {})).catch(() => {});
+  }, []);
+  const removeRule = async (workspace, index) => {
+    const response = await fetch(`${LOCAL_PROXY_URL}/agents/allow-rules/remove`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspace, index }) });
+    const result = await response.json().catch(() => ({}));
+    if (response.ok) setAllowRules(result.rules || {});
+  };
+  const ruleLabel = (rule) => (rule.tool === "files" ? tr("修改此目录内的文件", "Edit files inside this folder") : rule.exact !== undefined ? tr("命令（完全一致）：{0}", "Command (exact): {0}").replace("{0}", rule.exact) : tr("以 {0} 开头的命令", "Commands starting with {0}").replace("{0}", rule.prefix));
+  const ruleEntries = Object.entries(allowRules).flatMap(([folder, rules]) => rules.map((rule) => ({ folder, rule })));
 
   const status = (id) => {
     const found = detection?.[id];
@@ -146,6 +159,20 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           <Input value={folderDraft} onChange={(e) => { setFolderDraft(e.target.value); setFolderError(""); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyFolder(folderDraft); } }} placeholder={tr("或直接输入文件夹路径，按回车确认", "Or type a folder path and press Enter")} aria-label={tr("工作目录路径", "Working directory path")} spellCheck={false} />
           {folderError && <span className="sx-hint" role="alert">{folderError}</span>}
         </div>
+      </Group>
+      <Group title={tr("通知", "Notifications")} hint={tr("页面在后台时，任务需要你批准或完成后弹出系统通知，点一下回到对应卡片。", "While the page is in the background, get a system notification when a task needs approval or finishes; click it to jump to the card.")}>
+        <Row title={tr("系统通知", "System notifications")} hint={typeof Notification !== "undefined" && Notification.permission === "denied" ? tr("浏览器已拒绝通知，请在站点设置里允许。", "The browser blocked notifications; allow them in the site settings.") : undefined}>
+          <Switch checked={!!systemNotifications} onChange={onSystemNotificationsChange} label={tr("系统通知", "System notifications")} onLabel={tr("已开启", "On")} offLabel={tr("已关闭", "Off")} />
+        </Row>
+      </Group>
+      <Group title={tr("已记住的“以后都允许”", "Remembered “always allow” rules")} hint={tr("在审批卡上点“以后都允许”会出现在这里；只对那个目录生效，带管道、分号或重定向的命令不会被自动批准。", "Created from the approval card; they apply to that folder only, and commands with pipes, semicolons or redirects are never auto-approved.")}>
+        {ruleEntries.length === 0 && <div className="sx-row"><div className="sx-row-text"><span>{tr("还没有。", "None yet.")}</span></div></div>}
+        {ruleEntries.map(({ folder, rule }) => (
+          <div className="sx-row" key={`${folder}:${rule.index}`}>
+            <div className="sx-row-text"><strong>{ruleLabel(rule)}</strong><span>{folder}</span></div>
+            <div className="sx-row-control"><Button onClick={() => removeRule(folder, rule.index)}>{tr("删除", "Remove")}</Button></div>
+          </div>
+        ))}
       </Group>
       {!enabled.length && (
         <Group>

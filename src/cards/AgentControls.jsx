@@ -1,4 +1,20 @@
 import React, { useState } from "react";
+import { DiffText } from "./ChangesPanel.jsx";
+
+export const allowLabel = (suggestion, tr) => suggestion.kind === "files" ? tr("此目录内的文件修改", "edits to files inside this folder") : suggestion.kind === "exact" ? tr("这条完全相同的命令：{0}", "this exact command: {0}").replace("{0}", suggestion.label) : tr("以 {0} 开头的命令", "commands starting with {0}").replace("{0}", suggestion.label);
+
+// The actual command or file change behind an approval request.
+function ApprovalPreview({ item, tr }) {
+  const preview = item.preview;
+  if (!preview) return item.input ? <pre>{item.input}</pre> : null;
+  if (preview.kind === "command") return <pre className="approval-command">$ {preview.command}</pre>;
+  if (preview.kind === "write") return <div className="approval-file"><small>{tr("写入 {0}（{1} 字节）", "Write {0} ({1} bytes)").replace("{0}", preview.path).replace("{1}", preview.bytes)}</small><pre>{preview.content}</pre></div>;
+  if (preview.kind === "edit") {
+    const diff = preview.edits.map((edit) => `@@\n${edit.from.split("\n").map((line) => `-${line}`).join("\n")}\n${edit.to.split("\n").map((line) => `+${line}`).join("\n")}`).join("\n");
+    return <div className="approval-file"><small>{tr("修改 {0}", "Edit {0}").replace("{0}", preview.path || "")}</small><DiffText text={diff} tr={tr} /></div>;
+  }
+  return <pre>{preview.text}</pre>;
+}
 
 // What a running Pi card needs beside its activity log: approvals to answer, the latest
 // thing it said, and a box to steer it while it works.
@@ -23,9 +39,11 @@ export function AgentControls({ node, tr, respondAgentApproval, steerAgent }) {
       {pending.map((item) => (
         <div className="approval-request" key={item.id} role="alertdialog" aria-label={tr("Pi 想要运行 {0}", "Pi wants to run {0}").replace("{0}", item.tool)}>
           <strong>{tr("Pi 想要运行 {0}", "Pi wants to run {0}").replace("{0}", item.tool)}</strong>
-          {item.input && <pre>{item.input}</pre>}
+          <ApprovalPreview item={item} tr={tr} />
+          {item.suggestion && <small className="approval-rule">{tr("“以后都允许”的范围：", "“Always allow” covers:")}{" "}{allowLabel(item.suggestion, tr)}</small>}
           <div>
             <button className="approve" onClick={() => respondAgentApproval(node, item.id, true)}>{tr("批准", "Approve")}</button>
+            {item.suggestion && <button className="always" title={allowLabel(item.suggestion, tr)} onClick={() => respondAgentApproval(node, item.id, true, true)}>{tr("以后都允许", "Always allow")}</button>}
             <button className="deny" onClick={() => respondAgentApproval(node, item.id, false)}>{tr("拒绝", "Deny")}</button>
           </div>
         </div>

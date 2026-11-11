@@ -2,6 +2,9 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentControls } from "./AgentControls.jsx";
+import { ChangesPanel } from "./ChangesPanel.jsx";
+import { UsageLine } from "./UsageLine.jsx";
+import { ToolEvent } from "./ToolEvent.jsx";
 
 // Content is separate from the canvas gesture and position shell.
 export function CardContent({
@@ -36,6 +39,9 @@ export function CardContent({
     toggleActivity,
     stopAgentJob,
     respondAgentApproval,
+    applyAgentChanges,
+    openCompare,
+    executePlan,
     steerAgent,
     stopGeneration,
     beginResize,
@@ -124,6 +130,7 @@ export function CardContent({
           />
           <textarea
             aria-label={tr("卡片正文", "Card body")}
+            placeholder={node.type === "thought" ? tr("正文（可选）", "Body (optional)") : undefined}
             value={editDraft.content}
             onChange={(event) =>
               setEditDraft((value) => ({
@@ -273,6 +280,7 @@ export function CardContent({
       {node.type === "action" && node.status === "running" && node.actionRunner === "pi" && (
         <AgentControls node={node} tr={tr} respondAgentApproval={respondAgentApproval} steerAgent={steerAgent} />
       )}
+      {node.type === "action" && <UsageLine usage={node.execution?.usage} tr={tr} />}
       {node.type === "action" && liveEvents.length > 0 && (
         <section
           className={`action-live-feed ${activityCollapsed ? "collapsed" : ""}`}
@@ -302,7 +310,7 @@ export function CardContent({
             </button>
           </header>
           <div>
-            {liveEvents.map((event) => (
+            {liveEvents.map((event) => event.meta?.tool ? <ToolEvent key={event.id} event={event} tr={tr} /> : (
               <article key={event.id} className={event.type}>
                 <i>
                   {event.type === "thinking"
@@ -346,6 +354,19 @@ export function CardContent({
           )}
         </section>
       )}
+      {node.type === "action" && node.compareGroup && (
+        <button className="compare-open" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); openCompare(node.compareGroup); }}>
+          {tr("方案 {0} · 并排对比", "Variant {0} · compare").replace("{0}", node.variant || "")}
+        </button>
+      )}
+      {node.type === "action" && node.actionPlanFirst && !node.planApproved && node.status === "done" && (
+        <section className="plan-ready" onPointerDown={(event) => event.stopPropagation()}>
+          <p>{tr("这是计划，还没有动手。", "This is a plan; nothing has been changed yet.")}</p>
+          <button onClick={(event) => { event.stopPropagation(); executePlan(node); }}>{tr("按计划执行", "Run the plan")}</button>
+          <small>{tr("想改计划？从这张卡片分支，告诉 Pi 怎么改。", "Want changes? Branch from this card and tell the agent what to adjust.")}</small>
+        </section>
+      )}
+      {node.type === "action" && <ChangesPanel node={node} tr={tr} applyAgentChanges={applyAgentChanges} />}
       {node.type === "action" && (
         <section
           className={`action-artifacts ${artifacts.length ? "" : "empty"}`}
