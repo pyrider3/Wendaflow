@@ -8,9 +8,13 @@ export function themePresets(tr, customLabel) {
     ["contrast-light", tr("极昼", "Daylight")],
     ["contrast-black", tr("极夜", "Nightfall")],
     ["starlight", tr("星夜", "Starlight")],
-    ["contrast-blue", tr("钴蓝", "Cobalt")],
-    ["contrast-amber", tr("琥珀", "Amber")],
-    ["contrast-plum", tr("紫曜", "Plum")],
+    ["obsidian", tr("黑曜", "Obsidian")],
+    ["aurora", tr("极光", "Aurora")],
+    ["dusk", tr("暮光", "Dusk")],
+    ["ocean", tr("深海", "Ocean")],
+    ["sakura", tr("樱粉", "Sakura")],
+    ["lavender", tr("薰衣草", "Lavender")],
+    ["dune", tr("沙丘", "Dune")],
     ["custom", customLabel],
   ];
 }

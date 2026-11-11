@@ -19,7 +19,7 @@
 .canvas-entry {display:flex;align-items:center;border-radius:7px;}.canvas-entry:hover {background:#718c7c14;}.canvas-entry.current {background:#4e947b15;}
 .canvas-entry-open {flex:1;min-width:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;padding:9px 8px;}.canvas-entry-open strong {display:flex;gap:8px;flex-wrap:wrap;font-size:12px;overflow-wrap:anywhere;}.canvas-entry-open small {display:block;margin-top:4px;font-size:10px;opacity:.65;}.canvas-entry-open em {font-size:9px;font-style:normal;opacity:.7;font-weight:400;}
 .archive-trash {flex-shrink:0;width:30px;height:30px;border:0;background:transparent;color:inherit;opacity:.55;cursor:pointer;font-size:20px;}.archive-trash:hover {color:#ca4d57;opacity:1;}
-:root:is([data-theme="contrast-black"],[data-theme="midnight"],[data-theme="graphite"],[data-theme="starlight"]) :is(.shortcut-help,.interaction-feedback,.quick-edit-hint) {background:#202523;color:#edf1ef;}
+:root:is([data-theme="contrast-black"],[data-theme="midnight"],[data-theme="graphite"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) :is(.shortcut-help,.interaction-feedback,.quick-edit-hint) {background:#202523;color:#edf1ef;}
 @media (prefers-reduced-motion:reduce) {.quick-edit-hint {animation:none;}}
 
 .storage-warning .warning-retry { width:auto; padding:0 8px; white-space:nowrap; flex-shrink:0; }

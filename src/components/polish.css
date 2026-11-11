@@ -202,6 +202,8 @@
 :root .app-shell .composer .parallel-toggle.active { background: var(--sx-accent-soft); color: var(--sx-accent); border-color: color-mix(in srgb, var(--sx-accent) 40%, transparent); }
 :root .app-shell .composer .segmented { padding: 3px; border: 1px solid var(--sx-line); border-radius: 12px; background: var(--sx-sunken); }
 :root .app-shell .composer .segmented::before { top: 3px; left: 3px; width: calc((100% - 6px) / 3); height: calc(100% - 6px); border-radius: 9px; background: var(--sx-raised); box-shadow: 0 2px 8px color-mix(in srgb, var(--sx-text) 14%, transparent), inset 0 0 0 1px var(--sx-line); transition: transform 0.5s var(--ease-spring); }
+:root .app-shell .composer .segmented[data-seg] { grid-template-columns: repeat(var(--seg-n), 1fr); }
+:root .app-shell .composer .segmented[data-seg]::before { width: calc((100% - 6px) / var(--seg-n)); transform: translateX(calc(var(--seg-i) * 100%)); }
 :root .app-shell .composer .segmented button { height: 28px; min-width: 44px; padding: 0 10px; border-radius: 9px; background: transparent; color: var(--sx-muted); font-size: 12.5px; font-weight: 500; transition: color 0.25s var(--ease-out); }
 :root .app-shell .composer .segmented button.selected { color: var(--sx-accent); font-weight: 700; }
 :root .app-shell .composer .shortcut { color: var(--sx-muted); font-size: 12px; }
@@ -287,3 +289,293 @@
   box-shadow: 0 3px 8px rgba(16, 18, 20, 0.14);
 }
 :root[data-theme^="contrast-"] .app-shell .node.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sx-accent) 35%, transparent), 0 8px 18px rgba(16, 18, 20, 0.18); }
+
+/* Action composer: one family of quiet chips (folder, permission, model) instead of a squeezed text summary. */
+:root .app-shell .composer .runner-picker { flex: 0 0 auto; width: 118px; animation: mode-control-in .17s var(--ease-out) both; }
+:root .app-shell .composer .runner-picker .model-picker { min-width: 0; width: 100%; }
+:root .app-shell .composer .runner-picker .model-picker-menu { min-width: 190px; }
+:root .app-shell .composer .agent-chips { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:root .app-shell .composer .agent-chip { height: 31px; display: inline-flex; align-items: center; gap: 6px; max-width: 170px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-muted); font-size: 12.5px; cursor: pointer; transition: color .2s var(--ease-out), border-color .2s var(--ease-out), background .2s var(--ease-out); }
+:root .app-shell .composer .agent-chip span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+:root .app-shell .composer .agent-chip svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+:root .app-shell .composer .agent-chip i { font-style: normal; font-size: 11px; opacity: .7; }
+:root .app-shell .composer .agent-chip:hover, :root .app-shell .composer .agent-chip.active { color: var(--sx-text); border-color: var(--sx-line-strong); background: color-mix(in srgb, var(--sx-accent) 7%, transparent); }
+:root .app-shell .composer .agent-chip.danger { color: #b4572b; border-color: color-mix(in srgb, #b4572b 45%, transparent); background: color-mix(in srgb, #b4572b 8%, transparent); }
+:root[data-theme="dark"] .app-shell .composer .agent-chip.danger { color: #e8956a; }
+:root .app-shell .composer .attach-button { width: 34px; height: 34px; padding: 0; display: inline-grid; place-items: center; font-size: 0; }
+:root .app-shell .composer .attach-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+:root .app-shell .composer .send-button:disabled { background: color-mix(in srgb, var(--sx-muted) 22%, transparent); color: var(--sx-muted); box-shadow: none; filter: none; transform: none; cursor: default; }
+:root .app-shell .composer textarea { resize: none; }
+@media (max-width: 700px) {
+  :root .app-shell .composer .agent-chip { max-width: 46vw; height: 36px; }
+  :root .app-shell .composer .agent-chips { flex-wrap: wrap; }
+  :root .app-shell .composer .attach-button { width: 40px; height: 40px; }
+}
+:root .app-shell .composer .runner-picker .model-picker > button { font-size: 12.5px; color: var(--sx-text); }
+:root .app-shell .composer .popover-choices { display: grid; gap: 4px; margin-top: 8px; }
+:root .app-shell .composer .popover-choices button { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 0 12px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--sx-text); font-size: 13px; text-align: left; cursor: pointer; transition: background .15s var(--ease-out), border-color .15s var(--ease-out); }
+:root .app-shell .composer .popover-choices button:hover { background: color-mix(in srgb, var(--sx-accent) 7%, transparent); }
+:root .app-shell .composer .popover-choices button i { font-style: normal; opacity: 0; color: var(--sx-accent); }
+:root .app-shell .composer .popover-choices button.selected { border-color: color-mix(in srgb, var(--sx-accent) 40%, transparent); background: color-mix(in srgb, var(--sx-accent) 9%, transparent); }
+:root .app-shell .composer .popover-choices button.selected i { opacity: 1; }
+:root .app-shell .composer .popover-choices button.risky { color: #b4572b; }
+:root .app-shell .composer .popover-choices button.risky.selected { border-color: color-mix(in srgb, #b4572b 45%, transparent); background: color-mix(in srgb, #b4572b 9%, transparent); }
+:root .app-shell .composer .popover-choices button.risky i { color: #b4572b; }
+/* Model panel: effort rail + directly pickable model list. */
+:root .app-shell .composer .effort { margin-top: 8px; padding: 10px 12px 8px; border-radius: 14px; background: color-mix(in srgb, var(--sx-text) 5%, transparent); }
+:root .app-shell .composer .effort-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+:root .app-shell .composer .effort-head small { font-size: 11px; color: var(--sx-muted); }
+:root .app-shell .composer .effort-head strong { font-size: 14px; color: var(--sx-accent); }
+:root .app-shell .composer .effort-track { position: relative; display: flex; height: 30px; margin-top: 6px; }
+:root .app-shell .composer .effort-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 8px; margin-top: -4px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 10%, transparent); }
+:root .app-shell .composer .effort-track::after { content: ""; position: absolute; left: 0; top: 50%; height: 8px; margin-top: -4px; width: var(--fill); border-radius: 999px; background: color-mix(in srgb, var(--sx-accent) 55%, transparent); transition: width .28s var(--ease-spring); }
+:root .app-shell .composer .effort-track button { position: relative; z-index: 1; flex: 1; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
+:root .app-shell .composer .effort-track button i { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--sx-text) 35%, transparent); transition: transform .25s var(--ease-spring), background .2s var(--ease-out), box-shadow .2s var(--ease-out); }
+:root .app-shell .composer .effort-track button.passed i { background: var(--sx-accent-ink, #fff); opacity: .8; }
+:root .app-shell .composer .effort-track button.selected i { width: 24px; height: 24px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.28), 0 0 0 1px color-mix(in srgb, var(--sx-accent) 40%, transparent); }
+:root .app-shell .composer .effort-ends { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: var(--sx-muted); }
+:root .app-shell .composer .model-list { margin-top: 8px; }
+:root .app-shell .composer .model-list > input { width: 100%; box-sizing: border-box; height: 32px; margin-bottom: 6px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13px; }
+:root .app-shell .composer .model-list-scroll { max-height: 210px; overflow-y: auto; display: grid; gap: 2px; }
+:root .app-shell .composer .model-list-scroll small { display: block; padding: 8px 10px 3px; font-size: 11px; color: var(--sx-muted); }
+:root .app-shell .composer .model-list-scroll button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13px; text-align: left; cursor: pointer; }
+:root .app-shell .composer .model-list-scroll button em { margin-left: 8px; font-style: normal; font-size: 11.5px; color: var(--sx-muted); }
+:root .app-shell .composer .model-list-scroll button:hover { background: color-mix(in srgb, var(--sx-accent) 7%, transparent); }
+:root .app-shell .composer .model-list-scroll button i { font-style: normal; opacity: 0; color: var(--sx-accent); }
+:root .app-shell .composer .model-list-scroll button.selected { background: color-mix(in srgb, var(--sx-accent) 10%, transparent); }
+:root .app-shell .composer .model-list-scroll button.selected i { opacity: 1; }
+:root .app-shell .composer .agent-config-popover .option-note { margin: 4px 0 0; font-size: 11.5px; color: var(--sx-muted); line-height: 1.5; }
+
+/* ===== Action composer popovers (v2): solid surface, anchored under the chip that opened it, no chrome. ===== */
+:root .app-shell .composer .chip-pop { position: absolute; z-index: 60; bottom: calc(100% + 10px); width: min(var(--w, 320px), 100%); box-sizing: border-box; padding: 8px; border: 1px solid var(--sx-line); border-radius: 18px; background: var(--sx-raised); color: var(--sx-text); box-shadow: 0 18px 48px rgba(16, 30, 24, 0.22), 0 2px 8px rgba(16, 30, 24, 0.08); transform: none; backdrop-filter: none; transform-origin: bottom left; animation: chip-pop-in .18s var(--ease-out) both; }
+:root .app-shell .composer .chip-pop.pop-dir { --w: 340px; }
+:root .app-shell .composer .chip-pop.pop-perm { --w: 280px; }
+:root .app-shell .composer .chip-pop.pop-model { --w: 320px; }
+@keyframes chip-pop-in { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
+:root .app-shell .composer .chip-pop .option-note { margin: 4px 8px; }
+
+/* permission list */
+:root .app-shell .composer .chip-pop .popover-choices { margin: 0; gap: 2px; }
+:root .app-shell .composer .chip-pop .popover-choices button { min-height: 0; padding: 9px 10px; align-items: flex-start; border-radius: 12px; }
+:root .app-shell .composer .chip-pop .popover-choices button span { display: grid; gap: 2px; }
+:root .app-shell .composer .chip-pop .popover-choices button b { font-weight: 600; font-size: 14px; }
+:root .app-shell .composer .chip-pop .popover-choices button em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--sx-muted); font-weight: 400; }
+:root .app-shell .composer .chip-pop .popover-choices button.selected { border-color: transparent; background: var(--sx-accent-soft); }
+:root .app-shell .composer .chip-pop .popover-choices button.risky b { color: #b4572b; }
+:root .app-shell .composer .chip-pop .popover-choices button.risky.selected { background: color-mix(in srgb, #b4572b 10%, var(--sx-raised)); }
+:root .app-shell .composer .chip-pop .popover-choices button i { margin-top: 2px; }
+
+/* folder */
+:root .app-shell .composer .chip-pop .pop-dir-current { display: grid; gap: 4px; padding: 8px 10px 4px; }
+:root .app-shell .composer .chip-pop .pop-dir-current small { font-size: 12px; color: var(--sx-muted); }
+:root .app-shell .composer .chip-pop .pop-dir-current code { font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--sx-text); word-break: break-all; }
+:root .app-shell .composer .chip-pop .pop-dir-actions { display: flex; gap: 6px; padding: 6px 10px; }
+:root .app-shell .composer .chip-pop .pop-dir-actions button { height: 34px; padding: 0 14px; border: 1px solid var(--sx-line-strong); border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13px; cursor: pointer; }
+:root .app-shell .composer .chip-pop .pop-dir-actions button.primary { border-color: transparent; background: var(--sx-accent); color: var(--sx-accent-ink); }
+:root .app-shell .composer .chip-pop .workspace-path { padding: 2px 10px 8px; }
+:root .app-shell .composer .chip-pop .workspace-path input { width: 100%; box-sizing: border-box; height: 36px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 10px; background: var(--sx-sunken); color: var(--sx-text); font-size: 13px; }
+:root .app-shell .composer .chip-pop .workspace-path p { margin: 6px 2px 0; font-size: 12px; color: var(--sx-danger); }
+
+/* model list + effort */
+:root .app-shell .composer .chip-pop .model-list { margin: 0; }
+:root .app-shell .composer .chip-pop .model-list > input { height: 36px; margin: 0 2px 6px; width: calc(100% - 4px); background: var(--sx-sunken); border-color: transparent; font-size: 13.5px; }
+:root .app-shell .composer .chip-pop .model-list-scroll { max-height: 232px; }
+:root .app-shell .composer .chip-pop .model-list-scroll small { padding: 10px 10px 4px; font-size: 11.5px; letter-spacing: .02em; }
+:root .app-shell .composer .chip-pop .model-list-scroll button { min-height: 38px; font-size: 14px; border-radius: 11px; }
+:root .app-shell .composer .chip-pop .model-list-scroll button.selected { background: var(--sx-accent-soft); }
+:root .app-shell .composer .chip-pop .effort { margin: 6px 0 0; padding: 12px 12px 6px; border-radius: 0; border-top: 1px solid var(--sx-line); background: transparent; }
+:root .app-shell .composer .chip-pop .effort-head small { font-size: 13px; color: var(--sx-text); }
+:root .app-shell .composer .chip-pop .effort-head strong { font-size: 13px; padding: 2px 9px; border-radius: 999px; background: var(--sx-accent-soft); }
+:root .app-shell .composer .chip-pop .effort-track { height: 28px; margin-top: 8px; }
+:root .app-shell .composer .chip-pop .effort-track::before, :root .app-shell .composer .chip-pop .effort-track::after { height: 6px; margin-top: -3px; }
+:root .app-shell .composer .chip-pop .effort-track::before { background: var(--sx-sunken); }
+:root .app-shell .composer .chip-pop .effort-track::after { background: var(--sx-accent); opacity: .5; }
+:root .app-shell .composer .chip-pop .effort-track button.selected i { width: 20px; height: 20px; background: var(--sx-raised); box-shadow: 0 1px 6px rgba(0,0,0,.3), 0 0 0 2px var(--sx-accent); }
+:root .app-shell .composer .chip-pop .effort-ends { margin-top: 0; padding: 0 2px 4px; }
+:root .app-shell .composer .chip-pop .inline-option-grid { margin: 8px 6px 4px; }
+
+/* ===== Composer v3: mode tabs in the header, one quiet toolbar underneath (attach · chips · send). ===== */
+:root .app-shell .composer .composer-context-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+:root .app-shell .composer .composer-context-row .segmented { flex: none; }
+:root .app-shell .composer .composer-context { flex: 1; min-width: 0; margin: 0; text-align: right; font-size: 12px; color: var(--sx-muted); }
+:root .app-shell .composer.branching .composer-context { color: var(--sx-accent); font-weight: 500; }
+:root .app-shell .composer .composer-context-row .composer-close { flex: none; }
+:root .app-shell .composer textarea { min-height: 56px; }
+:root .app-shell .composer .composer-bottom { flex-wrap: nowrap; align-items: flex-end; gap: 8px; margin-top: 4px; }
+:root .app-shell .composer .composer-bottom .attach-button { flex: none; width: 36px; height: 36px; border-radius: 12px; }
+:root .app-shell .composer .composer-bottom .inline-agent-config { flex: 1 1 0; min-width: 0; }
+:root .app-shell .composer .composer-bottom .agent-chips { flex-wrap: wrap; min-height: 36px; }
+:root .app-shell .composer .agent-chip { height: 36px; max-width: 200px; padding: 0 12px; font-size: 13px; }
+:root .app-shell .composer .agent-chip.runner { color: var(--sx-text); font-weight: 600; }
+:root .app-shell .composer .composer-bottom .send-button { flex: none; margin-left: auto; width: 40px; height: 40px; border-radius: 14px; }
+:root .app-shell .composer .composer-bottom .parallel-toggle { flex: none; height: 36px; border-radius: 999px; }
+:root .app-shell .composer .shortcut { display: none; }
+/* popovers for the conversation chips + shared bits */
+:root .app-shell .composer .chip-pop.pop-chat-effort { --w: 300px; }
+:root .app-shell .composer .chip-pop.pop-runner { --w: 230px; }
+:root .app-shell .composer .pop-link { display: block; width: calc(100% - 8px); margin: 4px; padding: 9px 10px; border: 0; border-top: 1px solid var(--sx-line); border-radius: 0 0 11px 11px; background: transparent; color: var(--sx-muted); font-size: 13px; text-align: left; cursor: pointer; }
+:root .app-shell .composer .pop-link:hover { color: var(--sx-text); }
+:root .app-shell .composer .pop-switch { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 14px; cursor: pointer; }
+:root .app-shell .composer .pop-seg { padding: 10px 12px 8px; display: grid; gap: 8px; }
+:root .app-shell .composer .pop-seg small { font-size: 13px; color: var(--sx-text); }
+:root .app-shell .composer .pop-seg > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: var(--sx-sunken); }
+:root .app-shell .composer .pop-seg button { height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--sx-muted); font-size: 13px; cursor: pointer; transition: background .18s var(--ease-out), color .18s var(--ease-out); }
+:root .app-shell .composer .pop-seg button.selected { background: var(--sx-raised); color: var(--sx-accent); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.14); }
+:root .app-shell .composer .chip-pop > .effort:first-child { margin-top: 0; border-top: 0; }
+@media (max-width: 700px) {
+  :root .app-shell .composer .composer-context { display: none; }
+  :root .app-shell .composer .composer-context-row { justify-content: space-between; }
+  :root .app-shell .composer .composer-bottom { flex-wrap: wrap; }
+  :root .app-shell .composer .composer-bottom .inline-agent-config { order: -1; flex: 1 1 100%; }
+  :root .app-shell .composer .composer-bottom .send-button { margin-left: auto; }
+}
+:root .app-shell .composer .chip-pop, :root .app-shell .composer .model-list-scroll { overscroll-behavior: contain; }
+
+/* ===== Agent card: changed files, diffs, approval previews ===== */
+.changes-panel { margin: 8px 0 0; border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 14px; overflow: hidden; font-size: 12.5px; }
+.changes-panel > header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 12px; background: color-mix(in srgb, currentColor 5%, transparent); font-weight: 600; }
+.changes-panel > header > button, .changes-confirm button, .changes-note button, .undo-file { height: 26px; padding: 0 10px; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); border-radius: 8px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.changes-panel > header > button:first-of-type { margin-left: auto; }
+.changes-confirm { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 400; }
+.changes-confirm .danger { border-color: transparent; background: #b4572b; color: #fff; }
+.changes-panel ul { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; }
+.changes-panel li + li { border-top: 1px solid color-mix(in srgb, currentColor 9%, transparent); }
+.changes-panel .file-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font-size: 12.5px; }
+.changes-panel .file-row:hover, .changes-panel li.open .file-row { background: color-mix(in srgb, currentColor 5%, transparent); }
+.changes-panel .file-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.changes-panel .file-row i { flex: none; padding: 1px 7px; border-radius: 999px; font-style: normal; font-size: 11px; background: color-mix(in srgb, currentColor 10%, transparent); }
+.changes-panel .file-row i.added { background: color-mix(in srgb, #2e9e6b 22%, transparent); }
+.changes-panel .file-row i.deleted { background: color-mix(in srgb, #c4503f 22%, transparent); }
+.changes-panel b.add, .diff-text .add { color: #2e8f62; }
+.changes-panel b.del, .diff-text .del { color: #c4503f; }
+.changes-panel b { font-weight: 600; }
+.file-diff { padding: 0 12px 10px; }
+.diff-text { max-height: 260px; overflow: auto; margin: 0; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, currentColor 6%, transparent); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+.diff-text span { display: block; }
+.diff-text .add { background: color-mix(in srgb, #2e9e6b 14%, transparent); }
+.diff-text .del { background: color-mix(in srgb, #c4503f 14%, transparent); }
+.diff-text .hunk { color: color-mix(in srgb, currentColor 50%, transparent); }
+.undo-file { margin-top: 8px; }
+.changes-note { margin: 0; padding: 8px 12px; font-size: 12px; opacity: .75; }
+.approval-request pre { max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+.approval-request .approval-file small { display: block; margin: 4px 0; opacity: .75; }
+.approval-request .approval-command { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ===== Compare: A/B variants ===== */
+:root .app-shell .composer .variant-tabs { flex: none; display: inline-flex; padding: 2px; border-radius: 999px; background: var(--sx-sunken); border: 1px solid var(--sx-line); }
+:root .app-shell .composer .variant-tabs button { width: 30px; height: 30px; border: 0; border-radius: 999px; background: transparent; color: var(--sx-muted); font-weight: 700; font-size: 13px; cursor: pointer; transition: background .18s var(--ease-out), color .18s var(--ease-out); }
+:root .app-shell .composer .variant-tabs button.selected { background: var(--sx-accent); color: var(--sx-accent-ink); }
+:root .app-shell .composer .agent-chip.compare { margin-left: auto; }
+:root .app-shell .composer .agent-chip.compare.active { color: var(--sx-accent); border-color: var(--sx-accent); background: var(--sx-accent-soft); }
+.compare-open { display: block; width: 100%; margin: 8px 0 0; height: 30px; border: 1px dashed color-mix(in srgb, currentColor 30%, transparent); border-radius: 10px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.compare-open:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+.compare-backdrop { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px; background: rgba(12, 20, 16, 0.45); backdrop-filter: blur(4px); animation: chip-pop-in .2s var(--ease-out) both; }
+.compare-sheet { width: min(1100px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; border-radius: 22px; background: var(--sx-raised, #fff); color: var(--sx-text, #1e2a24); box-shadow: 0 30px 80px rgba(0,0,0,.35); overflow: hidden; }
+.compare-sheet > header { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--sx-line, #e1e9e4); }
+.compare-sheet > header strong { font-size: 16px; }
+.compare-sheet > header small { color: var(--sx-muted, #66746c); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-close { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 10px; background: transparent; color: inherit; font-size: 22px; cursor: pointer; }
+.compare-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px; overflow: auto; }
+.compare-columns section { min-width: 0; padding: 12px; border: 1px solid var(--sx-line, #e1e9e4); border-radius: 16px; }
+.compare-columns section > header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.compare-columns section > header b { font-size: 15px; color: var(--sx-accent, #1b7556); }
+.compare-columns section > header span { font-size: 13px; }
+.compare-columns section > header small { margin-left: auto; color: var(--sx-muted, #66746c); }
+.compare-output { margin: 0 0 8px; font-size: 12.5px; line-height: 1.55; color: var(--sx-muted, #66746c); white-space: pre-wrap; }
+.compare-columns .adopt { width: 100%; height: 38px; margin-top: 10px; border: 0; border-radius: 12px; background: var(--sx-accent, #1b7556); color: var(--sx-accent-ink, #fff); font-size: 14px; font-weight: 600; cursor: pointer; }
+@media (max-width: 760px) { .compare-columns { grid-template-columns: 1fr; } }
+.pi-import { width: min(640px, 100%); }
+.pi-import-tools { display: flex; align-items: center; gap: 12px; padding: 12px 16px 4px; }
+.pi-import-tools input[type="text"], .pi-import-tools input:not([type]) { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid var(--sx-line, #e1e9e4); border-radius: 10px; background: var(--sx-sunken, #f1f5f2); color: inherit; font-size: 14px; }
+.pi-import-tools label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--sx-muted, #66746c); white-space: nowrap; }
+.pi-import-list { list-style: none; margin: 0; padding: 8px 10px 12px; overflow-y: auto; }
+.pi-import-list button { width: 100%; display: grid; gap: 3px; padding: 10px 12px; border: 0; border-radius: 12px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.pi-import-list button:hover { background: var(--sx-accent-soft, #e2f0e9); }
+.pi-import-list strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-import-list span { font-size: 12.5px; color: var(--sx-muted, #66746c); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pi-import-list small { font-size: 12px; color: var(--sx-muted, #66746c); }
+
+/* @file and /command suggestions above the composer */
+.suggest-menu { position: absolute; z-index: 70; left: 16px; bottom: calc(100% + 8px); width: min(480px, calc(100% - 32px)); max-height: 260px; overflow-y: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--sx-line, #e1e9e4); border-radius: 16px; background: var(--sx-raised, #fff); color: var(--sx-text, #1e2a24); box-shadow: 0 18px 48px rgba(16, 30, 24, 0.22), 0 2px 8px rgba(16, 30, 24, 0.08); animation: chip-pop-in .16s var(--ease-out) both; }
+.suggest-menu li { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.suggest-menu li.active { background: var(--sx-accent-soft, #e2f0e9); }
+.suggest-menu strong { flex: none; font-size: 13.5px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.suggest-menu small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--sx-muted, #66746c); }
+.plan-ready { margin: 8px 0 0; padding: 10px 12px; display: grid; gap: 8px; border: 1px dashed color-mix(in srgb, currentColor 30%, transparent); border-radius: 14px; font-size: 12.5px; }
+.plan-ready p { margin: 0; font-weight: 600; }
+.plan-ready button { height: 32px; border: 0; border-radius: 10px; background: #1b7556; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.plan-ready small { opacity: .7; }
+:root .app-shell .composer .agent-chip.plan.active { color: var(--sx-accent); border-color: var(--sx-accent); background: var(--sx-accent-soft); }
+
+/* Agent card: usage line + structured tool calls */
+.usage-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0 0; font-size: 11.5px; color: color-mix(in srgb, currentColor 62%, transparent); font-variant-numeric: tabular-nums; }
+.usage-line .usage-model { font-weight: 600; color: color-mix(in srgb, currentColor 80%, transparent); }
+.usage-context { display: inline-flex; align-items: center; gap: 6px; }
+.usage-context b { position: relative; width: 44px; height: 5px; border-radius: 999px; background: color-mix(in srgb, currentColor 16%, transparent); overflow: hidden; }
+.usage-context b::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--used); border-radius: inherit; background: #2e9e6b; transition: width .3s var(--ease-out, ease); }
+.usage-context.mid b::after { background: #d29a2b; }
+.usage-context.high b::after { background: #c4503f; }
+.usage-context.high { color: #c4503f; }
+.action-live-feed article.tool > i { font-size: 7.5px; font-weight: 700; letter-spacing: -.02em; }
+.action-live-feed article.tool strong { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; font-weight: 600; }
+.action-live-feed article.tool code { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.action-live-feed article.tool .tool-state { font-style: normal; font-size: 9px; opacity: .7; }
+.action-live-feed article.tool .tool-state.error { color: #c4503f; opacity: 1; }
+.action-live-feed article.tool.error { border-color: color-mix(in srgb, #c4503f 40%, transparent); }
+.action-live-feed article.tool details { margin-top: 3px; }
+.action-live-feed article.tool summary { cursor: pointer; font-size: 9px; opacity: .65; }
+.action-live-feed article.tool pre { max-height: 160px; overflow: auto; margin: 3px 0 0; padding: 5px 6px; border-radius: 6px; background: color-mix(in srgb, currentColor 7%, transparent); font: 9.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+.approval-request .always { background: transparent; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
+.approval-request .approval-rule { display: block; margin: 4px 0 2px; font-size: 11px; opacity: .7; }
+:root .app-shell .composer .pop-dir-more { padding: 0 10px 8px; display: grid; gap: 6px; }
+:root .app-shell .composer .pop-dir-more summary { cursor: pointer; font-size: 13px; color: var(--sx-muted); padding: 4px 0; }
+:root .app-shell .composer .pop-instruction { padding: 6px 0; border-top: 1px solid var(--sx-line); }
+:root .app-shell .composer .pop-instruction b { font-size: 13px; }
+:root .app-shell .composer .pop-instruction small { margin-left: 8px; font-size: 12px; color: var(--sx-muted); }
+:root .app-shell .composer .pop-instruction pre { max-height: 140px; overflow: auto; margin: 6px 0 0; padding: 8px; border-radius: 10px; background: var(--sx-sunken); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+:root .app-shell .composer .pop-hint { font-size: 12px; color: var(--sx-muted); line-height: 1.5; }
+:root .app-shell .composer .pop-dir-more .pop-link { width: 100%; margin: 0; padding: 6px 0; border-top: 0; text-align: left; }
+
+/* ===== Task overview (top bar) ===== */
+.task-overview { position: relative; display: inline-flex; }
+.task-overview-button { position: relative; }
+.task-overview-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.task-overview-button b { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; background: var(--sx-accent, #1b7556); color: var(--sx-accent-ink, #fff); font-size: 10px; line-height: 16px; text-align: center; }
+.task-overview-button.attention b { background: #c4503f; color: #fff; animation: task-pulse 1.4s ease-in-out infinite; }
+@keyframes task-pulse { 50% { transform: scale(1.18); } }
+.task-overview-panel { position: absolute; z-index: 90; top: calc(100% + 10px); right: 0; width: min(380px, calc(100vw - 24px)); max-height: min(520px, 70vh); display: flex; flex-direction: column; border: 1px solid var(--sx-line, #e1e9e4); border-radius: 18px; background: var(--sx-raised, #fff); color: var(--sx-text, #1e2a24); box-shadow: 0 18px 48px rgba(16,30,24,.22), 0 2px 8px rgba(16,30,24,.08); animation: chip-pop-in .18s var(--ease-out, ease) both; overflow: hidden; }
+.task-overview-panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 12px 16px 8px; }
+.task-overview-panel > header strong { font-size: 14px; }
+.task-overview-panel > header small { font-size: 12px; color: var(--sx-muted, #66746c); }
+.task-overview-panel ul { list-style: none; margin: 0; padding: 4px 8px 10px; overflow-y: auto; }
+.task-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 8px; border: 0; border-radius: 12px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.task-row:hover { background: var(--sx-accent-soft, #e2f0e9); }
+.task-row i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #8a9690; }
+.task-overview-panel li.running .task-row i { background: var(--sx-accent, #1b7556); animation: task-pulse 1.2s ease-in-out infinite; }
+.task-overview-panel li.waiting .task-row i { background: #c4503f; }
+.task-overview-panel li.done .task-row i { background: #2e9e6b; }
+.task-overview-panel li.failed .task-row i { background: #c4503f; }
+.task-row span { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.task-row strong { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-row small { font-size: 12px; color: var(--sx-muted, #66746c); }
+.task-row em { flex: none; font-style: normal; font-size: 12px; color: var(--sx-muted, #66746c); }
+.task-overview-panel li.waiting .task-row em { color: #c4503f; font-weight: 600; }
+.task-approval { margin: 0 8px 6px 27px; padding: 8px 10px; border-radius: 12px; background: var(--sx-sunken, #f1f5f2); display: grid; gap: 8px; }
+.task-approval code { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; max-height: 72px; overflow: auto; }
+.task-approval div { display: flex; gap: 6px; }
+.task-approval button { height: 28px; padding: 0 12px; border: 1px solid var(--sx-line-strong, #cbd8d0); border-radius: 9px; background: transparent; color: inherit; font-size: 12.5px; cursor: pointer; }
+.task-approval .approve { border-color: transparent; background: var(--sx-accent, #1b7556); color: var(--sx-accent-ink, #fff); }
+@media (max-width: 700px) { .task-overview-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; } }
+
+/* Action chips: the two occasional switches are icon-only until switched on, so the row never has to wrap. */
+@media (min-width: 701px) {
+  :root .app-shell .composer .composer-bottom .agent-chips { flex-wrap: nowrap; }
+  :root .app-shell .composer .agent-chips .agent-chip { flex: 0 0 auto; }
+  :root .app-shell .composer .agent-chips .agent-chip.dir { flex: 0 1 auto; min-width: 44px; max-width: 150px; }
+  :root .app-shell .composer .agent-chips .agent-chip.dir span { overflow: hidden; text-overflow: ellipsis; }
+  :root .app-shell .composer .agent-chip.plan:not(.active) span, :root .app-shell .composer .agent-chip.compare span { display: none; }
+  :root .app-shell .composer .agent-chip.plan:not(.active), :root .app-shell .composer .agent-chip.compare { width: 36px; padding: 0; justify-content: center; }
+  :root .app-shell .composer .composer-bottom .agent-chips { overflow: clip; overflow-clip-margin: 4px; }
+  :root .app-shell .composer .agent-chips .agent-chip.model-chip { flex: 0 1 auto; min-width: 60px; }
+  :root .app-shell .composer .agent-chips .agent-chip.model-chip span { overflow: hidden; text-overflow: ellipsis; }
+}

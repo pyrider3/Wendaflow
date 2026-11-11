@@ -7,7 +7,7 @@
 }
 :root[data-theme="sage"] { --card-selection: #176b48; --card-selection-surface: #f4f8f5; }
 :root[data-theme="paper"] { --card-selection: #925019; --card-selection-surface: #fffcf6; }
-:root:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="contrast-black"], [data-theme="starlight"], [data-theme="contrast-blue"], [data-theme="contrast-amber"], [data-theme="contrast-plum"]) {
+:root:is([data-theme="midnight"], [data-theme="graphite"], [data-theme="contrast-black"], [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="contrast-blue"], [data-theme="contrast-amber"], [data-theme="contrast-plum"]) {
   --card-selection: #80bdff;
   --card-selection-surface: #19232e;
   --card-selection-gap: #10151c;

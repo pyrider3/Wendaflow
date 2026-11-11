@@ -208,56 +208,101 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .canvas-tabs
   button,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .quiet-button,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .rail-button,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .settings-panel,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .search-panel,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .library-panel,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .canvas-overview,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .agent-config-popover {
   background: linear-gradient(
@@ -289,7 +334,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .canvas-tabs
   > button.active {
@@ -315,7 +365,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .canvas-tabs
   > button.active::before {
@@ -324,25 +379,45 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   button,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   input,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   select,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   textarea {
   color: #e7ece9;
@@ -350,39 +425,69 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .agent-config-popover
   input,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .agent-config-popover
   select,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .inline-workspace,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .segmented,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .attach-button,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .agent-summary-button {
   background: rgba(255, 255, 255, 0.065);
@@ -392,7 +497,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .theme-presets
   button {
@@ -403,7 +513,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .sponsor-preview-wallet {
   border-color: #415249;
@@ -412,7 +527,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .workspace-setting
   span {
@@ -421,13 +541,23 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .workspace-setting,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .agent-advanced-settings {
   background: #282e31;
@@ -441,7 +571,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .theme-presets
   button {
@@ -452,7 +587,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .theme-presets
   button.active {
@@ -462,7 +602,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .status.done {
   background: #33403a;
@@ -471,7 +616,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .status.running {
   background: #214a3b;
@@ -480,7 +630,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .status.approval {
   background: #514126;
@@ -489,7 +644,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .status.failed {
   background: #542e2c;
@@ -498,7 +658,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .status.stopped {
   background: #45413a;
@@ -507,14 +672,24 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .path-item
   small,
     :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .request-history-list
   small {
@@ -523,7 +698,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer {
   background: #202529;
@@ -540,7 +720,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer.branching {
   border-color: #3c8265;
@@ -552,7 +737,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   textarea {
@@ -561,7 +751,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   textarea::placeholder {
@@ -571,7 +766,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .segmented {
@@ -583,7 +783,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .segmented
@@ -594,7 +799,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .segmented
@@ -610,28 +820,48 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   select,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .agent-summary-button,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .attach-button,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .parallel-toggle {
@@ -649,14 +879,24 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   select:disabled,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   button:disabled {
@@ -666,7 +906,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .context-toggle {
@@ -677,7 +922,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .context-toggle.active {
@@ -688,7 +938,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .context-inspector {
@@ -698,7 +953,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .context-inspector
@@ -710,7 +970,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .shortcut {
@@ -719,7 +984,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .branch-feedback {
   background: #26312d;
@@ -729,13 +999,23 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .running-line,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .success-line {
   background: #263a32;
@@ -745,7 +1025,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .execution-record {
   background: #252c2f;
@@ -755,13 +1040,23 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .fork-button,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .collapse-button {
   background: #252d30;
@@ -778,7 +1073,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .collapse-button.collapsed {
   background: #29473b;
@@ -788,7 +1088,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .fork-button.armed {
   background: #2f765a;
@@ -798,7 +1103,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .stop-generation {
   z-index: 12;
@@ -811,7 +1121,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .stop-generation:hover {
   background: #a33e37;
@@ -820,7 +1135,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-artifacts {
   border-top-color: #3c4744;
@@ -828,7 +1148,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-live-feed {
   border-top-color: #3c4744;
@@ -836,7 +1161,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-live-feed
   article {
@@ -846,7 +1176,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-live-feed
   strong {
@@ -855,7 +1190,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-terminal {
   background: #182124;
@@ -864,7 +1204,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-terminal
   pre {
@@ -874,7 +1219,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-artifacts
   > div
@@ -882,7 +1232,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-artifacts
   > div
@@ -893,7 +1248,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .action-artifacts
   strong {
@@ -902,7 +1262,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .segmented::before {
@@ -915,7 +1280,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .composer
   .segmented
@@ -926,7 +1296,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .markdown-content
   strong {
@@ -935,7 +1310,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content {
@@ -944,7 +1324,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -952,7 +1337,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -960,7 +1350,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -970,7 +1365,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -981,7 +1381,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -992,7 +1397,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -1000,7 +1410,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -1010,7 +1425,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node
   .markdown-content
@@ -1020,7 +1440,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node-kind {
   color: #b2c0b9;
@@ -1028,7 +1453,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .node-tags
   span {
@@ -1038,7 +1468,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .output-assets
   a {
@@ -1049,7 +1484,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .generation-progress {
   color: #b8d0c2;
@@ -1057,7 +1497,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .thinking-output {
   border-color: #4a5d54;
@@ -1066,7 +1511,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .thinking-output
   summary {
@@ -1075,7 +1525,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .markdown-content::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.055);
@@ -1083,7 +1538,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .markdown-content::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #79aa91, #527b68) padding-box;
@@ -1092,19 +1552,34 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .image-attachment,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .file-attachment,
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .code-attachment {
   background: rgba(255, 255, 255, 0.055);
@@ -1312,7 +1787,12 @@
 :root:is(
     [data-theme="midnight"],
     [data-theme="graphite"],
-    [data-theme="contrast-black"]
+    [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
   )
   .canvas-tabs
   > button.active {
@@ -1383,6 +1863,11 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
@@ -1398,6 +1883,11 @@
       [data-theme="midnight"],
       [data-theme="graphite"],
       [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
       [data-theme="contrast-blue"],
       [data-theme="contrast-amber"],
       [data-theme="contrast-plum"]
@@ -1412,7 +1902,12 @@
     :root:is(
       [data-theme="midnight"],
       [data-theme="graphite"],
-      [data-theme="contrast-black"]
+      [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"]
     )
   )
   button:hover {
@@ -1446,6 +1941,11 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
@@ -1460,6 +1960,11 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
@@ -1473,6 +1978,11 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]
@@ -1485,6 +1995,11 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
+    [data-theme="starlight"],
+    [data-theme="aurora"],
+    [data-theme="dusk"],
+    [data-theme="ocean"],
+    [data-theme="obsidian"],
     [data-theme="contrast-blue"],
     [data-theme="contrast-amber"],
     [data-theme="contrast-plum"]

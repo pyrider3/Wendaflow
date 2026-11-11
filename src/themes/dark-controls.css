@@ -4,7 +4,7 @@
   [data-theme="midnight"],
   [data-theme="graphite"],
   [data-theme="contrast-black"],
-  [data-theme="starlight"]
+  [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
 ) {
   color-scheme: dark;
   --dark-panel: #171c24;
@@ -25,7 +25,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   .segmented::before {
   background: var(--dark-active);
@@ -34,7 +34,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   .segmented
   button.selected {
@@ -44,7 +44,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   :is(input, select, textarea) {
   background-color: var(--dark-panel);
@@ -55,7 +55,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   :is(input, textarea)::placeholder {
   color: var(--dark-muted);
@@ -65,7 +65,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   :is(
     .quick-thought-toggle,
@@ -80,7 +80,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   :is(.node h2, .node p, .markdown-content, .markdown-content strong) {
   color: var(--dark-text);
@@ -89,7 +89,7 @@
     [data-theme="midnight"],
     [data-theme="graphite"],
     [data-theme="contrast-black"],
-    [data-theme="starlight"]
+    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
   )
   :is(.node.colored, article.node[style*="--node-tint"]) {
   background: color-mix(
@@ -100,18 +100,18 @@
 }
 
 /* Editing surfaces must use the same dark palette as their containing card. */
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) :is(.inline-node-editor,.quick-thought-editor) {
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) :is(.inline-node-editor,.quick-thought-editor) {
   background:var(--dark-panel);color:var(--dark-text);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .inline-node-editor :is(input,textarea,button) {
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .inline-node-editor :is(input,textarea,button) {
   background:var(--dark-control);color:var(--dark-text);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .node.conversation .markdown-content {
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .node.conversation .markdown-content {
   color:var(--dark-text);font-size:13px;line-height:1.75;
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .node .image-attachment {
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .node .image-attachment {
   background:var(--dark-panel);color:var(--dark-accent);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"]) .inline-node-editor button.save {
+:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .inline-node-editor button.save {
   background:#286447;color:#fff;border-color:#86c5a1;
 }
