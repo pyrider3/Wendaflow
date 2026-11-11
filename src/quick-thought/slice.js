@@ -1,3 +1,4 @@
+import {parentIdsOf,detachParent,dropParents} from '../canvas/parents.mjs';
 // Segment tests include endpoints, collinear overlap and a small screen-space tolerance.
 export function segmentHitsRect(a,b,rect) {
  let lo=0,hi=1;
@@ -15,22 +16,25 @@ export function segmentsHit(a,b,c,d,tolerance=3) {
  return Math.min(pointDistance(a,c,d),pointDistance(b,c,d),pointDistance(c,a,b),pointDistance(d,a,b))<=tolerance;
 }
 export function removeSliceRecords(nodes,ids,connections) {
- const parents=new Set(),relationKeys=new Map();
+ const parents=new Set(),parentEdges=new Set(),relationKeys=new Map();
  for(const c of connections) {
-  if(c.kind==='parent')parents.add(c.childId);
+  if(c.kind==='parent'){if(c.sourceId)parentEdges.add(`${c.sourceId}>${c.childId}`);else parents.add(c.childId);}
   else {if(!relationKeys.has(c.sourceId))relationKeys.set(c.sourceId,new Set());relationKeys.get(c.sourceId).add(`${c.targetId}:${c.type||'reference'}`);}
  }
  return nodes.filter(n=>!ids.has(n.id)).map(n=>{
   const keys=relationKeys.get(n.id);
-  const parentId=ids.has(n.parentId)||parents.has(n.id)?null:n.parentId;
+  let moved=dropParents(n,ids);
+  if(parents.has(n.id)&&n.parentId)moved=detachParent(moved,n.parentId);
+  for(const pid of parentIdsOf(n))if(parentEdges.has(`${pid}>${n.id}`))moved=detachParent(moved,pid);
+  const parentId=moved.parentId||null;
   const links=(n.links||[]).filter(id=>!ids.has(id)&&!keys?.has(`${id}:reference`));
   const relations=(n.relations||[]).filter(r=>!ids.has(r.targetId)&&!keys?.has(`${r.targetId}:${r.type||'reference'}`));
-  return parentId===n.parentId&&links.length===(n.links||[]).length&&relations.length===(n.relations||[]).length?n:{...n,parentId,links,relations};
+  return parentId===(n.parentId||null)&&moved.extraParentIds===n.extraParentIds&&links.length===(n.links||[]).length&&relations.length===(n.relations||[]).length?n:{...moved,parentId,links,relations};
  });
 }
 export function sliceBackups(nodes,ids,connections) {
  const next=new Map(removeSliceRecords(nodes,ids,connections).map(n=>[n.id,n]));
- return nodes.filter(n=>!ids.has(n.id)&&next.get(n.id)!==n).map(n=>({id:n.id,parentId:n.parentId,links:n.links,relations:n.relations}));
+ return nodes.filter(n=>!ids.has(n.id)&&next.get(n.id)!==n).map(n=>({id:n.id,parentId:n.parentId,...(n.extraParentIds?{extraParentIds:n.extraParentIds}:{}),links:n.links,relations:n.relations}));
 }
 
 // Flatten cubic curves in screen space once per gesture, avoiding SVG layout APIs on each move.

@@ -1,3 +1,4 @@
+import {reachesUp} from './parents.mjs';
 export const WDF_FORMAT = 'branchspace-wdf';
 export function normalizeWdf(payload) {
   if (!payload || !['branchspace-wdf', 'wonderful-wdf'].includes(payload.format) || !Array.isArray(payload.nodes)) throw new Error('Invalid WDF format');
@@ -31,12 +32,23 @@ export function normalizeWdf(payload) {
     }
     path.forEach(id=>done.add(id));
   }
+  // Extra parents are optional and must never form a cycle; drop any that would.
+  for (const n of nodes) {
+    const wanted = Array.isArray(n.extraParentIds) ? n.extraParentIds : [];
+    n.extraParentIds = [];
+    for (const id of wanted) {
+      if (typeof id !== 'string' || !ids.has(id) || id === n.id || id === n.parentId || n.extraParentIds.includes(id) || reachesUp(byId, id, n.id)) continue;
+      n.extraParentIds.push(id);
+    }
+    if (!n.extraParentIds.length) delete n.extraParentIds;
+  }
   const v=payload.viewport;
   return {...payload, format:WDF_FORMAT, version:1, nodes, collapsedIds:(Array.isArray(payload.collapsedIds)?payload.collapsedIds:[]).filter(id=>ids.has(id)),
     viewport: v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.zoom) && v.zoom>0 ? {...v,zoom:Math.max(.02,Math.min(4,v.zoom))} : {x:20,y:20,zoom:.9}};
 }
 export function remapNodes(copied, idMap) {
   return copied.map(n=>({...n,id:idMap.get(n.id),parentId:idMap.get(n.parentId)||null,
+    ...(n.extraParentIds?.length?{extraParentIds:n.extraParentIds.filter(id=>idMap.has(id)).map(id=>idMap.get(id))}:{}),
     links:(n.links||[]).filter(id=>idMap.has(id)).map(id=>idMap.get(id)),
     relations:(n.relations||[]).filter(r=>idMap.has(r.targetId)).map((r,i)=>({...r,id:`${idMap.get(n.id)}-relation-${i}`,targetId:idMap.get(r.targetId)}))}));
 }

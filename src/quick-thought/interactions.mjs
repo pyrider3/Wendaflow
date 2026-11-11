@@ -1,3 +1,4 @@
+import {parentIdsOf,reachesUp} from '../canvas/parents.mjs';
 export const DRAG_THRESHOLD = 5;
 export function crossedDragThreshold(drag,point) {
   return drag.started || Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>=DRAG_THRESHOLD;
@@ -13,9 +14,8 @@ export function connectionIntent(nodes,sourceId,targetId) {
   const map=new Map(nodes.map(n=>[n.id,n])), source=map.get(sourceId),target=map.get(targetId);
   if(!source || !target)return 'invalid';
   if(sourceId===targetId)return 'self';
-  const seen=new Set();let cursor=source;
-  while(cursor){if(cursor.id===targetId || seen.has(cursor.id))return 'cycle';seen.add(cursor.id);cursor=map.get(cursor.parentId);}
-  if(target.parentId===sourceId)return 'connected';
+  if(reachesUp(map,sourceId,targetId))return 'cycle';
+  if(parentIdsOf(target).includes(sourceId))return 'connected';
   return target.parentId?'reparent':'connect';
 }
 export function relativeIdeaPoint(node,kind,nodes,sizes) {

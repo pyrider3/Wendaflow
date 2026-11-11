@@ -17,7 +17,7 @@ export function createGraphIndex(nodes) {
   const descendantCount=new Map(order.map(id=>[id,end.get(id)-start.get(id)-1]));
   function isDescendant(id,parent){return start.has(id)&&start.has(parent)&&start.get(parent)<start.get(id)&&start.get(id)<end.get(parent);}
   function ancestors(id){const path=[],seen=new Set();let cursor=byId.get(id);while(cursor&&!seen.has(cursor.id)){path.push(cursor);seen.add(cursor.id);cursor=byId.get(cursor.parentId);}return path.reverse();}
-  function ancestorIds(ids){const result=new Set();for(const id of ids){let cursor=byId.get(id);while(cursor&&!result.has(cursor.id)){result.add(cursor.id);cursor=byId.get(cursor.parentId);}}return result;}
+  function ancestorIds(ids){const result=new Set(),stack=[...ids];while(stack.length){const node=byId.get(stack.pop());if(!node||result.has(node.id))continue;result.add(node.id);if(node.parentId)stack.push(node.parentId);if(node.extraParentIds)stack.push(...node.extraParentIds);}return result;}
   function visibleNodes(collapsed){
     if(!collapsed.size)return nodes;
     const delta=new Int32Array(order.length+1);

@@ -21,12 +21,25 @@ export function contextPlan(nodes, parentId, excludedIds = [], extraRelations = 
   const map = new Map(nodes.map((node) => [node.id, node]));
   const excluded = new Set(excludedIds);
   const path = [];
-  let cursor = map.get(parentId);
-  const visited=new Set();
-  while (cursor && !visited.has(cursor.id)) {
+  const chain = [];
+  const visited = new Set();
+  for (let cursor = map.get(parentId); cursor && !visited.has(cursor.id); cursor = cursor.parentId ? map.get(cursor.parentId) : null) {
     visited.add(cursor.id);
-    if (cursor.type !== 'action' && !excluded.has(cursor.id)) path.unshift({ node: cursor, relation: 'inherit' });
-    cursor = cursor.parentId ? map.get(cursor.parentId) : null;
+    chain.push(cursor);
+  }
+  // Extra parents contribute their own branch before the node that has them.
+  const pushBranch = (node) => {
+    for (const extraId of node.extraParentIds || []) {
+      const extra = map.get(extraId);
+      if (!extra || visited.has(extraId)) continue;
+      const branch = [];
+      for (let c = extra; c && !visited.has(c.id); c = c.parentId ? map.get(c.parentId) : null) { visited.add(c.id); branch.push(c); }
+      for (const c of branch.reverse()) { pushBranch(c); if (c.type !== 'action' && !excluded.has(c.id)) path.push({ node: c, relation: 'inherit' }); }
+    }
+  };
+  for (const node of chain.reverse()) {
+    pushBranch(node);
+    if (node.type !== 'action' && !excluded.has(node.id)) path.push({ node, relation: 'inherit' });
   }
   const seen = new Set(path.map((item) => item.node.id));
   for (const { node } of [...path]) {
@@ -77,9 +90,13 @@ export function contextMessages(nodes, parentId, prompt, attachments = [], exclu
   for (const { node, relation } of path) {
     const parts = [];
     if (node.prompt) parts.push(`用户问题：${clipped(node.prompt, '问题上下文')}`);
-    if (node.content) {
-      const content = clipped(node.content, '回答上下文');
-      if (content) parts.push(node.type === 'thought' ? `用户想法 / 背景：${content}` : `此前回答：${content}`);
+    // A title-only idea has no body; its title is the idea.
+    const idea = node.type === 'thought' && !node.content ? node.title : node.content;
+    if (idea) {
+      const content = clipped(idea, '回答上下文');
+      const norm = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+      const heading = node.type === 'thought' && node.content && node.title && norm(node.title) !== norm(node.content) ? `${node.title}\n` : '';
+      if (content) parts.push(node.type === 'thought' ? `用户想法 / 背景：${heading}${content}` : `此前回答：${content}`);
     }
     const heldAttachments = (node.attachments || []).filter((attachment) => !attachment.text && !(attachment.dataUrl?.startsWith('data:image/') && (attachment.size || 0) <= 6 * 1024 * 1024));
     if (heldAttachments.length) parts.push(`历史附件索引（未随本轮重复上传）：${heldAttachments.map((attachment) => attachment.name).join('、')}`);

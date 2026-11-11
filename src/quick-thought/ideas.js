@@ -1,3 +1,4 @@
+import {parentIdsOf,reachesUp,dropParents,addExtraParent} from '../canvas/parents.mjs';
 // Capture visible card borders once per gesture, outside the pointer-move loop.
 export function marqueeBounds(world, canvasRect) {
   const bounds = new Map();
@@ -30,10 +31,10 @@ export function newThought(point,title,parentId,id) {
 }
 
 export function deletionBackups(nodes,ids) {
-  return nodes.filter(node=>!ids.has(node.id)&&(ids.has(node.parentId)||(node.links||[]).some(id=>ids.has(id))||(node.relations||[]).some(r=>ids.has(r.targetId)))).map(node=>({id:node.id,parentId:node.parentId,links:node.links,relations:node.relations}));
+  return nodes.filter(node=>!ids.has(node.id)&&(parentIdsOf(node).some(id=>ids.has(id))||(node.links||[]).some(id=>ids.has(id))||(node.relations||[]).some(r=>ids.has(r.targetId)))).map(node=>({id:node.id,parentId:node.parentId,...(node.extraParentIds?{extraParentIds:node.extraParentIds}:{}),links:node.links,relations:node.relations}));
 }
 export function removeNodeRecords(nodes,ids) {
-  return nodes.filter(node=>!ids.has(node.id)).map(node=>({...node,parentId:ids.has(node.parentId)?null:node.parentId,relations:(node.relations||[]).filter(r=>!ids.has(r.targetId)),links:(node.links||[]).filter(id=>!ids.has(id))}));
+  return nodes.filter(node=>!ids.has(node.id)).map(node=>({...dropParents(node,ids),relations:(node.relations||[]).filter(r=>!ids.has(r.targetId)),links:(node.links||[]).filter(id=>!ids.has(id))}));
 }
 
 // An ordinary blank click (including small hand jitter) clears selection.
@@ -43,14 +44,12 @@ export function completeThoughtMarquee(nodes, sizes, viewport, box) {
 }
 
 // Drag source is the parent; the existing drop target becomes its child.
-export function attachThoughtChild(nodes, parentId, childId) {
+// With extra=true the target keeps its current parent and gains this one as well.
+export function attachThoughtChild(nodes, parentId, childId, extra=false) {
+  if (extra) return addExtraParent(nodes, parentId, childId);
   const byId = new Map(nodes.map(node => [node.id, node]));
   const parent = byId.get(parentId), child = byId.get(childId);
   if (!parent || !child || parentId === childId) return nodes;
-  const seen = new Set();
-  for (let node = parent; node; node = byId.get(node.parentId)) {
-    if (node.id === childId || seen.has(node.id)) return nodes;
-    seen.add(node.id);
-  }
-  return nodes.map(node => node.id === childId ? {...node, parentId} : node);
+  if (reachesUp(byId, parentId, childId)) return nodes;
+  return nodes.map(node => { if (node.id !== childId) return node; const {extraParentIds, ...rest} = node; const keep = (extraParentIds || []).filter(id => id !== parentId); return keep.length ? {...rest, parentId, extraParentIds: keep} : {...rest, parentId}; });
 }
