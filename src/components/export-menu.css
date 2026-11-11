@@ -1,0 +1,17 @@
+.export-wrap { position: relative; display: inline-flex; }
+.export-menu {
+  position: absolute; z-index: 90; top: calc(100% + 8px); right: 0; width: 244px; padding: 6px;
+  display: grid; gap: 2px; border-radius: 14px;
+  background: var(--sx-bg, #fff); color: var(--sx-text, #1d2823);
+  border: 1px solid var(--sx-line, #d8e0db); box-shadow: var(--sx-shadow, 0 18px 50px rgba(0, 0, 0, 0.22));
+  transform-origin: top right; animation: export-menu-in 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.export-menu button {
+  display: grid; gap: 1px; padding: 9px 12px; text-align: left; border: 0; border-radius: 10px;
+  background: transparent; color: inherit; cursor: pointer; font: inherit; transition: background 0.12s;
+}
+.export-menu button:hover, .export-menu button:focus-visible { background: var(--sx-accent-soft, #e6f1ec); }
+.export-menu strong { font-size: 13.5px; font-weight: 600; }
+.export-menu small { font-size: 11.5px; color: var(--sx-muted, #6b7a72); }
+@keyframes export-menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .export-menu { animation: none; } }
