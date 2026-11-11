@@ -124,22 +124,6 @@
     "Local cache unavailable. Use Save to write a WDF file."
   ],
   [
-    "授权验证失败",
-    "License verification failed"
-  ],
-  [
-    "授权已验证。",
-    "License verified."
-  ],
-  [
-    "当前离线，授权将在 {0} 天后需要联网验证。",
-    "Offline — verification required in {0} days."
-  ],
-  [
-    "当前无法验证授权，请联网后重试。",
-    "License could not be verified. Connect to the internet and try again."
-  ],
-  [
     "发现新版本",
     "New version available"
   ],
@@ -602,26 +586,6 @@
   [
     "配置会记住，并随当前模型使用",
     "Settings are remembered for the current model"
-  ],
-  [
-    "请输入激活码。",
-    "Enter an activation code."
-  ],
-  [
-    "正在激活…",
-    "Activating…"
-  ],
-  [
-    "激活失败。",
-    "Activation failed."
-  ],
-  [
-    "激活成功，授权已绑定到这台设备。",
-    "Activated successfully and bound to this device."
-  ],
-  [
-    "已移除此设备上的授权。你可以稍后重新激活。",
-    "License removed from this device. You can activate again later."
   ],
   [
     "关闭提示",
@@ -1468,14 +1432,6 @@
     "Files are saved with the current canvas"
   ],
   [
-    "授权",
-    "License"
-  ],
-  [
-    "激活码与设备授权",
-    "Activation code and device access"
-  ],
-  [
     "运行期间的应用内提醒",
     "In-app alerts while the app is running"
   ],
@@ -1636,40 +1592,8 @@
     "This device ID"
   ],
   [
-    "授权与激活",
-    "License & activation"
-  ],
-  [
-    "激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。",
-    "An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification."
-  ],
-  [
-    "已激活",
-    "Activated"
-  ],
-  [
-    "有效至",
-    "Valid until"
-  ],
-  [
-    "永久授权",
-    "Perpetual license"
-  ],
-  [
-    "已绑定到这台设备。",
-    "Bound to this device."
-  ],
-  [
-    "移除此设备上的授权",
-    "Remove local license"
-  ],
-  [
     "激活码",
     "Activation code"
-  ],
-  [
-    "激活此设备",
-    "Activate this device"
   ],
   [
     "备份或恢复完整画布，包括节点、附件和布局。",
@@ -1698,14 +1622,6 @@
   [
     "当前版本",
     "Current version"
-  ],
-  [
-    "授权状态",
-    "License status"
-  ],
-  [
-    "未激活",
-    "Not activated"
   ],
   [
     "官方网站",

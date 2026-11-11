@@ -23,6 +23,11 @@ import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs
 import {AppearancePanel} from './components/AppearancePanel.jsx';
 import {AgentsPanel} from './components/AgentsPanel.jsx';
 import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} from './components/PiOptions.jsx';
+import {CompareView} from './cards/CompareView.jsx';
+import {PiSessionImport} from './components/PiSessionImport.jsx';
+import {SuggestTextarea} from './components/SuggestTextarea.jsx';
+import {TaskOverview} from './components/TaskOverview.jsx';
+import {EffortSlider, ModelList, piEffortLevels, piModelGroups} from './components/ModelPanel.jsx';
 import {AGENT_LABELS} from './agents/catalog.mjs';
 import {pinchViewport} from './canvas/pinch.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
@@ -38,11 +43,17 @@ import { normalizeWdf, remapNodes } from './canvas/document.mjs';
 import {createGraphIndex} from './canvas/graph-index.mjs';
 import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,LatestFrame,advanceViewport} from './canvas/camera.mjs';
 import {useCanvasNodes} from './canvas/useCanvasNodes.js';
+import {detachParent} from './canvas/parents.mjs';
+import {diagramPrompt,parseDiagram,applyDiagram} from './canvas/ai-diagram.mjs';
 import {crossedDragThreshold,combineSelection,connectionIntent,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
 import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
 import './themes/black-readability.css';
+import './themes/gallery.css';
+import './components/export-menu.css';
+import './themes/dark-popovers.css';
+import { toSVG, toMarkdown, toHTML } from './canvas/export.mjs';
 import './components/polish.css';
 import './components/mobile.css';
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
@@ -55,7 +66,6 @@ const CANVAS_DB_VERSION = 1;
 const CANVAS_STORE = 'canvases';
 const OFFICIAL_NOTIFICATION_SERVER = 'https://api.qnjyxh.xyz';
 const APP_VERSION = '0.2.15';
-const LICENSE_OFFLINE_GRACE_DAYS = 7;
 
 function isNewerVersion(candidate, current) {
   const numbers = (value) => String(value || '').replace(/^v/i, '').split(/[^0-9]+/).filter(Boolean).map(Number);
@@ -175,35 +185,19 @@ const PHRASE_PACKS = {
 // Shared settings/navigation vocabulary.  Keep these explicit and offline: UI
 // translation must never send card content or model output to a third party.
 const COMPLETE_UI_PACKS = {
-  'zh-TW': { 'About':'關於','Notifications':'通知','License':'授權','Activated':'已啟用','Not activated':'未啟用','Current version':'目前版本','Official website':'官方網站','Notification service':'通知服務','Model connections':'模型連線','Appearance':'外觀','Project data':'專案資料','Local models':'本機模型','Cloud model library':'雲端模型庫','API configuration':'API 設定','Display name':'顯示名稱','Server URL':'服務位址','Model name':'模型名稱','Test connection':'測試連線','In-app notifications':'應用程式內通知','Receive notifications':'接收通知','Activation code':'啟用碼','Export WDF':'匯出 WDF','Import WDF':'匯入 WDF','Save':'儲存','Close':'關閉','Delete':'刪除','Cancel':'取消','Done':'完成' },
-  ja: { 'About':'情報','Notifications':'通知','License':'ライセンス','Activated':'有効','Not activated':'未有効','Current version':'現在のバージョン','Official website':'公式サイト','Notification service':'通知サービス','Model connections':'モデル接続','Appearance':'外観','Project data':'プロジェクトデータ','Local models':'ローカルモデル','Cloud model library':'クラウドモデルライブラリ','API configuration':'API 設定','Display name':'表示名','Server URL':'サーバー URL','Model name':'モデル名','Test connection':'接続をテスト','In-app notifications':'アプリ内通知','Receive notifications':'通知を受け取る','Activation code':'アクティベーションコード','Export WDF':'WDF をエクスポート','Import WDF':'WDF をインポート','Save':'保存','Close':'閉じる','Delete':'削除','Cancel':'キャンセル','Done':'完了' },
-  ko: { 'About':'정보','Notifications':'알림','License':'라이선스','Activated':'활성화됨','Not activated':'활성화되지 않음','Current version':'현재 버전','Official website':'공식 웹사이트','Notification service':'알림 서비스','Model connections':'모델 연결','Appearance':'모양','Project data':'프로젝트 데이터','Local models':'로컬 모델','Cloud model library':'클라우드 모델 라이브러리','API configuration':'API 설정','Display name':'표시 이름','Server URL':'서버 URL','Model name':'모델 이름','Test connection':'연결 테스트','In-app notifications':'앱 내 알림','Receive notifications':'알림 받기','Activation code':'활성화 코드','Export WDF':'WDF 내보내기','Import WDF':'WDF 가져오기','Save':'저장','Close':'닫기','Delete':'삭제','Cancel':'취소','Done':'완료' },
-  es: { 'About':'Acerca de','Notifications':'Notificaciones','License':'Licencia','Activated':'Activada','Not activated':'Sin activar','Current version':'Versión actual','Official website':'Sitio web oficial','Notification service':'Servicio de notificaciones','Model connections':'Conexiones de modelos','Appearance':'Apariencia','Project data':'Datos del proyecto','Local models':'Modelos locales','Cloud model library':'Biblioteca de modelos en la nube','API configuration':'Configuración de API','Display name':'Nombre visible','Server URL':'URL del servidor','Model name':'Nombre del modelo','Test connection':'Probar conexión','In-app notifications':'Notificaciones en la aplicación','Receive notifications':'Recibir notificaciones','Activation code':'Código de activación','Export WDF':'Exportar WDF','Import WDF':'Importar WDF','Save':'Guardar','Close':'Cerrar','Delete':'Eliminar','Cancel':'Cancelar','Done':'Listo' },
-  fr: { 'About':'À propos','Notifications':'Notifications','License':'Licence','Activated':'Activée','Not activated':'Non activée','Current version':'Version actuelle','Official website':'Site officiel','Notification service':'Service de notifications','Model connections':'Connexions de modèles','Appearance':'Apparence','Project data':'Données du projet','Local models':'Modèles locaux','Cloud model library':'Bibliothèque de modèles cloud','API configuration':'Configuration API','Display name':'Nom affiché','Server URL':'URL du serveur','Model name':'Nom du modèle','Test connection':'Tester la connexion','In-app notifications':'Notifications intégrées','Receive notifications':'Recevoir les notifications','Activation code':'Code d’activation','Export WDF':'Exporter WDF','Import WDF':'Importer WDF','Save':'Enregistrer','Close':'Fermer','Delete':'Supprimer','Cancel':'Annuler','Done':'Terminé' },
-  de: { 'About':'Info','Notifications':'Benachrichtigungen','License':'Lizenz','Activated':'Aktiviert','Not activated':'Nicht aktiviert','Current version':'Aktuelle Version','Official website':'Offizielle Website','Notification service':'Benachrichtigungsdienst','Model connections':'Modellverbindungen','Appearance':'Darstellung','Project data':'Projektdaten','Local models':'Lokale Modelle','Cloud model library':'Cloud-Modellbibliothek','API configuration':'API-Konfiguration','Display name':'Anzeigename','Server URL':'Server-URL','Model name':'Modellname','Test connection':'Verbindung testen','In-app notifications':'In-App-Benachrichtigungen','Receive notifications':'Benachrichtigungen empfangen','Activation code':'Aktivierungscode','Export WDF':'WDF exportieren','Import WDF':'WDF importieren','Save':'Speichern','Close':'Schließen','Delete':'Löschen','Cancel':'Abbrechen','Done':'Fertig' },
-  'pt-BR': { 'About':'Sobre','Notifications':'Notificações','License':'Licença','Activated':'Ativada','Not activated':'Não ativada','Current version':'Versão atual','Official website':'Site oficial','Notification service':'Serviço de notificações','Model connections':'Conexões de modelos','Appearance':'Aparência','Project data':'Dados do projeto','Local models':'Modelos locais','Cloud model library':'Biblioteca de modelos na nuvem','API configuration':'Configuração de API','Display name':'Nome de exibição','Server URL':'URL do servidor','Model name':'Nome do modelo','Test connection':'Testar conexão','In-app notifications':'Notificações no aplicativo','Receive notifications':'Receber notificações','Activation code':'Código de ativação','Export WDF':'Exportar WDF','Import WDF':'Importar WDF','Save':'Salvar','Close':'Fechar','Delete':'Excluir','Cancel':'Cancelar','Done':'Concluído' },
-  ru: { 'About':'О приложении','Notifications':'Уведомления','License':'Лицензия','Activated':'Активирована','Not activated':'Не активирована','Current version':'Текущая версия','Official website':'Официальный сайт','Notification service':'Служба уведомлений','Model connections':'Подключения моделей','Appearance':'Внешний вид','Project data':'Данные проекта','Local models':'Локальные модели','Cloud model library':'Библиотека облачных моделей','API configuration':'Настройка API','Display name':'Отображаемое имя','Server URL':'URL сервера','Model name':'Название модели','Test connection':'Проверить подключение','In-app notifications':'Уведомления в приложении','Receive notifications':'Получать уведомления','Activation code':'Код активации','Export WDF':'Экспорт WDF','Import WDF':'Импорт WDF','Save':'Сохранить','Close':'Закрыть','Delete':'Удалить','Cancel':'Отмена','Done':'Готово' },
-  ar: { 'About':'حول','Notifications':'الإشعارات','License':'الترخيص','Activated':'مفعّل','Not activated':'غير مفعّل','Current version':'الإصدار الحالي','Official website':'الموقع الرسمي','Notification service':'خدمة الإشعارات','Model connections':'اتصالات النماذج','Appearance':'المظهر','Project data':'بيانات المشروع','Local models':'النماذج المحلية','Cloud model library':'مكتبة النماذج السحابية','API configuration':'إعداد API','Display name':'اسم العرض','Server URL':'عنوان الخادم','Model name':'اسم النموذج','Test connection':'اختبار الاتصال','In-app notifications':'إشعارات داخل التطبيق','Receive notifications':'تلقي الإشعارات','Activation code':'رمز التفعيل','Export WDF':'تصدير WDF','Import WDF':'استيراد WDF','Save':'حفظ','Close':'إغلاق','Delete':'حذف','Cancel':'إلغاء','Done':'تم' },
+  'zh-TW': { 'About':'關於','Notifications':'通知','Current version':'目前版本','Official website':'官方網站','Notification service':'通知服務','Model connections':'模型連線','Appearance':'外觀','Project data':'專案資料','Local models':'本機模型','Cloud model library':'雲端模型庫','API configuration':'API 設定','Display name':'顯示名稱','Server URL':'服務位址','Model name':'模型名稱','Test connection':'測試連線','In-app notifications':'應用程式內通知','Receive notifications':'接收通知','Activation code':'啟用碼','Export WDF':'匯出 WDF','Import WDF':'匯入 WDF','Save':'儲存','Close':'關閉','Delete':'刪除','Cancel':'取消','Done':'完成' },
+  ja: { 'About':'情報','Notifications':'通知','Current version':'現在のバージョン','Official website':'公式サイト','Notification service':'通知サービス','Model connections':'モデル接続','Appearance':'外観','Project data':'プロジェクトデータ','Local models':'ローカルモデル','Cloud model library':'クラウドモデルライブラリ','API configuration':'API 設定','Display name':'表示名','Server URL':'サーバー URL','Model name':'モデル名','Test connection':'接続をテスト','In-app notifications':'アプリ内通知','Receive notifications':'通知を受け取る','Activation code':'アクティベーションコード','Export WDF':'WDF をエクスポート','Import WDF':'WDF をインポート','Save':'保存','Close':'閉じる','Delete':'削除','Cancel':'キャンセル','Done':'完了' },
+  ko: { 'About':'정보','Notifications':'알림','Current version':'현재 버전','Official website':'공식 웹사이트','Notification service':'알림 서비스','Model connections':'모델 연결','Appearance':'모양','Project data':'프로젝트 데이터','Local models':'로컬 모델','Cloud model library':'클라우드 모델 라이브러리','API configuration':'API 설정','Display name':'표시 이름','Server URL':'서버 URL','Model name':'모델 이름','Test connection':'연결 테스트','In-app notifications':'앱 내 알림','Receive notifications':'알림 받기','Activation code':'활성화 코드','Export WDF':'WDF 내보내기','Import WDF':'WDF 가져오기','Save':'저장','Close':'닫기','Delete':'삭제','Cancel':'취소','Done':'완료' },
+  es: { 'About':'Acerca de','Notifications':'Notificaciones','Current version':'Versión actual','Official website':'Sitio web oficial','Notification service':'Servicio de notificaciones','Model connections':'Conexiones de modelos','Appearance':'Apariencia','Project data':'Datos del proyecto','Local models':'Modelos locales','Cloud model library':'Biblioteca de modelos en la nube','API configuration':'Configuración de API','Display name':'Nombre visible','Server URL':'URL del servidor','Model name':'Nombre del modelo','Test connection':'Probar conexión','In-app notifications':'Notificaciones en la aplicación','Receive notifications':'Recibir notificaciones','Activation code':'Código de activación','Export WDF':'Exportar WDF','Import WDF':'Importar WDF','Save':'Guardar','Close':'Cerrar','Delete':'Eliminar','Cancel':'Cancelar','Done':'Listo' },
+  fr: { 'About':'À propos','Notifications':'Notifications','Current version':'Version actuelle','Official website':'Site officiel','Notification service':'Service de notifications','Model connections':'Connexions de modèles','Appearance':'Apparence','Project data':'Données du projet','Local models':'Modèles locaux','Cloud model library':'Bibliothèque de modèles cloud','API configuration':'Configuration API','Display name':'Nom affiché','Server URL':'URL du serveur','Model name':'Nom du modèle','Test connection':'Tester la connexion','In-app notifications':'Notifications intégrées','Receive notifications':'Recevoir les notifications','Activation code':'Code d’activation','Export WDF':'Exporter WDF','Import WDF':'Importer WDF','Save':'Enregistrer','Close':'Fermer','Delete':'Supprimer','Cancel':'Annuler','Done':'Terminé' },
+  de: { 'About':'Info','Notifications':'Benachrichtigungen','Current version':'Aktuelle Version','Official website':'Offizielle Website','Notification service':'Benachrichtigungsdienst','Model connections':'Modellverbindungen','Appearance':'Darstellung','Project data':'Projektdaten','Local models':'Lokale Modelle','Cloud model library':'Cloud-Modellbibliothek','API configuration':'API-Konfiguration','Display name':'Anzeigename','Server URL':'Server-URL','Model name':'Modellname','Test connection':'Verbindung testen','In-app notifications':'In-App-Benachrichtigungen','Receive notifications':'Benachrichtigungen empfangen','Activation code':'Aktivierungscode','Export WDF':'WDF exportieren','Import WDF':'WDF importieren','Save':'Speichern','Close':'Schließen','Delete':'Löschen','Cancel':'Abbrechen','Done':'Fertig' },
+  'pt-BR': { 'About':'Sobre','Notifications':'Notificações','Current version':'Versão atual','Official website':'Site oficial','Notification service':'Serviço de notificações','Model connections':'Conexões de modelos','Appearance':'Aparência','Project data':'Dados do projeto','Local models':'Modelos locais','Cloud model library':'Biblioteca de modelos na nuvem','API configuration':'Configuração de API','Display name':'Nome de exibição','Server URL':'URL do servidor','Model name':'Nome do modelo','Test connection':'Testar conexão','In-app notifications':'Notificações no aplicativo','Receive notifications':'Receber notificações','Activation code':'Código de ativação','Export WDF':'Exportar WDF','Import WDF':'Importar WDF','Save':'Salvar','Close':'Fechar','Delete':'Excluir','Cancel':'Cancelar','Done':'Concluído' },
+  ru: { 'About':'О приложении','Notifications':'Уведомления','Current version':'Текущая версия','Official website':'Официальный сайт','Notification service':'Служба уведомлений','Model connections':'Подключения моделей','Appearance':'Внешний вид','Project data':'Данные проекта','Local models':'Локальные модели','Cloud model library':'Библиотека облачных моделей','API configuration':'Настройка API','Display name':'Отображаемое имя','Server URL':'URL сервера','Model name':'Название модели','Test connection':'Проверить подключение','In-app notifications':'Уведомления в приложении','Receive notifications':'Получать уведомления','Activation code':'Код активации','Export WDF':'Экспорт WDF','Import WDF':'Импорт WDF','Save':'Сохранить','Close':'Закрыть','Delete':'Удалить','Cancel':'Отмена','Done':'Готово' },
+  ar: { 'About':'حول','Notifications':'الإشعارات','Current version':'الإصدار الحالي','Official website':'الموقع الرسمي','Notification service':'خدمة الإشعارات','Model connections':'اتصالات النماذج','Appearance':'المظهر','Project data':'بيانات المشروع','Local models':'النماذج المحلية','Cloud model library':'مكتبة النماذج السحابية','API configuration':'إعداد API','Display name':'اسم العرض','Server URL':'عنوان الخادم','Model name':'اسم النموذج','Test connection':'اختبار الاتصال','In-app notifications':'إشعارات داخل التطبيق','Receive notifications':'تلقي الإشعارات','Activation code':'رمز التفعيل','Export WDF':'تصدير WDF','Import WDF':'استيراد WDF','Save':'حفظ','Close':'إغلاق','Delete':'حذف','Cancel':'إلغاء','Done':'تم' },
 };
 
-const SPONSOR_LOCALIZATIONS = `
-Sponsor|贊助|スポンサー|후원|Patrocinar|Soutenir|Unterstützen|Apoiar|Поддержать|دعم
-Support continued Wendaflow development|支持 Wendaflow 持續開發|Wendaflow の継続開発を支援|Wendaflow의 지속적인 개발 지원|Apoyar el desarrollo continuo de Wendaflow|Soutenir le développement continu de Wendaflow|Die Weiterentwicklung von Wendaflow unterstützen|Apoie o desenvolvimento contínuo do Wendaflow|Поддержать дальнейшую разработку Wendaflow|دعم تطوير Wendaflow المستمر
-Sponsor Wendaflow|贊助 Wendaflow|Wendaflow を支援|Wendaflow 후원|Patrocinar Wendaflow|Soutenir Wendaflow|Wendaflow unterstützen|Apoiar o Wendaflow|Поддержать Wendaflow|ادعم Wendaflow
-If Wendaflow helps you, you can support its continued development through any option below. Click a QR code to enlarge it.|如果 Wendaflow 對你有幫助，歡迎透過下列任一方式支持後續開發。點擊 QR 碼可放大查看。|Wendaflow がお役に立った場合は、以下のいずれかの方法で開発を支援できます。QR コードをクリックすると拡大できます。|Wendaflow가 도움이 되었다면 아래 방법 중 하나로 개발을 후원해 주세요. QR 코드를 클릭하면 확대됩니다.|Si Wendaflow te ayuda, puedes apoyar su desarrollo con cualquiera de las opciones siguientes. Haz clic en el código QR para ampliarlo.|Si Wendaflow vous aide, vous pouvez soutenir son développement avec l’une des options ci-dessous. Cliquez sur le QR code pour l’agrandir.|Wenn Wendaflow dir hilft, kannst du die Weiterentwicklung mit einer der folgenden Optionen unterstützen. Klicke den QR-Code zum Vergrößern an.|Se o Wendaflow ajuda você, apoie o desenvolvimento contínuo por qualquer opção abaixo. Clique no QR code para ampliar.|Если Wendaflow вам помогает, поддержите его дальнейшую разработку любым из способов ниже. Нажмите QR-код для увеличения.|إذا كان Wendaflow مفيداً لك، يمكنك دعم تطويره المستمر عبر أي خيار أدناه. انقر رمز QR لتكبيره.
-WeChat Pay|微信支付|WeChat Pay|위챗 페이|WeChat Pay|WeChat Pay|WeChat Pay|WeChat Pay|WeChat Pay|WeChat Pay
-WeChat Pay recommended|推薦使用微信支付|WeChat Pay を推奨|위챗 페이 권장|Se recomienda WeChat Pay|WeChat Pay recommandé|WeChat Pay empfohlen|WeChat Pay recomendado|Рекомендуется WeChat Pay|يوصى باستخدام WeChat Pay
-Alipay|支付寶|Alipay|알리페이|Alipay|Alipay|Alipay|Alipay|Alipay|Alipay
-Scan with Alipay|使用支付寶掃碼|Alipay でスキャン|알리페이로 스캔|Escanear con Alipay|Scanner avec Alipay|Mit Alipay scannen|Escaneie com o Alipay|Сканировать через Alipay|امسح عبر Alipay
-Binance Pay|幣安支付|Binance Pay|바이낸스 페이|Binance Pay|Binance Pay|Binance Pay|Binance Pay|Binance Pay|Binance Pay
-Scan with Binance App|使用幣安 App 掃碼|Binance アプリでスキャン|바이낸스 앱으로 스캔|Escanear con la app de Binance|Scanner avec l’app Binance|Mit der Binance-App scannen|Escaneie com o app Binance|Сканировать в приложении Binance|امسح عبر تطبيق Binance
-USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON|USDT · TRON
-TRON network only|僅支援 TRON 網路|TRON ネットワークのみ|TRON 네트워크만 지원|Solo red TRON|Réseau TRON uniquement|Nur TRON-Netzwerk|Somente rede TRON|Только сеть TRON|شبكة TRON فقط
-sponsorship QR code|贊助 QR 碼|支援用 QR コード|후원 QR 코드|Código QR de patrocinio|QR code de soutien|Unterstützungs-QR-Code|QR code de apoio|QR-код для поддержки|رمز QR للدعم
-Click to enlarge|點擊放大|クリックして拡大|클릭하여 확대|Haz clic para ampliar|Cliquer pour agrandir|Zum Vergrößern klicken|Clique para ampliar|Нажмите для увеличения|انقر للتكبير
-Thank you — your support directly helps Wendaflow keep improving.|感謝你的支持，它會直接幫助 Wendaflow 持續改進。|ご支援ありがとうございます。Wendaflow の継続的な改善に直接役立ちます。|후원해 주셔서 감사합니다. Wendaflow의 지속적인 개선에 직접 도움이 됩니다.|Gracias: tu apoyo ayuda directamente a que Wendaflow siga mejorando.|Merci : votre soutien aide directement Wendaflow à continuer de s’améliorer.|Danke — deine Unterstützung hilft Wendaflow direkt, sich weiter zu verbessern.|Obrigado — seu apoio ajuda diretamente o Wendaflow a continuar melhorando.|Спасибо — ваша поддержка напрямую помогает Wendaflow становиться лучше.|شكراً لك — دعمك يساعد Wendaflow مباشرة على الاستمرار في التحسن.
-`;
-const TRANSLATIONS = buildCatalog(UI_COPY, PHRASE_PACKS, COMPLETE_UI_PACKS, [SPONSOR_LOCALIZATIONS]);
+const TRANSLATIONS = buildCatalog(UI_COPY, PHRASE_PACKS, COMPLETE_UI_PACKS);
+
 function readUiLanguage() {
   const value = localStorage.getItem('wendaflow-ui-language');
   return UI_LANGUAGES.some(([id]) => id === value) ? value : 'zh-CN';
@@ -248,6 +242,12 @@ function ancestors(nodes, id) {
     seen.add(cursor.id);
     result.unshift(cursor);
     cursor = cursor.parentId ? map.get(cursor.parentId) : null;
+  }
+  for (const node of [...result]) {
+    for (const extraId of node.extraParentIds || []) {
+      const extra = map.get(extraId);
+      if (extra && !seen.has(extraId)) { seen.add(extraId); result.unshift(extra); }
+    }
   }
   return result;
 }
@@ -365,6 +365,14 @@ function App() {
   const [closingPanels, setClosingPanels] = useState(new Set());
   const [editingCanvasId, setEditingCanvasId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('');
+  const imeComposingRef = useRef(false);
+  const imePendingSaveRef = useRef(false);
+  useEffect(() => {
+    const start = () => { imeComposingRef.current = true; };
+    const end = () => { imeComposingRef.current = false; if (imePendingSaveRef.current) { imePendingSaveRef.current = false; window.setTimeout(() => { if (!imeComposingRef.current) void saveCanvasRef.current?.(true); }, 400); } };
+    document.addEventListener('compositionstart', start, true); document.addEventListener('compositionend', end, true);
+    return () => { document.removeEventListener('compositionstart', start, true); document.removeEventListener('compositionend', end, true); };
+  }, []);
   const saveCanvasRef = useRef(null);
   const [autosavePolicy,setAutosavePolicy]=useState(()=>{try{const value=JSON.parse(localStorage.getItem('wendaflow-autosave-v1')||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}});
   const autosavePolicyRef=useRef(autosavePolicy);
@@ -383,7 +391,7 @@ function App() {
   const say=(zh,en)=>uiLanguage.startsWith('zh')?zh:en;
   const [canvasLibraryStatus, setCanvasLibraryStatus] = useState('');
   const [canvasTransition, setCanvasTransition] = useState('');
-  const [theme, setTheme] = useState(() => localStorage.getItem('wonderful-theme') || 'contrast-light');
+  const [theme, setTheme] = useState(() => { const saved = localStorage.getItem('wonderful-theme'); return !saved || /^(contrast-(blue|amber|plum)|slate)$/.test(saved) ? (saved ? 'obsidian' : 'contrast-light') : saved; });
   const [uiLanguage, setUiLanguage] = useState(readUiLanguage);
   const [quickThought, setQuickThought] = useState(()=>localStorage.getItem('wendaflow-quick-thought')==='1');
   const [quickEditor,setQuickEditor]=useState(null);
@@ -432,7 +440,48 @@ function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [actionRunner, setActionRunner] = useState(() => localStorage.getItem('wonderful-action-runner') || '');
   const [actionOptionsOpen, setActionOptionsOpen] = useState(false);
+  const [popLeft, setPopLeft] = useState(0);
+  // Side-by-side comparison: variant A is the normal composer state, variant B carries its own runner/settings.
+  const [compareMode, setCompareMode] = useState(false);
+  const [variantB, setVariantB] = useState(null);
+  const [activeVariant, setActiveVariant] = useState('A');
+  const [compareGroupOpen, setCompareGroupOpen] = useState(null);
+  const followedJobsRef = useRef(new Set());
+  // Optional desktop notifications for "needs your approval" and "finished" while the page is in the background.
+  const [systemNotifications, setSystemNotifications] = useState(() => { try { return localStorage.getItem('wendaflow-system-notify') === '1'; } catch { return false; } });
+  async function changeSystemNotifications(on) {
+    if (on && typeof Notification !== 'undefined' && Notification.permission === 'default') await Notification.requestPermission();
+    const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    const value = on && granted;
+    setSystemNotifications(value);
+    try { localStorage.setItem('wendaflow-system-notify', value ? '1' : '0'); } catch { /* storage blocked */ }
+    if (on && !granted) notify(tr('浏览器没有允许通知，请在站点设置里开启。', 'The browser has not allowed notifications; enable them in the site settings.'));
+  }
+  function desktopNotify(title, body, nodeId) {
+    if (!systemNotifications || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if (document.hasFocus() && !document.hidden) return;
+    try {
+      const popup = new Notification(title, { body: String(body).slice(0, 160), tag: nodeId });
+      popup.onclick = () => { window.focus(); const node = currentNodes().find((item) => item.id === nodeId); if (node) focusSearchResult(node); popup.close(); };
+    } catch { /* notifications unavailable */ }
+  }
+  const [folderSettings, setFolderSettings] = useState(() => { try { return JSON.parse(localStorage.getItem('wendaflow-folder-settings') || '{}') || {}; } catch { return {}; } });
+  const [projectInstructions, setProjectInstructions] = useState([]);
+  const [piImportOpen, setPiImportOpen] = useState(false);
+  const [planFirst, setPlanFirst] = useState(false);
+  function resetCompare() { setCompareMode(false); setVariantB(null); setActiveVariant('A'); setPlanFirst(false); }
+  function toggleCompare() {
+    if (compareMode) { resetCompare(); return; }
+    setVariantB({ runner: actionRunner, settings: JSON.parse(JSON.stringify(taskAgentSettings)) });
+    setCompareMode(true); setActiveVariant('B'); setActionOptionsOpen(false);
+  }
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
+  useEffect(() => {
+    if (!actionOptionsOpen && !chatOptionsOpen) return undefined;
+    const close = (event) => { if (event.type === 'keydown' ? event.key === 'Escape' : !event.target.closest?.('.inline-agent-config')) { setActionOptionsOpen(false); setChatOptionsOpen(false); } };
+    document.addEventListener('pointerdown', close, true); document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('pointerdown', close, true); document.removeEventListener('keydown', close); };
+  }, [actionOptionsOpen, chatOptionsOpen]);
   const [actionWorkspace, setActionWorkspace] = useState('');
   const [workspaceDraft, setWorkspaceDraft] = useState('');
   const [workspaceError, setWorkspaceError] = useState('');
@@ -455,8 +504,6 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsClosing, setSettingsClosing] = useState(false);
   const [settingsSection, setSettingsSection] = useState('models');
-  const [sponsorPreview, setSponsorPreview] = useState(null);
-  const [sponsorCopied, setSponsorCopied] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState(() => {
     try { return JSON.parse(localStorage.getItem('wendaflow-notifications') || '[]'); } catch { return []; }
@@ -469,12 +516,6 @@ function App() {
   const [notificationDetail, setNotificationDetail] = useState(null);
   const [updateCheckState, setUpdateCheckState] = useState('idle');
   const notificationToastTimerRef = useRef(null);
-  const [license, setLicense] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('wendaflow-license') || 'null'); } catch { return null; }
-  });
-  const [activationCode, setActivationCode] = useState('');
-  const [licenseStatus, setLicenseStatus] = useState('');
-  const [licenseBusy, setLicenseBusy] = useState(false);
   const [localProfiles, setLocalProfiles] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('branchspace-local-profiles'));
@@ -518,6 +559,8 @@ function App() {
   const composerFileDragDepthRef = useRef(0);
   const [model, setModel] = useState(() => `cloud:${cloudProfiles[0].id}`);
   const [nodeType, setNodeType] = useState(quickThought ? 'thought' : 'conversation');
+  const [drawBusy, setDrawBusy] = useState(false);
+  const drawAbortRef = useRef(null);
   const [focusMode, setFocusMode] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   // Once the user opens the card details, they follow the selection until closed.
@@ -664,13 +707,14 @@ function App() {
     const size=node=>nodeSizes.get(node.id)||{width:node.manualWidth||224,height:node.manualHeight||110};
     for(const node of visibleNodes){
       const parent=graph.byId.get(node.parentId);
-      if(parent&&connectionInView('parent',parent,node,size(parent),size(node),bounds))parents.push(node);
+      if(parent&&connectionInView('parent',parent,node,size(parent),size(node),bounds))parents.push({node,parent,extra:false});
+      for(const extraId of node.extraParentIds||[]){const extra=graph.byId.get(extraId);if(extra&&connectionInView('parent',extra,node,size(extra),size(node),bounds))parents.push({node,parent:extra,extra:true});}
       const links=[...(node.links||[]).map(targetId=>({targetId,type:'reference'})),...(node.relations||[])];
       links.forEach((link,index)=>{const target=graph.byId.get(link.targetId);if(target&&connectionInView('relation',node,target,size(node),size(target),bounds))relations.push({source:node,target,type:link.type||'reference',relationId:link.id,index});});
     }
     return {parents,relations};
   },[visibleNodes,graph,nodeSizes,viewport]);
-  const renderedEdgeKey=renderedConnections.parents.map(n=>'p:'+n.id).concat(renderedConnections.relations.map(e=>'r:'+e.source.id+':'+e.target.id+':'+e.type+':'+e.index)).join('|');
+  const renderedEdgeKey=renderedConnections.parents.map(e=>'p:'+e.parent.id+'>'+e.node.id).concat(renderedConnections.relations.map(e=>'r:'+e.source.id+':'+e.target.id+':'+e.type+':'+e.index)).join('|');
   const renderedNodeKey=renderedNodes.map(node=>node.id).join('|');
   const deletionIds = useMemo(() => {
     if(quickThought)return cardIds(nodes,selectedIds);
@@ -941,15 +985,7 @@ function App() {
   useEffect(() => localStorage.setItem('branchspace-cloud-profiles', JSON.stringify(cloudProfiles)), [cloudProfiles]);
   useEffect(() => localStorage.setItem('wendaflow-notifications', JSON.stringify(notifications.slice(0, 120))), [notifications]);
   useEffect(() => localStorage.setItem('wendaflow-notification-settings', JSON.stringify({ ...notificationSettings, serverUrl: OFFICIAL_NOTIFICATION_SERVER })), [notificationSettings]);
-  useEffect(() => { if (license) localStorage.setItem('wendaflow-license', JSON.stringify(license)); else localStorage.removeItem('wendaflow-license'); }, [license]);
-  useEffect(() => {
-    if (!license?.token) return;
-    let cancelled = false;
-    fetch(`${OFFICIAL_NOTIFICATION_SERVER}/v1/licenses/validate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: license.token, deviceId: notificationSettings.deviceId, appVersion: APP_VERSION }) })
-      .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || tr('授权验证失败',"License verification failed")); if (!cancelled) { setLicense({ ...data.license, lastValidatedAt: new Date().toISOString() }); setLicenseStatus(tr('授权已验证。','License verified.')); } })
-      .catch(() => { if (!cancelled) { const validated = license.lastValidatedAt ? new Date(license.lastValidatedAt).getTime() : 0; const remaining = Math.ceil((validated + LICENSE_OFFLINE_GRACE_DAYS * 86400000 - Date.now()) / 86400000); setLicenseStatus(remaining > 0 ? tr(`当前离线，授权将在 ${remaining} 天后需要联网验证。`, `Offline — verification required in ${remaining} days.`) : tr('当前无法验证授权，请联网后重试。','License could not be verified. Connect to the internet and try again.')); } });
-    return () => { cancelled = true; };
-  }, []);
+  useEffect(() => { try { localStorage.removeItem('wendaflow-license'); } catch {} }, []);
   useEffect(() => {
     if (PUBLIC_WEB || !notificationSettings.enabled) return undefined;
     const base = OFFICIAL_NOTIFICATION_SERVER;
@@ -1559,7 +1595,7 @@ function App() {
     setNodes((items) => items.map((node) => {
       let next = node;
       connections.filter((connection) => connection.kind === 'parent' && connection.childId === node.id)
-        .forEach(() => { next = { ...next, parentId: null }; });
+        .forEach((connection) => { next = detachParent(next, connection.parentId || connection.sourceId || next.parentId); });
       const removing = connections.filter((connection) => connection.kind === 'relation' && connection.sourceId === node.id);
       if (removing.length) {
         const keys = new Set(removing.map((connection) => `${connection.targetId}:${connection.type || ''}`));
@@ -1678,7 +1714,7 @@ function App() {
         const validTarget=nodes.some(n=>n.id===target);
         const intent=current.quick&&!current.reference?connectionIntent(nodes,current.sourceId,target):'connect';
         const invalid=current.quick && ['cycle','self','invalid'].includes(intent);
-        const next = { ...current, intent, invalidTargetId:invalid?target:null, moved:current.moved||Math.hypot(event.clientX-current.startX,event.clientY-current.startY)>5,x: event.clientX, y: event.clientY, targetId: invalid || target === current.sourceId || !validTarget ? null : target };
+        const next = { ...current, intent, extra: event.altKey, invalidTargetId:invalid?target:null, moved:current.moved||Math.hypot(event.clientX-current.startX,event.clientY-current.startY)>5,x: event.clientX, y: event.clientY, targetId: invalid || target === current.sourceId || !validTarget ? null : target };
         relationDragRef.current = next;
         setRelationDrag(next);
       }
@@ -1728,9 +1764,9 @@ function App() {
           else if(finalRelationDrag.targetId && finalRelationDrag.reference)commitRelation(finalRelationDrag.sourceId,finalRelationDrag.targetId,'reference');
           else if(finalRelationDrag.targetId) {
             if(finalRelationDrag.intent==='connected'){notify(say('这两个想法已连接。','These ideas are already connected.'));return;}
-            const next = attachThoughtChild(nodes, finalRelationDrag.sourceId, finalRelationDrag.targetId);
+            const next = attachThoughtChild(nodes, finalRelationDrag.sourceId, finalRelationDrag.targetId, !!finalRelationDrag.extra);
             if (next === nodes) setStorageWarning(tr('不能把节点继承到自己的后代。',"Cannot inherit from a descendant"));
-            else { if(nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId!==finalRelationDrag.sourceId)notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));setNodes(next); pulseThought(worldRef.current,finalRelationDrag.targetId); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
+            else { if(finalRelationDrag.extra)notify(say('已添加为另一个父节点。','Added as another parent.'));else if(nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId!==finalRelationDrag.sourceId)notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));setNodes(next); pulseThought(worldRef.current,finalRelationDrag.targetId); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
           }
           else if(!document.elementsFromPoint(event.clientX,event.clientY).some(el=>el.closest?.('.node,.composer,.inspector,.ix,.quick-thought-editor')))createQuickIdea(clientWorld(event),[finalRelationDrag.sourceId]);
         }
@@ -1774,7 +1810,7 @@ function App() {
           const intersects = box.right >= canvasRect.left + left && box.left <= canvasRect.left + right && box.bottom >= canvasRect.top + top && box.top <= canvasRect.top + bottom;
           if (!intersects) return [];
           const kind = path.dataset.connectionKind;
-          return [{ key: path.dataset.connectionKey, kind, sourceId: path.dataset.sourceId, targetId: path.dataset.targetId, childId: path.dataset.childId, type: path.dataset.connectionType }];
+          return [{ key: path.dataset.connectionKey, kind, sourceId: path.dataset.sourceId, targetId: path.dataset.targetId, childId: path.dataset.childId, parentId: path.dataset.parentId, type: path.dataset.connectionType }];
         });
         setSelectedConnections(picked);
         if (picked.length) setLineSelectionMenu({ open: true });
@@ -2038,6 +2074,57 @@ function App() {
     const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));
     const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined;
+    const close = (event) => { if (!event.target.closest?.('.export-wrap')) setExportMenuOpen(false); };
+    const key = (event) => { if (event.key === 'Escape') setExportMenuOpen(false); };
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key); };
+  }, [exportMenuOpen]);
+  async function saveExport(data, name, type) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type });
+    if (window.showSaveFilePicker) {
+      try {
+        const ext = name.slice(name.lastIndexOf('.'));
+        const handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: name, accept: { [type.split(';')[0]]: [ext] } }] });
+        const writable = await handle.createWritable(); await writable.write(blob); await writable.close();
+        notify(tr(`已导出 ${handle.name}`, `Exported ${handle.name}`));
+        return;
+      } catch (error) { if (error?.name === 'AbortError') return; }
+    }
+    downloadWorkspaceFile(blob, name, type);
+    notify(tr(`已导出 ${name}，在浏览器的下载文件夹里`, `Exported ${name} to your browser's downloads folder`));
+  }
+  async function exportShareable(kind) {
+    setExportMenuOpen(false);
+    try {
+      if (kind === 'wdf') { if (await exportCanvases([activeCanvasId])) notify(tr('已导出 WDF 画布文件，在浏览器的下载文件夹里', "Exported WDF canvas file to your browser's downloads folder")); return; }
+      if (quickEditor) saveQuickIdea();
+      const list = currentNodes();
+      if (!list.length) { setStorageWarning(say('画布是空的，没有可导出的内容。','The canvas is empty; nothing to export.')); return; }
+      const name = (activeCanvas?.name || 'wendaflow').replace(/[\\/:*?"<>|]/g, '_');
+      const bg = getComputedStyle(document.querySelector('.canvas') || document.body).backgroundColor.match(/\d+/g) || [255, 255, 255];
+      const theme = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) < 128 ? 'dark' : 'light';
+      if (kind === 'md') await saveExport(toMarkdown(list, { title: name }), `${name}.md`, 'text/markdown;charset=utf-8');
+      else if (kind === 'html') await saveExport(toHTML(list, { theme, title: name }), `${name}.html`, 'text/html;charset=utf-8');
+      else if (kind === 'svg') await saveExport(toSVG(list, { theme, title: name }).svg, `${name}.svg`, 'image/svg+xml;charset=utf-8');
+      else if (kind === 'png') {
+        const { svg, width, height } = toSVG(list, { theme, title: name });
+        const scale = Math.max(0.25, Math.min(2, 8000 / Math.max(width, height)));
+        const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+        try {
+          const img = new Image(); img.decoding = 'sync';
+          await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('render')); img.src = url; });
+          const canvas = document.createElement('canvas'); canvas.width = Math.round(width * scale); canvas.height = Math.round(height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (!blob) throw new Error(say('图片太大，请改用 SVG。','Image too large; use SVG instead.'));
+          await saveExport(blob, `${name}.png`, 'image/png');
+        } finally { URL.revokeObjectURL(url); }
+      }
+    } catch (error) { setStorageWarning(say('导出失败：','Export failed: ') + error.message); }
+  }
   async function exportCanvases(ids) {
     try {
       if(quickEditor)saveQuickIdea();
@@ -2084,8 +2171,11 @@ function App() {
   async function saveCanvas(silent = false) {
     if(!activeCanvasId||discardedCanvasIdsRef.current.has(activeCanvasId))return;
     if(silent && autosavePolicyRef.current[activeCanvasId]!==true)return;
+    // Autosave must never commit or close an editor the user is still typing in
+    // (it used to end quick-thought editing mid-sentence); only an explicit save does.
+    if(silent && imeComposingRef.current){imePendingSaveRef.current=true;return;}
     if(!silent && editingNode && saveNodeEdit()===false)return;
-    if(quickEditor){saveQuickIdea();}
+    if(!silent && quickEditor){saveQuickIdea();}
     const savingId=activeCanvasId, snapshot=currentNodes(), snapshotViewport={...targetViewportRef.current};
     if(canvasSavesRef.current.has(savingId)){await canvasSavesRef.current.get(savingId);return;}
     let releaseSave;const saveBarrier=new Promise(resolve=>releaseSave=resolve);canvasSavesRef.current.set(savingId,saveBarrier);
@@ -2182,7 +2272,9 @@ function App() {
   function updateAgentSetting(runner, patch) {
     if (actionOptionsOpen) {
       setTaskAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }));
-      setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }));
+      // Edits made while composing belong to the folder they were made for; Settings → Agents keeps the global defaults.
+      if (effectiveFolder) rememberForFolder(effectiveFolder, (saved) => ({ ...saved, settings: { ...saved.settings, [runner]: { ...saved.settings?.[runner], ...patch } } }));
+      else setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }));
       return;
     }
     setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }));
@@ -2240,7 +2332,60 @@ function App() {
     return normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {}).reasoning !== 'none';
   }
 
+  // AI drawing: ask the selected model for a JSON graph and merge it into the canvas as one undoable step.
+  async function drawWithAI() {
+    const request = draft.trim();
+    if (drawBusy) { drawAbortRef.current?.abort(); return; }
+    if (!request) return;
+    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : null;
+    const localProfile = model.startsWith('local:') ? localProfiles.find((item) => item.id === model.slice(6)) : ollama;
+    if (profile && !profile.apiKey) { notify(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`)); return; }
+    setDrawBusy(true);
+    const controller = new AbortController(); drawAbortRef.current = controller;
+    notify(tr('AI 正在绘图……','AI is drawing…'));
+    try {
+      const messages = contextMessages(nodes, null, diagramPrompt(request, nodes), [], []);
+      const chatOptions = normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {});
+      const maxX = nodes.length ? Math.max(...nodes.map((node) => node.x + (nodeSizes.get(node.id)?.width || 224))) : 0;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      const view = viewportRef.current;
+      const origin = nodes.length ? { x: maxX + 160, y: Math.min(...nodes.map((node) => node.y)) } : { x: rect ? (120 - view.x) / view.zoom : 120, y: rect ? (110 - view.y) / view.zoom : 110 };
+      const baseNodes = nodes, baseIds = nodes.map((node) => node.id), stamp = Date.now();
+      let buffer = '', shown = 0, fitTimer = 0;
+      // Cards appear while the model is still writing; one undo step covers the whole drawing.
+      beginHistory();
+      const show = (text, final) => {
+        const partial = parseDiagram(text, baseIds, { partial: true });
+        if (!partial || (!final && partial.nodes.length === shown)) return null;
+        shown = partial.nodes.length;
+        const result = applyDiagram(baseNodes, partial, { origin, stamp, author: 'AI' });
+        setNodes(result.nodes);
+        setSelectedIds(new Set(result.createdIds)); setSelectedId(result.createdIds[0] || null);
+        setNewNodeId(result.createdIds.at(-1) || null);
+        window.clearTimeout(fitTimer); fitTimer = window.setTimeout(() => { setNewNodeId(null); fitViewRef.current?.(); }, 260);
+        return result;
+      };
+      const onToken = (text) => { buffer = text; show(text, false); };
+      let result = null;
+      try {
+        const answer = profile
+          ? await streamCloud({ ...profile, messages, chatOptions, signal: controller.signal, onToken })
+          : await streamOllama({ endpoint: localProfile.endpoint, model: localProfile.model, messages, chatOptions, signal: controller.signal, onToken });
+        result = show(answer || buffer, true);
+        if (!result) parseDiagram(answer || buffer, baseIds);
+      } finally { endHistory(); }
+      if (!result) throw new Error(tr('模型没有画出任何节点','The model drew no nodes'));
+      setDraft('');
+      if (branchingFrom) closeBranch();
+      notify(tr(`AI 画出了 ${result.createdIds.length} 个节点、${result.edgeCount} 条线，可按 Ctrl+Z 撤销。`,`AI drew ${result.createdIds.length} nodes and ${result.edgeCount} lines. Press Ctrl+Z to undo.`));
+    } catch (error) {
+      if (error?.name === 'AbortError') notify(tr('已停止绘图，已画出的部分保留。','Drawing stopped; what was drawn is kept.'));
+      else notify(tr(`绘图失败：${error.message}`,`Drawing failed: ${error.message}`));
+    } finally { setDrawBusy(false); drawAbortRef.current = null; }
+  }
+
   async function createFirstNode() {
+    if (!quickThought && nodeType === 'draw') { drawWithAI(); return; }
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
     if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
@@ -2256,18 +2401,27 @@ function App() {
       title: questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
       content: requestText, prompt: creationType === 'conversation' ? requestText : null,
       x: rootPosition.x, y: rootPosition.y, attachments,
-      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, modelValue: model, actionRunner, actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
+      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, modelValue: model, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
     };
+    const compareRoots = (() => {
+      if (!(compareMode && variantB && creationType === 'action')) return [root];
+      const group = `cmp-${Date.now()}`;
+      return [
+        { ...root, id: `${root.id}-a`, compareGroup: group, variant: 'A', actionIsolated: true },
+        { ...root, id: `${root.id}-b`, x: root.x + 300, model: AGENT_LABELS[variantB.runner], actionRunner: variantB.runner, actionPlanFirst: planFirst && variantB.runner !== 'deepseek', actionOptions: variantB.settings[variantB.runner], compareGroup: group, variant: 'B', actionIsolated: true },
+      ];
+    })();
+    if (compareRoots.length > 1) { root.id = compareRoots[0].id; }
     const sourceNodes = nodes;
-    setNodes((items) => [...items, root]);
+    setNodes((items) => [...items, ...compareRoots]);
     setSelectedId(root.id);
     setSelectedIds(new Set([root.id]));
     setNewNodeId(root.id);
-    setDraft(''); setAttachments([]); setRootComposerOpen(false); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(JSON.parse(JSON.stringify(agentSettings)));
+    setDraft(''); setAttachments([]); setRootComposerOpen(false); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(settingsForFolder(activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '')); resetCompare();
     if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
     nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
     if (root.type === 'conversation') await generateResponse(root.id, model, sourceNodes, null, requestText, root.attachments);
-    if (root.type === 'action') void approveAction(root, [...sourceNodes, root], activeCanvas);
+    if (root.type === 'action') compareRoots.forEach((card) => void approveAction(card, [...sourceNodes, ...compareRoots], activeCanvas));
   }
 
   async function discardTemporaryCanvas(id) {
@@ -2372,6 +2526,7 @@ function App() {
   }
 
   async function createBranch() {
+    if (!quickThought && nodeType === 'draw') { drawWithAI(); return; }
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
     if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
@@ -2391,7 +2546,7 @@ function App() {
       setCollapsedIds((current) => { const next = new Set(current); next.delete(selected.id); return next; });
       setNewNodeId(created[0].id);
       selectNode(created[0].id);
-      closeBranch(); setDraft(''); setAttachments([]); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(JSON.parse(JSON.stringify(agentSettings)));
+      closeBranch(); setDraft(''); setAttachments([]); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(settingsForFolder(activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''));
       created.forEach((node) => generateResponse(node.id, node.modelValue, nodes, selected.id, text, node.attachments, node.contextExclusions, activeCanvasIdRef.current, extraRelations));
       return;
     }
@@ -2409,21 +2564,30 @@ function App() {
       attachments,
       x: position.x,
       y: position.y,
-      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, actionRunner, actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', contextRelations: [...pendingContextRelations], execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
+      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', contextRelations: [...pendingContextRelations], execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
       modelValue: creationType === 'conversation' ? model : null,
       contextExclusions: [...excludedContextIds],
     };
-    setNodes((items) => [...items, next]);
+    const compareCards = (() => {
+      if (!(compareMode && variantB && creationType === 'action')) return [next];
+      const group = `cmp-${Date.now()}`;
+      return [
+        { ...next, id: `${id}-a`, compareGroup: group, variant: 'A', actionIsolated: true },
+        { ...next, id: `${id}-b`, y: next.y + 230, model: AGENT_LABELS[variantB.runner], actionRunner: variantB.runner, actionPlanFirst: planFirst && variantB.runner !== 'deepseek', actionOptions: variantB.settings[variantB.runner], compareGroup: group, variant: 'B', actionIsolated: true },
+      ];
+    })();
+    setNodes((items) => [...items, ...compareCards]);
     setCollapsedIds((current) => {
       if (!current.has(selected.id)) return current;
       const expanded = new Set(current);
       expanded.delete(selected.id);
       return expanded;
     });
-    setNewNodeId(id);
+    setNewNodeId(compareCards[0].id);
     if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
     nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
-    selectNode(id);
+    selectNode(compareCards[0].id);
+    resetCompare();
     const extraRelations = [...pendingContextRelations];
     closeBranch();
     setDraft('');
@@ -2432,7 +2596,7 @@ function App() {
     // communicate the connection phase.  Do not use that display status as a
     // dispatch guard: doing so created the card but never sent its request.
     if (next.type === 'action') {
-      void approveAction(next, [...nodes, next], activeCanvas);
+      compareCards.forEach((card) => void approveAction(card, [...nodes, ...compareCards], activeCanvas));
     } else if (next.type === 'conversation') {
       await generateResponse(id, model, nodes, selected.id, text, next.attachments, next.contextExclusions, activeCanvasIdRef.current, extraRelations);
     }
@@ -2809,10 +2973,13 @@ function App() {
     if (nodeToEdit.id !== selectedId) { setSelectedId(nodeToEdit.id); setSelectedIds(new Set([nodeToEdit.id])); }
     const card = worldRef.current?.querySelector(`.node[data-node-id="${CSS.escape(nodeToEdit.id)}"]`);
     setInlineEditSize(card ? { width: Math.max(280,card.offsetWidth), height: Math.max(240,card.offsetHeight) } : {width:280,height:240});
-    setEditDraft({ title: nodeToEdit.title || '', prompt: nodeToEdit.prompt || '', content: nodeToEdit.content || '', type: nodeToEdit.type, tags: (nodeToEdit.tags || []).join('，'), note: nodeToEdit.note || '', color: nodeToEdit.color || '' });
+    setEditDraft({ title: nodeToEdit.title || '', prompt: nodeToEdit.prompt || '', content: nodeToEdit.type === 'thought' && sameText(nodeToEdit.content, nodeToEdit.title) ? '' : nodeToEdit.content || '', type: nodeToEdit.type, tags: (nodeToEdit.tags || []).join('，'), note: nodeToEdit.note || '', color: nodeToEdit.color || '' });
     setEditingNode(nodeToEdit.id);
     setInspectorTab('actions');
   }
+
+  // A quick idea stores its sentence as both title and content; that copy is not a body the user wrote.
+  function sameText(a, b) { const norm = (value) => String(value || '').trim().replace(/\s+/g, ' '); return norm(a) === norm(b); }
 
   function saveNodeEdit() {
     if (!canEditCard(selected)) return false;
@@ -2997,6 +3164,45 @@ function App() {
     }, 230);
   }
 
+  // Follows one agent job until it settles, mirroring its events/approvals/changes onto the card. Also used to
+  // pick a run back up after the page was reloaded while it was still going.
+  async function followAgentJob({ canvasId, actionId, jobId, runner, task, initial = null, inheritedIds = [], workspace = '', forkedFrom = '' }) {
+    const runnerName = AGENT_LABELS[runner] || runner;
+    followedJobsRef.current.add(jobId);
+    try {
+      let result = initial;
+      if (!result) {
+        const first = await fetch(`${LOCAL_PROXY_URL}/agent/status?id=${encodeURIComponent(jobId)}`);
+        result = await first.json();
+        if (!first.ok) throw new Error(result.error);
+      }
+      let announcedApproval = '';
+      while (result.status === 'running') {
+        if (result.pending?.[0]?.id && result.pending[0].id !== announcedApproval) { announcedApproval = result.pending[0].id; notify(tr(`${runnerName} 正在等待你的批准。`, `${runnerName} is waiting for your approval.`)); desktopNotify(tr('需要你的批准', 'Approval needed'), `${runnerName} · ${result.pending[0].tool}`, actionId); }
+        updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
+        await new Promise((resolve) => window.setTimeout(resolve, 280));
+        const statusResponse = await fetch(`${LOCAL_PROXY_URL}/agent/status?id=${encodeURIComponent(jobId)}`); result = await statusResponse.json();
+        if (!statusResponse.ok) throw new Error(result.error);
+      }
+      const finalStatus = result.status === 'done' ? 'done' : result.status === 'stopped' ? 'stopped' : 'failed';
+      if (finalStatus !== 'stopped') desktopNotify(finalStatus === 'done' ? tr('任务已完成', 'Task finished') : tr('任务失败', 'Task failed'), `${runnerName} · ${task.slice(0, 80)}`, actionId);
+      updateTaskNode(canvasId, actionId, (node) => ({ ...node, status: finalStatus, content: result.output ? `${task}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${result.output}` : node.content, error: result.error || null, execution: { ...(node.execution || {}), jobId, runner, pending: [], canSteer: false, sessionId: result.sessionId || '', forkedFrom, completedAt: result.completedAt, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, workspace, output: result.output } }));
+    } finally { followedJobsRef.current.delete(jobId); }
+  }
+
+  // A card still marked "running" after a reload has lost its poller: pick the job up again, or say it is gone.
+  useEffect(() => {
+    if (PUBLIC_WEB) return;
+    const canvasId = activeCanvasIdRef.current;
+    for (const node of nodes) {
+      const jobId = node.execution?.jobId;
+      if (node.type !== 'action' || node.status !== 'running' || !jobId || followedJobsRef.current.has(jobId)) continue;
+      const task = node.content.split('\n\n---\n\n')[0];
+      void followAgentJob({ canvasId, actionId: node.id, jobId, runner: node.actionRunner || node.execution.runner || 'codex', task, inheritedIds: node.execution.inheritedNodeIds || [], workspace: node.execution.workspace || '', forkedFrom: node.execution.forkedFrom || '' })
+        .catch(() => updateTaskNode(canvasId, node.id, (item) => ({ ...item, status: 'failed', error: tr('找不到这次运行（后端可能已重启），无法继续跟踪。', 'This run could not be found (the backend may have restarted), so it can no longer be followed.'), execution: { ...(item.execution || {}), pending: [], canSteer: false } })));
+    }
+  }, [nodes]);
+
   async function approveAction(actionNode = selected, sourceNodes = nodes, canvasSnapshot = activeCanvas) {
     if(PUBLIC_WEB){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
     if (actionNode?.type !== 'action') return;
@@ -3009,7 +3215,7 @@ function App() {
     // A Pi card branched from another Pi card continues a fork of that card's Pi session, so the
     // cards already inside that session are not sent again as pasted context.
     const piFork = (() => {
-      if ((actionNode.actionRunner || 'codex') !== 'pi') return null;
+      if ((actionNode.actionRunner || 'codex') !== 'pi' || actionNode.actionIsolated) return null;
       const isPiRun = (node) => node?.type === 'action' && node.actionRunner === 'pi' && node.execution?.sessionId;
       let parent = sourceNodes.find((node) => node.id === actionNode.parentId);
       if (!isPiRun(parent) || excluded.has(parent.id)) return null;
@@ -3028,7 +3234,12 @@ function App() {
       return `[${index + 1}] ${label}「${node.title}」${question}\n内容：${node.content}`;
     }).join('\n\n');
     const inheritedAttachments = inherited.flatMap((node) => node.attachments || []);
-    const prompt = `${context ? `这是 Wendaflow 画布已经确认的上下文。必须先阅读并使用它；它不是可忽略的附注：\n\n${context}\n\n---\n\n` : ''}当前需要执行的任务：\n${task}\n\n请在最终答复中说明你实际使用了哪些上下文节点；如果上下文与任务冲突，优先说明冲突而不是静默忽略。`;
+    const planning = actionNode.actionPlanFirst === true && !actionNode.planApproved;
+    const slashCommand = (actionNode.actionRunner || 'codex') === 'pi' && /^\/[\w:.-]+/.test(task.trim());
+    const planDirective = planning ? '\n\n【计划模式】这一轮只做只读分析：不要修改、创建或删除任何文件，也不要运行有副作用的命令。请先阅读相关文件，然后给出一份可执行的分步计划：每一步要做什么、会动哪些文件、有什么风险或需要确认的地方。用户确认后才会真正执行。' : '';
+    const defaultPrompt = `${context ? `这是 Wendaflow 画布已经确认的上下文。必须先阅读并使用它；它不是可忽略的附注：\n\n${context}\n\n---\n\n` : ''}当前需要执行的任务：\n${task}${planDirective}\n\n请在最终答复中说明你实际使用了哪些上下文节点；如果上下文与任务冲突，优先说明冲突而不是静默忽略。`;
+    // A Pi slash command (/skill:name …) only works at the very start of the message, so context follows it.
+    const prompt = slashCommand ? `${task.trim()}${context ? `\n\n---\n以下是 Wendaflow 画布上的上下文，仅供参考：\n\n${context}` : ''}` : defaultPrompt;
     const runner = actionNode.actionRunner || 'codex';
     const runnerName = AGENT_LABELS[runner];
     const taskCanvasId = activeCanvasIdRef.current;
@@ -3037,31 +3248,61 @@ function App() {
       const taskAttachments = [...inheritedAttachments, ...(actionNode.attachments || [])].filter((item) => item.dataUrl || item.sourcePath).map((item) => ({ name: item.name, type: item.type, dataUrl: item.dataUrl, sourcePath: item.sourcePath || '' }));
       const images = taskAttachments.filter((item) => item.dataUrl?.startsWith('data:image/'));
       const files = taskAttachments.filter((item) => !item.dataUrl?.startsWith('data:image/'));
-      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', options: { ...(actionNode.actionOptions || agentSettings[runner]), ...(piFork ? { parentSession: piFork.sessionId } : {}) } }) });
+      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', isolate: actionNode.actionIsolated === true, options: { ...(actionNode.actionOptions || agentSettings[runner]), ...(planning ? ({ pi: { permission: 'read', readOnly: true }, codex: { accessMode: 'read-only' }, claude: { permissionMode: 'plan' } }[runner] || {}) : {}), ...(piFork ? { parentSession: piFork.sessionId } : {}) } }) });
       let result = await response.json();
       if (!response.ok) throw new Error(result.error || tr(`Codex 返回 ${response.status}`,`Codex returned ${response.status}`));
       const jobId = result.id;
       const live=activeCanvasIdRef.current===taskCanvasId?currentNodes():(canvasDraftsRef.current.get(taskCanvasId)||await readCanvasState(taskCanvasId))?.nodes;
       if(!live?.some(node=>node.id===actionId && node.type==='action' && node.status==='running')){await stopAgentJob({execution:{jobId}});return;}
-      let announcedApproval = '';
-      while (result.status === 'running') {
-        if (result.pending?.[0]?.id && result.pending[0].id !== announcedApproval) { announcedApproval = result.pending[0].id; notify(tr(`${runnerName} 正在等待你的批准。`, `${runnerName} is waiting for your approval.`)); }
-        updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], inheritedNodeIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '' } }));
-        await new Promise((resolve) => window.setTimeout(resolve, 280));
-        const statusResponse = await fetch(`${LOCAL_PROXY_URL}/agent/status?id=${encodeURIComponent(jobId)}`); result = await statusResponse.json();
-        if (!statusResponse.ok) throw new Error(result.error);
-      }
-      const finalStatus = result.status === 'done' ? 'done' : result.status === 'stopped' ? 'stopped' : 'failed';
-      updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, status: finalStatus, content: result.output ? `${task}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${result.output}` : node.content, error: result.error || null, execution: { ...(node.execution || {}), jobId, runner, pending: [], canSteer: false, sessionId: result.sessionId || '', forkedFrom: piFork?.sessionId || '', completedAt: result.completedAt, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], inheritedNodeIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', output: result.output } }));
+      await followAgentJob({ canvasId: taskCanvasId, actionId, jobId, runner, task, initial: result, inheritedIds: inherited.map((item) => item.id), workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', forkedFrom: piFork?.sessionId || '' });
     } catch (error) {
       updateTaskNode(taskCanvasId, actionId, (node) => ({ ...node, status: 'failed', content: `${task}\n\n---\n\n${tr(`${runnerName} 执行失败：${systemText(error.message)}`,`${runnerName} execution failed: ${systemText(error.message)}`)}`, error: error.message }));
     }
   }
 
-  async function respondAgentApproval(node, requestId, approved) {
+  // A Pi session found on disk becomes a finished action card; branching from it then forks that very session.
+  function importPiSession(detail) {
+    const { session, events, output, prompt } = detail;
+    const parent = selected && nodes.some((node) => node.id === selected.id) ? selected : null;
+    const position = parent ? findBranchPosition(nodes, parent, nodeSizes) : rootPosition;
+    const id = `import-${Date.now()}`;
+    const runnerName = AGENT_LABELS.pi;
+    const card = {
+      id, parentId: parent?.id || null, type: 'action', author: tr('执行代理',"Agent"), model: runnerName,
+      title: questionTitle(prompt, tr('新行动',"New action")),
+      content: output ? `${prompt}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${output}` : prompt,
+      prompt: null, attachments: [], x: position.x, y: position.y, status: 'done',
+      actionRunner: 'pi', actionOptions: JSON.parse(JSON.stringify(agentSettings.pi)), actionWorkspace: session.cwd || '', contextRelations: [], contextExclusions: [],
+      execution: { activityCollapsed: true, runner: 'pi', imported: true, sessionId: session.id, forkedFrom: '', pending: [], canSteer: false, events, terminal: '', artifacts: [], inheritedNodeIds: [], workspace: session.cwd || '', output, completedAt: session.updatedAt },
+    };
+    setNodes((items) => [...items, card]);
+    setNewNodeId(id); selectNode(id);
+    if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
+    nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
+    notify(tr('已导入 Pi 会话。从这张卡片分支，会接着这个会话继续。', 'Pi session imported. Branch from this card to continue that session.'));
+  }
+
+  // "Plan first" cards only analyse; this starts the real run as a branch that continues the same session.
+  function executePlan(node) {
+    const position = findBranchPosition(nodes, node, nodeSizes);
+    const id = `node-${Date.now()}`;
+    const text = tr('按上面的计划执行。', 'Carry out the plan above.');
+    const child = { id, parentId: node.id, type: 'action', author: tr('执行代理', "Agent"), model: AGENT_LABELS[node.actionRunner], title: questionTitle(text, tr('新行动', "New action")), content: text, prompt: null, attachments: [], x: position.x, y: position.y, status: 'running', generationPhase: null, modelValue: null, actionRunner: node.actionRunner, actionOptions: node.actionOptions, actionWorkspace: node.actionWorkspace || '', actionIsolated: node.actionIsolated === true, contextRelations: [], contextExclusions: [], execution: { activityCollapsed: true, events: [] } };
+    setNodes((items) => [...items.map((item) => item.id === node.id ? { ...item, planApproved: true } : item), child]);
+    setNewNodeId(id); selectNode(id);
+    if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
+    nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
+    void approveAction(child, [...nodes, child], activeCanvas);
+  }
+
+  function applyAgentChanges(node, changes) {
+    setNodes((items) => items.map((item) => item.id === node.id ? { ...item, execution: { ...(item.execution || {}), changes } } : item));
+  }
+
+  async function respondAgentApproval(node, requestId, approved, always = false) {
     const id = node.execution?.jobId;
     if (!id) return;
-    await fetch(`${LOCAL_PROXY_URL}/agent/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, requestId, approved }) });
+    await fetch(`${LOCAL_PROXY_URL}/agent/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, requestId, approved, always }) });
   }
 
   async function steerAgent(node, message, behavior) {
@@ -3128,79 +3369,190 @@ function App() {
     } catch (error) { setStorageWarning(error.message || tr('无法下载产物',"Cannot download artifact")); }
   }
 
+  // Agent settings are remembered per working folder: the runner and any option changed in the composer for that folder.
+  const effectiveFolder = actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '';
+  function settingsForFolder(folder) {
+    const merged = JSON.parse(JSON.stringify(agentSettings));
+    const saved = folderSettings[folder]?.settings || {};
+    for (const id of Object.keys(saved)) merged[id] = { ...merged[id], ...saved[id] };
+    return merged;
+  }
+  function rememberForFolder(folder, update) {
+    setFolderSettings((current) => ({ ...current, [folder]: update(current[folder] || {}) }));
+  }
+  function forgetFolder(folder) {
+    setFolderSettings((current) => { const next = { ...current }; delete next[folder]; return next; });
+    setTaskAgentSettings(JSON.parse(JSON.stringify(agentSettings)));
+  }
+  useEffect(() => { try { localStorage.setItem('wendaflow-folder-settings', JSON.stringify(folderSettings)); } catch { /* storage blocked */ } }, [folderSettings]);
+  useEffect(() => {
+    if (!effectiveFolder) return;
+    setTaskAgentSettings(settingsForFolder(effectiveFolder));
+    const savedRunner = folderSettings[effectiveFolder]?.runner;
+    if (savedRunner && enabledAgents.includes(savedRunner)) setActionRunner(savedRunner);
+  }, [effectiveFolder, folderSettings, agentSettings]);
+  useEffect(() => {
+    if (actionOptionsOpen !== 'dir' || !effectiveFolder || PUBLIC_WEB) return undefined;
+    let cancelled = false;
+    fetch(`${LOCAL_PROXY_URL}/agents/project-instructions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: effectiveFolder }) })
+      .then((response) => response.json()).then((result) => { if (!cancelled) setProjectInstructions(result.files || []); }).catch(() => { if (!cancelled) setProjectInstructions([]); });
+    return () => { cancelled = true; };
+  }, [actionOptionsOpen, effectiveFolder]);
+
+  const suggestProps = { enabled: nodeType === 'action' && !PUBLIC_WEB, commandsEnabled: actionRunner === 'pi', workspace: actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '', piCommand: agentSettings.pi?.command || '', tr };
+
+  function renderModeSwitch() {
+    const modes = [['conversation', copy.chat], ['thought', copy.idea], ['draw', tr('绘图','Draw')], ['action', copy.action]].filter(([value]) => !PUBLIC_WEB || value !== 'action');
+    return <div className="segmented" data-seg style={{ '--seg-n': modes.length, '--seg-i': Math.max(0, modes.findIndex(([value]) => value === nodeType)) }}>{modes.map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}</div>;
+  }
+
+  function placePanel(event, width) {
+    const button = event.currentTarget; const host = button.closest('.inline-agent-config');
+    setPopLeft(Math.max(0, Math.min(button.offsetLeft, (host?.offsetWidth || 0) - width)));
+  }
+
   function renderActionRunnerControls() {
     if (!enabledAgents.length) {
       return <button className="agent-setup-button" onClick={openAgentSettings}>{tr('配置执行器…','Set up an agent…')}</button>;
     }
     return <>
-      <ModelPicker language={uiLanguage} value={actionRunner} onChange={setActionRunner} options={enabledAgents.map((id) => ({ value: id, label: AGENT_LABELS[id] }))} />
       {renderActionControls()}
     </>;
   }
 
   function renderActionControls() {
-    const options = taskAgentSettings[actionRunner];
-    const runnerLabel = AGENT_LABELS[actionRunner];
+    // While comparing, the chips edit whichever variant (A = the normal composer state, B = its own copy) is selected.
+    const onB = compareMode && activeVariant === 'B' && !!variantB;
+    const runnerNow = onB ? variantB.runner : actionRunner;
+    const settingsNow = onB ? variantB.settings : taskAgentSettings;
+    const setRunnerNow = (value) => { if (onB) setVariantB((current) => ({ ...current, runner: value })); else { setActionRunner(value); if (effectiveFolder) rememberForFolder(effectiveFolder, (saved) => ({ ...saved, runner: value })); } };
+    const updateVariantSetting = (runner, patch) => (onB ? setVariantB((current) => ({ ...current, settings: { ...current.settings, [runner]: { ...current.settings[runner], ...patch } } })) : updateAgentSetting(runner, patch));
+    const options = settingsNow[runnerNow];
+    const runnerLabel = AGENT_LABELS[runnerNow];
     const accessLabels = { 'read-only': tr('只读','Read only'), 'workspace-write': tr('工作区可写','Workspace write'), 'auto-review': tr('自动审查','Auto review'), 'full-access': tr('完全访问','Full access') };
     const reasoningLabels = { low:tr('低','Low'),medium:tr('中','Medium'),high:tr('高','High'),xhigh:tr('极高','XHigh'),max:tr('最高','Max') };
-    const summary = actionRunner === 'codex' ? `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${accessLabels[options.accessMode] || tr('工作区可写','Workspace write')}` : actionRunner === 'claude' ? `${options.model || tr('默认模型','Default model')} · ${options.permissionMode}` : actionRunner === 'pi' ? `${options.model || tr('默认模型','Default model')} · ${(options.permission || (options.readOnly ? 'read' : 'full')) === 'read' ? tr('只读','Read only') : (options.permission || 'full') === 'ask' ? tr('执行前询问','Ask before acting') : tr('可读写','Read/write')}` : `${reasoningLabels[options.reasoning] || options.reasoning.toUpperCase()} · ${options.thinking ? tr('思考开启','Thinking on') : tr('直接执行','Direct execution')}`;
+    const claudeModes = { default: tr('默认','Default'), plan: tr('计划模式','Plan mode'), acceptEdits: tr('自动接受编辑','Accept edits automatically'), bypassPermissions: tr('完全访问','Full access') };
+    const piPermission = options.permission || (options.readOnly ? 'read' : 'full');
+    const defaultModel = tr('默认模型','Default model');
+    const chipPermission = runnerNow === 'codex' ? { label: accessLabels[options.accessMode] || accessLabels['workspace-write'], danger: options.accessMode === 'full-access' }
+      : runnerNow === 'claude' ? { label: claudeModes[options.permissionMode] || options.permissionMode, danger: options.permissionMode === 'bypassPermissions' }
+      : runnerNow === 'pi' ? { label: piPermission === 'read' ? tr('只读','Read only') : piPermission === 'ask' ? tr('执行前询问','Ask before acting') : tr('完全信任','Full trust'), danger: piPermission === 'full' }
+      : { label: options.thinking ? tr('思考开启','Thinking on') : tr('直接执行','Direct execution'), danger: false };
+    const chipModel = runnerNow === 'codex' ? `${options.model || defaultModel} · ${reasoningLabels[options.reasoning] || options.reasoning}`
+      : runnerNow === 'deepseek' ? (reasoningLabels[options.reasoning] || options.reasoning.toUpperCase())
+      : (options.model || defaultModel);
     const workspace = actionWorkspace || activeCanvas?.workspace || '';
+    const effectiveDirectory = workspace || workspaceConfig?.defaultWorkspace || '';
+    const chipDirectory = effectiveDirectory ? effectiveDirectory.split(/[\\/]/).filter(Boolean).pop() || effectiveDirectory : tr('默认目录','Default folder');
+    const popWidths = { runner: 230, dir: 340, perm: 280, model: 320 };
+    const toggleOptions = (section, event) => {
+      const button = event.currentTarget; const host = button.closest('.inline-agent-config');
+      setPopLeft(Math.max(0, Math.min(button.offsetLeft, (host?.offsetWidth || 0) - popWidths[section])));
+      setActionOptionsOpen((value) => value === section ? false : section);
+    };
+    const panel = actionOptionsOpen;
+    const panelTitle = panel === 'runner' ? runnerLabel : panel === 'dir' ? tr('工作目录','Working directory') : panel === 'perm' ? tr('权限','Permissions') : tr('模型','Model');
+    const permissionChoices = runnerNow === 'codex' ? [['read-only', tr('只读分析','Read-only analysis')], ['workspace-write', tr('工作区可写','Workspace write')], ['auto-review', tr('自动审查并执行','Auto-review and execute')], ['full-access', tr('完全访问（跳过审批与沙箱）','Full access (skip approvals and sandbox)'), true]]
+      : runnerNow === 'claude' ? [['default', claudeModes.default], ['plan', claudeModes.plan], ['acceptEdits', claudeModes.acceptEdits], ['bypassPermissions', claudeModes.bypassPermissions, true]]
+      : runnerNow === 'pi' ? [['ask', tr('执行前询问','Ask before acting'), false, tr('修改文件或运行命令前先征得你的同意','Asks you before editing files or running commands')], ['read', tr('只读（读取与搜索）','Read-only (read and search)'), false, tr('只能读取和搜索，不做任何修改','Can only read and search, never changes anything')], ['full', tr('完全信任','Full trust'), true, tr('不再询问，直接执行所有操作','Never asks, runs everything directly')]] : [];
+    const permissionValue = runnerNow === 'codex' ? options.accessMode : runnerNow === 'claude' ? options.permissionMode : piPermission;
+    const choosePermission = (value) => { if (runnerNow === 'codex') updateVariantSetting('codex', { accessMode: value }); else if (runnerNow === 'claude') updateVariantSetting('claude', { permissionMode: value }); else updateVariantSetting('pi', { permission: value, readOnly: value === 'read' }); setActionOptionsOpen(false); };
     return <div className="inline-agent-config">
-      <button className={`agent-summary-button ${actionOptionsOpen ? 'active' : ''}`} onClick={() => setActionOptionsOpen((value) => !value)}><span>{summary}</span><i>⌄</i></button>
-      {actionOptionsOpen && <div className="agent-config-popover">
-        <header><div><small>{tr('本次行动配置','Action settings')}</small><strong>{runnerLabel}</strong></div><button onClick={() => setActionOptionsOpen(false)}>×</button></header>
-        {actionRunner === 'codex' && <>
-          <div className="inline-option-grid two-column">
-            <label>{tr('模型','Model')}<input value={options.model} onChange={(event) => updateAgentSetting('codex', { model: event.target.value })} placeholder={tr('使用默认模型','Use default model')} /></label>
-            <label>{tr('推理强度','Reasoning effort')}<select value={options.reasoning} onChange={(event) => updateAgentSetting('codex', { reasoning: event.target.value })}><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option><option value="xhigh">{tr('极高','XHigh')}</option></select></label>
-            <label className="full-row">{tr('执行模式','Execution mode')}<select className={options.accessMode === 'full-access' ? 'danger-select' : ''} value={options.accessMode} onChange={(event) => updateAgentSetting('codex', { accessMode: event.target.value })}><option value="read-only">{tr('只读分析','Read-only analysis')}</option><option value="workspace-write">{tr('工作区可写','Workspace write')}</option><option value="auto-review">{tr('自动审查并执行','Auto-review and execute')}</option><option value="full-access">{tr('完全访问（跳过审批与沙箱）','Full access (skip approvals and sandbox)')}</option></select></label>
-            <label>{tr('配置 Profile','Configuration profile')}<input value={options.profile} onChange={(event) => updateAgentSetting('codex', { profile: event.target.value })} placeholder={tr('可选','Optional')} /></label>
-            <label className="inline-checkbox"><input type="checkbox" checked={options.ephemeral !== false} onChange={(event) => updateAgentSetting('codex', { ephemeral: event.target.checked })} />{tr('临时会话','Ephemeral session')}</label>
-          </div>
-          {options.accessMode === 'full-access' && <p className="permission-warning">{tr('完全访问会跳过沙箱和单次审批，仅在你信任任务与工作目录时使用。','Full access skips the sandbox and per-action approvals. Use it only for trusted tasks and directories.')}</p>}
+      <div className="agent-chips">
+        {compareMode && <div className="variant-tabs" role="tablist" aria-label={tr('对比方案','Variants')}>{['A', 'B'].map((key) => <button key={key} role="tab" aria-selected={activeVariant === key} className={activeVariant === key ? 'selected' : ''} onClick={() => { setActiveVariant(key); setActionOptionsOpen(false); }}>{key}</button>)}</div>}
+        <button className={`agent-chip runner ${panel === 'runner' ? 'active' : ''}`} title={tr('执行器','Agent')} onClick={(event) => toggleOptions('runner', event)}><span>{runnerLabel}</span><i>⌄</i></button>
+        <button className={`agent-chip dir ${panel === 'dir' ? 'active' : ''}`} title={`${tr('工作目录','Working directory')}: ${effectiveDirectory || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}`} onClick={(event) => toggleOptions('dir', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" /></svg><span>{chipDirectory}</span></button>
+        <button className={`agent-chip ${chipPermission.danger ? 'danger' : ''} ${panel === 'perm' ? 'active' : ''}`} title={tr('权限','Permissions')} onClick={(event) => toggleOptions('perm', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v3.7c0 3-2 5.3-5 6.9-3-1.6-5-3.9-5-6.9V3.6z" /></svg><span>{chipPermission.label}</span></button>
+        <button className={`agent-chip model-chip ${panel === 'model' ? 'active' : ''}`} title={tr('模型','Model')} onClick={(event) => toggleOptions('model', event)}><span>{chipModel}</span><i>⌄</i></button>
+        {runnerNow !== 'deepseek' && <button className={`agent-chip plan ${planFirst ? 'active' : ''}`} title={tr('先只读分析并给出计划，你确认后再执行','Analyze read-only and propose a plan first; run it only after you confirm')} aria-pressed={planFirst} aria-label={tr('先出计划','Plan first')} onClick={() => setPlanFirst((value) => !value)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg><span>{tr('先出计划','Plan first')}</span></button>}
+        <button className={`agent-chip compare ${compareMode ? 'active' : ''}`} title={tr('同一个任务用两种设置各跑一次，在隔离副本里比较结果','Run the task twice with different settings in isolated copies and compare')} aria-pressed={compareMode} aria-label={tr('并排对比','Compare')} onClick={toggleCompare}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5h9M9.5 2.5 12 5l-2.5 2.5M13 11H4M6.5 8.5 4 11l2.5 2.5" /></svg><span>{tr('并排对比','Compare')}</span></button>
+      </div>
+      {panel && <div className={`chip-pop pop-${panel}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog" aria-label={panelTitle}>
+        {panel === 'runner' && <>
+          <ModelList groups={[{ title: '', items: enabledAgents.map((id) => ({ value: id, label: AGENT_LABELS[id] })) }]} value={runnerNow} onChange={(value) => { setRunnerNow(value); setActionOptionsOpen(false); }} tr={tr} />
+          {enabledAgents.includes('pi') && <button className="pop-link" onClick={() => { setActionOptionsOpen(false); setPiImportOpen(true); }}>{tr('导入 Pi 会话…','Import a Pi session…')}</button>}
+          <button className="pop-link" onClick={() => { setActionOptionsOpen(false); openAgentSettings(); }}>{tr('配置执行器…','Set up an agent…')}</button>
         </>}
-        {actionRunner === 'claude' && <div className="inline-option-grid two-column">
-          <label>{tr('模型','Model')}<input value={options.model} onChange={(event) => updateAgentSetting('claude', { model: event.target.value })} placeholder={tr('使用默认模型','Use default model')} /></label>
-          <label>{tr('权限模式','Permission mode')}<select value={options.permissionMode} onChange={(event) => updateAgentSetting('claude', { permissionMode: event.target.value })}><option value="default">{tr('默认','Default')}</option><option value="plan">{tr('计划模式','Plan mode')}</option><option value="acceptEdits">{tr('自动接受编辑','Accept edits automatically')}</option><option value="bypassPermissions">{tr('完全访问','Full access')}</option></select></label>
-          <label>{tr('最大轮数','Maximum turns')}<input type="number" min="1" max="200" value={options.maxTurns} onChange={(event) => updateAgentSetting('claude', { maxTurns: event.target.value })} placeholder={tr('不限','No limit')} /></label>
-          <label className="inline-checkbox"><input type="checkbox" checked={!!options.verbose} onChange={(event) => updateAgentSetting('claude', { verbose: event.target.checked })} />{tr('详细日志','Verbose logs')}</label>
-        </div>}
-        {actionRunner === 'pi' && <div className="inline-option-grid two-column">
-          <label className="full-row">{tr('模型','Model')}<select value={piSelectionValue(options)} onChange={(event) => updateAgentSetting('pi', { ...parsePiSelection(event.target.value), thinking: '' })}><PiModelOptions info={piInfo} selection={piSelectionValue(options)} tr={tr} /></select></label>
-          <label>{tr('思考强度','Thinking level')}<select value={options.thinking || ''} disabled={piLevels?.levels?.length === 1 && piLevels.levels[0] === 'off'} onChange={(event) => updateAgentSetting('pi', { thinking: event.target.value })}><PiThinkingOptions levels={piLevels} current={options.model ? undefined : piInfo?.current?.thinkingLevel} tr={tr} /></select></label>
-          <label>{tr('权限','Permissions')}<select value={options.permission || (options.readOnly ? 'read' : 'full')} onChange={(event) => updateAgentSetting('pi', { permission: event.target.value, readOnly: event.target.value === 'read' })}><option value="ask">{tr('执行前询问','Ask before acting')}</option><option value="full">{tr('完全信任','Full trust')}</option><option value="read">{tr('只读（读取与搜索）','Read-only (read and search)')}</option></select></label>
-        </div>}
-        {actionRunner === 'deepseek' && <div className="inline-option-grid two-column">
-          <label>{tr('配置档','Profile')}<input value={options.profile} disabled /></label>
-          <label>{tr('推理策略','Reasoning strategy')}<select value={options.reasoning} onChange={(event) => updateAgentSetting('deepseek', { reasoning: event.target.value })}><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option><option value="max">{tr('最高','Max')}</option></select></label>
-          <label className="inline-checkbox full-row"><input type="checkbox" checked={options.thinking} onChange={(event) => updateAgentSetting('deepseek', { thinking: event.target.checked })} />{tr('要求充分思考后再执行','Require extended thinking before execution')}</label>
-        </div>}
-        <div className="inline-workspace"><div><small>{tr('工作目录','Working directory')}</small><strong title={workspace || workspaceConfig?.defaultWorkspace || ''}>{workspace ? workspace.split(/[\\/]/).pop() : workspaceConfig?.defaultWorkspace ? workspaceConfig.defaultWorkspace.split(/[\\/]/).pop() : tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</strong></div><button onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button className="clear-workspace" onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
-        <div className="workspace-path"><input value={workspaceDraft} onChange={(event) => { setWorkspaceDraft(event.target.value); setWorkspaceError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void applyTypedWorkspace(); } }} placeholder={tr('或直接输入文件夹路径，按回车确认','Or type a folder path and press Enter')} aria-label={tr('工作目录路径','Working directory path')} spellCheck={false} />{workspaceError && <p role="alert">{workspaceError}</p>}</div>
-        <footer><span>{tr('点击发送即授权并立即执行','Sending authorizes immediate execution')}</span><button onClick={() => setActionOptionsOpen(false)}>{tr('完成','Done')}</button></footer>
+        {panel === 'perm' && runnerNow !== 'deepseek' && <div className="popover-choices" role="radiogroup" aria-label={panelTitle}>{permissionChoices.map(([value, label, risky, desc]) => <button key={value} role="radio" aria-checked={permissionValue === value} className={`${permissionValue === value ? 'selected' : ''} ${risky ? 'risky' : ''}`} onClick={() => choosePermission(value)}><span><b>{label}</b>{desc && <em>{desc}</em>}</span><i aria-hidden="true">✓</i></button>)}</div>}
+        {panel === 'perm' && runnerNow === 'codex' && options.accessMode === 'full-access' && <p className="permission-warning">{tr('完全访问会跳过沙箱和单次审批，仅在你信任任务与工作目录时使用。','Full access skips the sandbox and per-action approvals. Use it only for trusted tasks and directories.')}</p>}
+        {panel === 'perm' && runnerNow === 'deepseek' && <div className="inline-option-grid"><label className="inline-checkbox full-row"><input type="checkbox" checked={options.thinking} onChange={(event) => updateVariantSetting('deepseek', { thinking: event.target.checked })} />{tr('要求充分思考后再执行','Require extended thinking before execution')}</label></div>}
+        {panel === 'model' && runnerNow === 'pi' && <>
+          <ModelList groups={piModelGroups(piInfo, piSelectionValue(options), tr)} value={piSelectionValue(options)} searchable={(piInfo?.models?.length || 0) > 8} onChange={(value) => updateVariantSetting('pi', { ...parsePiSelection(value), thinking: '' })} tr={tr} />
+          <EffortSlider levels={piEffortLevels(piLevels, tr)} value={options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || '')} onChange={(value) => updateVariantSetting('pi', { thinking: value })} label={tr('思考强度','Thinking level')} defaultLabel={tr('默认','Default')} disabledNote={tr('此模型不能调节思考强度','This model has no adjustable thinking level')} tr={tr} />
+        </>}
+        {panel === 'model' && runnerNow === 'codex' && <>
+          <EffortSlider levels={['low', 'medium', 'high', 'xhigh'].map((value) => ({ value, label: reasoningLabels[value] }))} value={options.reasoning} onChange={(value) => updateVariantSetting('codex', { reasoning: value })} label={tr('推理强度','Reasoning effort')} defaultLabel={tr('默认','Default')} tr={tr} />
+          <div className="inline-option-grid two-column">
+            <label className="full-row">{tr('模型','Model')}<input value={options.model} onChange={(event) => updateVariantSetting('codex', { model: event.target.value })} placeholder={tr('使用默认模型','Use default model')} /></label>
+            <label>{tr('配置 Profile','Configuration profile')}<input value={options.profile} onChange={(event) => updateVariantSetting('codex', { profile: event.target.value })} placeholder={tr('可选','Optional')} /></label>
+            <label className="inline-checkbox"><input type="checkbox" checked={options.ephemeral !== false} onChange={(event) => updateVariantSetting('codex', { ephemeral: event.target.checked })} />{tr('临时会话','Ephemeral session')}</label>
+          </div>
+        </>}
+        {panel === 'model' && runnerNow === 'claude' && <>
+          <ModelList groups={[{ title: '', items: [{ value: '', label: defaultModel }, { value: 'sonnet', label: 'Sonnet' }, { value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }, ...(options.model && !['sonnet', 'opus', 'haiku'].includes(options.model) ? [{ value: options.model, label: options.model }] : [])] }]} value={options.model || ''} onChange={(value) => updateVariantSetting('claude', { model: value })} tr={tr} />
+          <div className="inline-option-grid two-column">
+            <label>{tr('自定义模型','Custom model')}<input value={options.model} onChange={(event) => updateVariantSetting('claude', { model: event.target.value })} placeholder={tr('使用默认模型','Use default model')} /></label>
+            <label>{tr('最大轮数','Maximum turns')}<input type="number" min="1" max="200" value={options.maxTurns} onChange={(event) => updateVariantSetting('claude', { maxTurns: event.target.value })} placeholder={tr('不限','No limit')} /></label>
+            <label className="inline-checkbox full-row"><input type="checkbox" checked={!!options.verbose} onChange={(event) => updateVariantSetting('claude', { verbose: event.target.checked })} />{tr('详细日志','Verbose logs')}</label>
+          </div>
+        </>}
+        {panel === 'model' && runnerNow === 'deepseek' && <>
+          <EffortSlider levels={['low', 'medium', 'high', 'max'].map((value) => ({ value, label: reasoningLabels[value] }))} value={options.reasoning} onChange={(value) => updateVariantSetting('deepseek', { reasoning: value })} label={tr('推理策略','Reasoning strategy')} defaultLabel={tr('默认','Default')} tr={tr} />
+          <div className="inline-option-grid"><label>{tr('配置档','Profile')}<input value={options.profile} disabled /></label></div>
+        </>}
+        {panel === 'dir' && <>
+          <div className="pop-dir-current"><small>{tr('工作目录','Working directory')}</small><code title={effectiveDirectory}>{effectiveDirectory || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</code></div>
+          <div className="pop-dir-actions"><button className="primary" onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
+          <div className="workspace-path"><input value={workspaceDraft} onChange={(event) => { setWorkspaceDraft(event.target.value); setWorkspaceError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void applyTypedWorkspace(); } }} placeholder={tr('或直接输入文件夹路径，按回车确认','Or type a folder path and press Enter')} aria-label={tr('工作目录路径','Working directory path')} spellCheck={false} />{workspaceError && <p role="alert">{workspaceError}</p>}</div>
+          <div className="pop-dir-more">
+            {projectInstructions.length > 0 && (
+              <details>
+                <summary>{tr('智能体会读取的项目说明', 'Project instructions the agent reads')} · {projectInstructions.length}</summary>
+                {projectInstructions.map((file) => <div key={file.path} className="pop-instruction"><b title={file.path}>{file.name}</b><small>{file.scope === 'global' ? tr('Pi 全局', 'Pi global') : file.scope === 'folder' ? tr('此目录', 'This folder') : tr('上级目录', 'Parent folder')} · {(file.bytes / 1024).toFixed(1)} KB</small><pre>{file.head}</pre></div>)}
+              </details>
+            )}
+            {folderSettings[effectiveFolder] && <button className="pop-link" onClick={() => forgetFolder(effectiveFolder)}>{tr('忘记这个目录的执行器设置', "Forget this folder's agent settings")}</button>}
+            {effectiveFolder && !folderSettings[effectiveFolder] && <small className="pop-hint">{tr('在这里改的执行器、模型、权限会记在这个目录上。', 'Agent, model and permission changes made here are remembered for this folder.')}</small>}
+          </div>
+        </>}
       </div>}
     </div>;
   }
+
+  const drawThinkingOn = (() => {
+    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : localProfiles.find((item) => item.id === model.slice(6));
+    return normalizeChatOptions(profile?.chatOptions || {}).reasoning !== 'none';
+  })();
 
   function renderConversationControls() {
     const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : localProfiles.find((item) => item.id === model.slice(6));
     const options = normalizeChatOptions(profile?.chatOptions || {});
     const support = chatOptionSupport(profile, { local: !model.startsWith('cloud:') });
     const reasoningDisabled = options.reasoning === 'none';
-    const reasoningLabel = ({none:tr('已关闭','Off'),low:tr('低','Low'),medium:tr('中','Medium'),high:tr('高','High')}[options.reasoning] || options.reasoning);
-    const summary = !support.toggle ? tr('默认设置','Default') : `${reasoningDisabled || !options.thinking ? tr('直接回答','Direct answer') : tr('思考开启','Thinking on')}${support.levels ? ` · ${reasoningLabel}` : ''}`;
+    const levelLabels = { none: tr('已关闭','Off'), low: tr('低','Low'), medium: tr('中','Medium'), high: tr('高','High') };
+    const effortSummary = support.toggle ? `${reasoningDisabled || !options.thinking ? tr('直接回答','Direct answer') : tr('思考开启','Thinking on')}${support.levels ? ` · ${levelLabels[options.reasoning] || options.reasoning}` : ''}` : tr('创造性','Creativity');
+    const hasEffort = support.toggle || support.temperature;
+    const panel = chatOptionsOpen;
+    const widths = { model: 320, effort: 300 };
+    const toggle = (section, event) => { placePanel(event, widths[section]); setChatOptionsOpen((value) => value === section ? false : section); };
+    const cloudItems = cloudProfiles.map((item) => ({ value: `cloud:${item.id}`, label: item.name, hint: item.model }));
+    const localItems = localProfiles.map((item) => ({ value: `local:${item.id}`, label: item.name, hint: item.model }));
+    const groups = cloudItems.length && localItems.length ? [{ title: tr('云端模型','Cloud models'), items: cloudItems }, { title: tr('本地模型','Local models'), items: localItems }] : [{ title: '', items: [...cloudItems, ...localItems] }];
+    const creativity = [[0.2, tr('精确','Precise')], [0.7, tr('平衡','Balanced')], [1, tr('发散','Creative')]];
     return <div className="inline-agent-config conversation-config">
-      <button className={`agent-summary-button ${chatOptionsOpen ? 'active' : ''}`} onClick={() => setChatOptionsOpen((value) => !value)}><span>{summary}</span><i>⌄</i></button>
-      {chatOptionsOpen && <div className="agent-config-popover chat-config-popover">
-        <header><div><small>{tr('本次对话配置','Conversation settings')}</small><strong>{profile?.name || tr('当前模型','Current model')}</strong></div><button onClick={() => setChatOptionsOpen(false)}>×</button></header>
-        <div className="inline-option-grid two-column">
-          {support.levels&&<label>{tr('推理强度','Reasoning effort')}<select value={options.reasoning} onChange={(event) => { const reasoning = event.target.value; updateConversationOptions({ reasoning, thinking: reasoning !== 'none' }); }}><option value="none">{tr('已关闭','Off')}</option><option value="low">{tr('低','Low')}</option><option value="medium">{tr('中','Medium')}</option><option value="high">{tr('高','High')}</option></select></label>}
-          {support.temperature&&<label>{tr('创造性','Creativity')}<select value={String(options.temperature)} onChange={(event) => updateConversationOptions({ temperature: Number(event.target.value) })}><option value="0.2">{tr('精确','Precise')}</option><option value="0.7">{tr('平衡','Balanced')}</option><option value="1">{tr('发散','Creative')}</option></select></label>}
-          {support.toggle&&<label className="inline-checkbox full-row"><input type="checkbox" checked={!reasoningDisabled && !!options.thinking} onChange={(event) => updateConversationOptions(event.target.checked ? { thinking: true, reasoning: options.reasoning === 'none' ? 'low' : options.reasoning } : { thinking: false, reasoning: 'none' })} />{tr('开启模型的深度思考（若该模型支持）','Enable extended thinking when supported')}</label>}
-          {support.toggle&&!support.levels&&<p className="full-row option-note">{tr('此接口只能开关思考，不能调节强度。','This API can only turn thinking on or off, not set its level.')}</p>}
-          {!support.toggle&&<p className="full-row option-note">{tr('此接口暂不使用思考与创造性设置。','This API does not use thinking or creativity settings yet.')}</p>}
-        </div>
-        <footer><span>{tr('配置会记住，并随当前模型使用','Settings are remembered for the current model')}</span><button onClick={() => setChatOptionsOpen(false)}>{tr('完成','Done')}</button></footer>
+      <div className="agent-chips">
+        <button className={`agent-chip runner ${panel === 'model' ? 'active' : ''}`} title={modelOptions.find((item) => item.value === model)?.label || ''} onClick={(event) => toggle('model', event)}><span>{profile?.model || tr('选择模型','Select model')}</span><i>⌄</i></button>
+        {hasEffort && <button className={`agent-chip ${panel === 'effort' ? 'active' : ''}`} title={tr('本次对话配置','Conversation settings')} onClick={(event) => toggle('effort', event)}><span>{effortSummary}</span><i>⌄</i></button>}
+      </div>
+      {panel && <div className={`chip-pop pop-${panel === 'model' ? 'model' : 'chat-effort'}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog">
+        {panel === 'model' && <ModelList groups={groups} value={model} searchable={cloudItems.length + localItems.length > 8} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} tr={tr} />}
+        {panel === 'effort' && <>
+          {nodeType === 'draw' && <p className="option-note draw-think-note">{tr('绘图时开启思考会更慢：模型要先想完，节点才开始出现。想边写边画，请关闭思考。','Thinking makes drawing slower: cards only start appearing after the model finishes thinking. Turn it off to watch it draw live.')}</p>}
+          {support.levels && <EffortSlider levels={['none', 'low', 'medium', 'high'].map((value) => ({ value, label: levelLabels[value] }))} value={options.reasoning} onChange={(reasoning) => updateConversationOptions({ reasoning, thinking: reasoning !== 'none' })} label={tr('推理强度','Reasoning effort')} defaultLabel={tr('默认','Default')} tr={tr} />}
+          {support.toggle && !support.levels && <label className="pop-switch"><input type="checkbox" checked={!reasoningDisabled && !!options.thinking} onChange={(event) => updateConversationOptions(event.target.checked ? { thinking: true, reasoning: options.reasoning === 'none' ? 'low' : options.reasoning } : { thinking: false, reasoning: 'none' })} /><span>{tr('开启模型的深度思考（若该模型支持）','Enable extended thinking when supported')}</span></label>}
+          {support.toggle && !support.levels && <p className="option-note">{tr('此接口只能开关思考，不能调节强度。','This API can only turn thinking on or off, not set its level.')}</p>}
+          {support.temperature && <div className="pop-seg"><small>{tr('创造性','Creativity')}</small><div role="radiogroup" aria-label={tr('创造性','Creativity')}>{creativity.map(([value, label]) => <button key={value} role="radio" aria-checked={options.temperature === value} className={options.temperature === value ? 'selected' : ''} onClick={() => updateConversationOptions({ temperature: value })}>{label}</button>)}</div></div>}
+        </>}
       </div>}
     </div>;
   }
@@ -3220,21 +3572,10 @@ function App() {
     setNotificationToast(null);
     setNotificationDetail(null);
   };
-  const activateLicense = async () => {
-    const code = activationCode.trim();
-    if (!code) { setLicenseStatus(tr('请输入激活码。','Enter an activation code.')); return; }
-    setLicenseBusy(true); setLicenseStatus(tr('正在激活…','Activating…'));
-    try {
-      const response = await fetch(`${OFFICIAL_NOTIFICATION_SERVER}/v1/licenses/activate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, deviceId: notificationSettings.deviceId, appVersion: APP_VERSION }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || tr('激活失败。','Activation failed.'));
-      setLicense({ ...result.license, lastValidatedAt: new Date().toISOString() }); setActivationCode(''); setLicenseStatus(tr('激活成功，授权已绑定到这台设备。','Activated successfully and bound to this device.'));
-    } catch (error) { setLicenseStatus(error.message || tr('激活失败。','Activation failed.')); } finally { setLicenseBusy(false); }
-  };
-  const deactivateLicense = () => { setLicense(null); setLicenseStatus(tr('已移除此设备上的授权。你可以稍后重新激活。','License removed from this device. You can activate again later.')); };
 
   const cardRuntime=useRef(null);
   const liveCardActions=useRef(null);
-  const cardActions={respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
+  const cardActions={executePlan,openCompare:setCompareGroupOpen,applyAgentChanges,respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
     toggleActivity:node=>setNodes(items=>items.map(item=>item.id===node.id?{...item,execution:{...(item.execution||{}),activityCollapsed:!(item.execution?.activityCollapsed!==false)}}:item))};
   if(!liveCardActions.current)liveCardActions.current=Object.fromEntries(Object.keys(cardActions).map(key=>[key,(...args)=>cardRuntime.current.actions[key](...args)]));
   useLayoutEffect(()=>{cardRuntime.current={actions:cardActions,
@@ -3260,6 +3601,7 @@ function App() {
         <div className="window-drag-strip" style={!window.wonderfulWindow?{display:'none'}:undefined} aria-label={tr('拖动窗口','Drag window')} title={tr('拖动窗口','Drag window')} onPointerDown={(event) => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); window.wonderfulWindow?.beginDrag?.(event.screenX, event.screenY); }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) window.wonderfulWindow?.moveDrag?.(event.screenX, event.screenY); }} onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); window.wonderfulWindow?.endDrag?.(); }} onPointerCancel={() => window.wonderfulWindow?.endDrag?.()} />
         <div className={`topbar-actions ${canvasMenuOpen?'workspace-at-home':''}`}>
           {PUBLIC_WEB&&<PersonalCloud base={LOCAL_PROXY_URL} current={canvases.find(c=>c.id===activeCanvasId)} changeToken={nodes} getSnapshot={(commit=true)=>cloudSnapshot(activeCanvasId,commit)} canReceive={!quickEditor&&!editingNode&&!dragging&&!marquee&&!relationDrag} onOpen={openCloudCanvas} onAttach={attachCloudCanvas} onLogout={logoutCloud} onNew={createCanvas}/>}
+          {!PUBLIC_WEB && <TaskOverview nodes={nodes} tr={tr} runnerLabels={AGENT_LABELS} onFocus={focusSearchResult} onRespond={respondAgentApproval} />}
           <div className="notification-anchor">
             <button className={`quiet-button notification-button ${notificationsOpen ? 'active' : ''}`} aria-label={tr('通知','Notifications')} onClick={() => setNotificationsOpen((value) => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{notifications.filter((item) => !item.read).length > 0 && <b>{Math.min(99, notifications.filter((item) => !item.read).length)}</b>}</button>
             {notificationToast && <section className={`notification-toast ${notificationToast.requiresAcknowledgement ? 'requires-confirmation' : ''}`} role="status" onClick={() => openNotificationDetail(notificationToast)}><i>{notificationToast.kind === 'update' ? '↑' : '●'}</i><div><strong>{notificationToast.title}</strong><p>{notificationToast.body}</p></div>{!notificationToast.requiresAcknowledgement && <button aria-label={tr('关闭','Close')} onClick={(event) => { event.stopPropagation(); setNotificationToast(null); }}>×</button>}</section>}
@@ -3283,7 +3625,10 @@ function App() {
             const settled = className.includes(' saved');
             return <button className={`${className} ${settled ? 'compact' : ''}`} disabled={state === 'saving'} title={settled ? `${label} · ${hint}` : hint} aria-label={label} onClick={() => saveCanvas()}>{settled ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg> : label}</button>;
           })()}<button className={`quiet-button icon-only more-button ${toolsOpen ? 'active' : ''}`} aria-label={tr('更多','More')} aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}><svg className="app-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg></button>
-          <div className={`topbar-tools ${toolsOpen ? 'open' : ''}`} onClick={() => setToolsOpen(false)}><button className="quiet-button icon-only" aria-label={say('导出 WDF','Export WDF')} title={say('导出 WDF','Export WDF')} onClick={()=>exportCanvases([activeCanvasId])}><AppIcon name="export" /></button>
+          <div className={`topbar-tools ${toolsOpen ? 'open' : ''}`} onClick={() => setToolsOpen(false)}><span className="export-wrap" onClick={(event) => event.stopPropagation()}><button className={`quiet-button icon-only ${exportMenuOpen ? 'active' : ''}`} aria-label={say('导出与分享','Export and share')} title={say('导出与分享','Export and share')} aria-haspopup="menu" aria-expanded={exportMenuOpen} onClick={()=>setExportMenuOpen((open) => !open)}><AppIcon name="export" /></button>
+            {exportMenuOpen && <div className="export-menu" role="menu">
+              {[['png', say('PNG 图片','PNG image'), say('适合发给别人看','Easy to send around')], ['html', say('网页文件','Web page'), say('浏览器直接打开，含文字大纲','Opens in any browser, with outline')], ['md', 'Markdown', say('按层级整理的文字大纲','Text outline by hierarchy')], ['svg', 'SVG', say('矢量图，可继续编辑','Vector, keeps editing sharp')], ['wdf', say('WDF 画布文件','WDF canvas file'), say('完整备份，可导入回软件','Full backup, importable')]].map(([kind, label, hint]) => <button key={kind} role="menuitem" onClick={() => void exportShareable(kind)}><strong>{label}</strong><small>{hint}</small></button>)}
+            </div>}</span>
           <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z"><AppIcon name="undo" /></button>
         <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z"><AppIcon name="redo" /></button>
         <button className="quiet-button icon-only" aria-label={text('fitCanvas')} title={text('fitCanvas')} onClick={fitView}><AppIcon name="fit" /></button>
@@ -3357,9 +3702,7 @@ function App() {
             const connectionKey = `relation:${source.id}:${target.id}:${type}`;
             return <path key={relationId || `link-${source.id}-${target.id}-${type}-${index}`} data-connection-key={connectionKey} data-connection-kind="relation" data-source-id={source.id} data-target-id={target.id} data-connection-type={type} markerEnd="url(#connection-arrow)" className={`connection relation-connection ${type} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${deletingRelation ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`} onClick={(event) => { event.stopPropagation(); setRelationEditorClosing(false); setEditingRelation({ sourceId: source.id, targetId: target.id, type }); }} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'relation', sourceId: source.id, targetId: target.id, type, x: event.clientX, y: event.clientY }); }} />;
           })}
-          {renderedConnections.parents.map((node) => {
-            const parent = graph.byId.get(node.parentId);
-            if (!parent) return null;
+          {renderedConnections.parents.map(({node,parent,extra}) => {
             const parentSize = nodeSizes.get(parent.id) || { width: 224, height: 110 };
             const nodeSize = nodeSizes.get(node.id) || { width: 224, height: 110 };
             const x1 = parent.x + parentSize.width;
@@ -3372,7 +3715,7 @@ function App() {
             const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
             const deleting = deletingIds.has(node.id) || deletingIds.has(parent.id);
             const connectionKey = `parent:${parent.id}:${node.id}`;
-            return <path key={node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, x: event.clientX, y: event.clientY }); }} />;
+            return <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
           })}
         </svg>
         {lineSelectionMenu && selectedConnections.length > 0 && <section className="line-selection-menu" onPointerDown={(event) => event.stopPropagation()}><span>{tr(`已选 ${selectedConnections.length} 条连线`,`${selectedConnections.length} connections selected`)}</span><small>{selectedConnections.some((item) => item.kind === 'parent') ? tr('包含继承关系；删除会解除父子继承。','Includes inheritance links; deleting removes the parent-child relationship.') : tr('可批量移除引用或合并关系。','Remove reference or merge links in a batch.')}</small><div><button onClick={() => { setSelectedConnections([]); setLineSelectionMenu(null); }}>{tr('取消','Cancel')}</button><button className="danger" onClick={() => removeConnections()}>{tr('删除连线','Delete links')}</button></div></section>}
@@ -3427,37 +3770,35 @@ function App() {
 
         {!quickThought && branchSource && (
           <section className={`composer ${composerClosing ? 'closing' : 'branching'} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建分支","Create branch")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}>
-            <div className="composer-context-row">
+            <div className="composer-context-row">{renderModeSwitch()}
               <div className="composer-context">{tr(`新分支 · 从「${branchSource.title}」开始`,`New branch · from “${branchSource.title}”`)}</div>
               <button className={`context-toggle ${contextInspectorOpen ? 'active' : ''}`} onClick={() => setContextInspectorOpen((value) => !value)}>{text('context')} {contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} · {tr('附件','Attachments')} {contextAttachments(nodes, branchSource.id, attachments, [...excludedContextIds], pendingContextRelations).length}</button>
               <button className="composer-close" aria-label={tr('取消创建分支','Cancel branch')} onClick={closeBranch}>×</button>
             </div>
             {contextInspectorOpen && <div className="context-inspector"><header><strong>{tr("发送前上下文检查器","Pre-send context inspector")}</strong><span>{tr("点击节点可临时排除","Click a node to exclude it temporarily")}</span></header><p className="context-summary">{tr(`当前将发送 ${contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} 条上下文；已排除 ${excludedContextIds.size} 条。排除节点会同时移除它携带的附件，但不会删除画布上的关系。`,`Sending ${contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} context nodes; ${excludedContextIds.size} excluded. Excluding a node also excludes its attachments, without deleting any links.`)}</p><div>{contextPlan(nodes, branchSource.id, [], pendingContextRelations).map(({ node, relation }, index) => { const excluded = excludedContextIds.has(node.id); const fileCount = (node.attachments || []).length; return <button key={node.id} className={excluded ? 'excluded' : ''} onClick={() => setExcludedContextIds((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })}><i>{excluded ? '−' : index + 1}</i><span><strong>{node.title}</strong><small>{relation === 'merge' ? tr('合并上下文',"Merged context") : relation === 'reference' ? tr('引用上下文',"Referenced context") : node.type === 'thought' ? tr('想法背景',"Idea background") : tr('继承上下文',"Inherited context")}</small></span>{fileCount > 0 && <em>{tr(`${fileCount} 个附件`,`${fileCount} attachments`)}</em>}</button>; })}</div></div>}
             <div className="branch-intents">{[[tr('继续追问',"Ask further"),tr('请沿着这里继续深入分析。',"Continue analyzing this in depth.")],[tr('换个角度',"Another angle"),tr('请换一个角度重新思考。',"Reconsider this from another perspective.")],[tr('反驳它',"Challenge this"),tr('请寻找这个观点的漏洞、反例与风险。',"Find weaknesses, counterexamples, and risks in this view.")],[tr('总结此处',"Summarize here"),tr('请总结以上上下文的核心结论。',"Summarize the key conclusions of the context above.")],[tr('变成行动',"Turn into action"),tr('请将以上内容转化为可执行步骤。',"Turn the above into actionable steps.")]].map(([label,prompt]) => <button key={label} onClick={() => { setNodeType(label === tr('变成行动',"Turn into action") ? 'action' : 'conversation'); setDraft(prompt); }}>{label}</button>)}</div>
-            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={tr('沿着这个节点继续思考，或交给 AI 执行……','Continue from this node, or ask AI to act…')} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); createBranch(); } }} />
+            <SuggestTextarea value={draft} onChange={setDraft} onSubmit={createBranch} placeholder={nodeType === 'draw' ? tr('描述要画的图，新节点会接在画布右侧……','Describe the diagram; new cards are added to the right…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : tr('沿着这个节点继续思考，或交给 AI 执行……','Continue from this node, or ask AI to act…')} {...suggestProps} />
             {!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}
             {nodeType === 'conversation' && parallelMode && <div className="parallel-models">{modelOptions.map((item) => <button key={item.value} className={parallelModels.has(item.value) ? 'selected' : ''} onClick={() => setParallelModels((current) => { const next = new Set(current); if (next.has(item.value)) next.delete(item.value); else next.add(item.value); return next; })}>{item.label}</button>)}</div>}
-            <div className="composer-bottom">
-              <div className="segmented">
-                {[['conversation', copy.chat], ['thought', copy.idea], ['action', copy.action]].filter(([value])=>!PUBLIC_WEB || value!=='action').map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}
-              </div>
-              {nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}
-              {nodeType === 'conversation' && renderConversationControls()}
+            <div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />
+              {(nodeType === 'conversation' || nodeType === 'draw') && renderConversationControls()}
               {nodeType === 'action' && renderActionRunnerControls()}
               {nodeType === 'conversation' && <button className={`parallel-toggle ${parallelMode ? 'active' : ''}`} onClick={() => setParallelMode((value) => !value)}>{tr('并行','Parallel')}</button>}
-              <button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />
+              
               <span className="shortcut">{copy.shortcut}</span>
-              <button className="send-button" onClick={createBranch}>↑</button>
+              <button className="send-button" onClick={createBranch}>{drawBusy && nodeType === 'draw' ? '■' : '↑'}</button>
             </div>
           </section>
         )}
-        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row"><div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) : tr('先在 设置 → 执行器 里启用一个执行器','Enable an agent in Settings → Agents first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); createFirstNode(); } }} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><div className="segmented">{[['conversation', copy.chat], ['thought', copy.idea], ['action', copy.action]].filter(([value])=>!PUBLIC_WEB || value!=='action').map(([value, label]) => <button key={value} className={nodeType === value ? 'selected' : ''} onClick={() => setNodeType(value)}>{label}</button>)}</div>{nodeType === 'conversation' && <ModelPicker language={uiLanguage} value={model} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} options={modelOptions} />}{nodeType === 'conversation' && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<button className="attach-button" aria-label={copy.attach} onClick={() => attachmentRef.current?.click()}>{copy.attach}</button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} /><span className="shortcut">{copy.shortcut}</span><button className="send-button" onClick={createFirstNode}>↑</button></div></section>}
+        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row">{renderModeSwitch()}<div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><SuggestTextarea autoFocus value={draft} onChange={setDraft} onSubmit={createFirstNode} placeholder={nodeType === 'draw' ? tr('描述要画的图，例如：画出这个程序的原理图……','Describe the diagram, e.g. the architecture of this app…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) : tr('先在 设置 → 执行器 里启用一个执行器','Enable an agent in Settings → Agents first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} {...suggestProps} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />{(nodeType === 'conversation' || nodeType === 'draw') && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<span className="shortcut">{copy.shortcut}</span><button className="send-button" aria-label={tr("发送","Send")} disabled={!(drawBusy && nodeType === 'draw') && !draft.trim() && !attachments.length} onClick={createFirstNode}>{drawBusy && nodeType === 'draw' ? '■' : '↑'}</button></div></section>}
       </main>
 
-      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?say('松开将移动分支；原父子线会解除','Release to move branch; original parent link will detach'):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
+      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留）','Release to add another parent (keeps the current one)'):say('松开将移动分支；按住 Alt 则再加一个父节点','Release to move branch; hold Alt to add another parent instead')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
       {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
-      {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? { ...node, parentId: null } : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
+      {piImportOpen && <PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} />}
+      {compareGroupOpen && <CompareView cards={nodes.filter((node) => node.compareGroup === compareGroupOpen).sort((x, y) => String(x.variant).localeCompare(String(y.variant)))} tr={tr} runnerLabels={AGENT_LABELS} applyAgentChanges={applyAgentChanges} onClose={() => setCompareGroupOpen(null)} notify={notify} />}
+      {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? detachParent(node, contextMenu.parentId) : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
       {editingRelation && <div className={`relation-editor-popover ${relationEditorClosing ? 'closing' : ''}`}><span>{tr('正在编辑','Editing ')}{editingRelation.type === 'merge' ? tr('合并','merge') : tr('引用','reference')}{tr('连线',' link')}</span><div>{[['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} className={editingRelation.type === type ? 'active' : ''} onClick={() => { commitRelation(editingRelation.sourceId, editingRelation.targetId, type); setEditingRelation({ ...editingRelation, type }); }}>{label}</button>)}<button className="remove" onClick={() => { const relation = { ...editingRelation }; closeRelationEditor(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除','Delete')}</button></div><button className="relation-cancel" onClick={() => closeRelationEditor()}>{tr('完成','Done')}</button></div>}
       {mergeWorkbench && selectedIds.size > 1 && <section className="merge-workbench"><header><div><small>{tr("合并工作台","Merge workspace")}</small><strong>{tr(`${selectedIds.size} 个节点将作为显式上下文`,`${selectedIds.size} nodes will be explicit context`)}</strong></div><button onClick={() => setMergeWorkbench(false)}>×</button></header><div className="merge-goals">{['综合结论','并列比较','找出冲突','制定行动'].map((goal) => <button key={goal} className={mergeGoal === goal ? 'active' : ''} onClick={() => setMergeGoal(goal)}>{mergeGoalLabel(goal)}</button>)}</div><div className="merge-items">{[...selectedIds].map((id, index) => { const node = nodes.find((item) => item.id === id); return node && <span key={id}><i>{index + 1}</i>{node.title}</span>; })}</div><footer><small>{tr("第一个选中节点为起点；其余节点只会附加到这一次新分支的上下文，不会改写原节点关系。","The first node is the starting point. Other nodes add context to this branch only; existing links stay unchanged.")}</small><button onClick={() => { const ids = [...selectedIds]; const sourceId = selectedId && ids.includes(selectedId) ? selectedId : ids[0]; const source = nodes.find((node) => node.id === sourceId); const mergeRelations = ids.filter((id) => id !== sourceId).map((targetId, index) => ({ id: `merge-${Date.now()}-${index}`, targetId, type: 'merge' })); setPendingContextRelations(mergeRelations); setMergeWorkbench(false); setNodeType('conversation'); setDraft(tr(`请基于已合并的 ${ids.length} 个节点，${mergeGoal}。`,`Based on the ${ids.length} merged nodes: ${mergeGoalLabel(mergeGoal)}.`)); if (source) startBranch(source, { preservePendingContext: true }); }}>{tr("创建合并分支","Create merged branch")}</button></footer></section>}
 
@@ -3494,12 +3835,10 @@ function App() {
             { id: 'models', label: text('modelConnections') },
             { id: 'appearance', label: text('appearance') },
             ...(PUBLIC_WEB ? [] : [{ id: 'agents', label: tr('执行器','Agents') }]),
-            { id: 'license', label: tr('授权','License') },
             { id: 'notifications', label: tr('通知','Notifications') },
             { id: 'plugins', label: tr('插件','Plugins') },
             { id: 'project', label: text('projectData') },
             { id: 'about', label: tr('关于','About') },
-            { id: 'sponsor', label: tr('赞助','Sponsor') },
           ]}
         >
           {settingsSection === 'models' && (
@@ -3541,31 +3880,7 @@ function App() {
             </Page>
           )}
           {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
-          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} />}
-          {settingsSection === 'license' && (
-            <Page title={tr('授权与激活','License & activation')} description={tr('激活码首次使用时绑定本机设备；服务端撤销或到期会在下一次联网验证后生效。','An activation code binds to this device on first use. Revocation or expiry takes effect at the next online verification.')}>
-              {license ? (
-                <Group>
-                  <Row title={`${tr('已激活','Activated')} · ${String(license.tier || 'pro').toUpperCase()}`} hint={license.expiresAt ? `${tr('有效至','Valid until')} ${new Date(license.expiresAt).toLocaleDateString(uiLanguage)}` : tr('永久授权','Perpetual license')}>
-                    <Status tone="ok">{systemText(licenseStatus) || tr('已绑定到这台设备。','Bound to this device.')}</Status>
-                  </Row>
-                  <Row title={tr('移除此设备上的授权','Remove local license')}>
-                    <Button kind="danger" onClick={deactivateLicense}>{tr('移除授权','Remove')}</Button>
-                  </Row>
-                </Group>
-              ) : (
-                <Group>
-                  <Fields>
-                    <Field label={tr('激活码','Activation code')} span><Input value={activationCode} onChange={(event) => setActivationCode(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === 'Enter') activateLicense(); }} placeholder="WDF-XXXXXXX-XXXXXXX-XXXXXXX" autoComplete="off" /></Field>
-                  </Fields>
-                  <div className="sx-actionbar">
-                    <Status tone={licenseBusy ? 'busy' : 'idle'}>{systemText(licenseStatus) || tr('尚未激活','Not activated')}</Status>
-                    <Button kind="primary" disabled={licenseBusy} onClick={activateLicense}>{licenseBusy ? tr('正在激活…','Activating…') : tr('激活此设备','Activate this device')}</Button>
-                  </div>
-                </Group>
-              )}
-            </Page>
-          )}
+          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} systemNotifications={systemNotifications} onSystemNotificationsChange={changeSystemNotifications} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} />}
           {settingsSection === 'notifications' && (
             <Page title={tr('应用内通知','In-app notifications')} description={tr('仅当 Wendaflow 正在运行时接收通知；关闭软件后不会保留后台连接。','Receive notifications only while Wendaflow is running. No background connection is kept after you close the app.')}>
               <Group>
@@ -3602,7 +3917,6 @@ function App() {
             <Page title={tr('关于 Wendaflow','About Wendaflow')} description={tr('让思考不再被单一线性对话束缚。','A spatial workspace for conversations, context, and execution.')}>
               <Group>
                 <div className="sx-hero"><BrandMark size={56} /><div><strong>Wendaflow</strong><span>{tr('让对话自由分岔','Let conversations branch freely')}</span></div><em>v{APP_VERSION}</em></div>
-                <Row title={tr('授权状态','License status')}><span className="sx-value">{license ? `${String(license.tier || 'pro').toUpperCase()} · ${tr('已激活','Activated')}` : tr('未激活','Not activated')}</span></Row>
                 <Row title={tr('官方网站','Official website')}><a href="https://cn.qnjyxh.xyz" target="_blank" rel="noreferrer">cn.qnjyxh.xyz</a></Row>
                 <Row title={tr('通知服务','Notification service')}><span className="sx-value">{notificationSettings.enabled ? tr('已开启','Enabled') : tr('已关闭','Disabled')}</span></Row>
               </Group>
@@ -3614,21 +3928,8 @@ function App() {
               <p className="sx-note">{tr('Wendaflow 仅在你选择的模型连接中处理请求；模型密钥与画布数据由当前设备管理。','Wendaflow sends requests only through the model connections you configure. Model keys and canvas data stay managed by this device.')}</p>
             </Page>
           )}
-          {settingsSection === 'sponsor' && (
-            <Page title={tr('赞助 Wendaflow','Sponsor Wendaflow')} description={tr('如果 Wendaflow 对你有帮助，欢迎任选一种方式支持后续开发。点击二维码可放大查看。','If Wendaflow helps you, you can support its continued development through any option below. Click a QR code to enlarge it.')}>
-              <div className="sx-sponsors">{[['wechat.jpg',tr('微信支付','WeChat Pay'),tr('推荐使用微信支付','WeChat Pay recommended')],['alipay.jpg',tr('支付宝','Alipay'),tr('支付宝扫码支付','Scan with Alipay')],['binance.jpg',tr('币安支付','Binance Pay'),tr('使用币安 App 扫码支付','Scan with Binance App')],['usdt-tron.jpg','USDT · TRON',tr('仅支持 TRON 资产','TRON network only')]].map(([file,title,hint]) => (
-                <article className="sx-sponsor" key={file} role="button" tabIndex={0} onClick={() => setSponsorPreview({ file, title, hint })} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSponsorPreview({ file, title, hint }); } }}>
-                  <img src={`sponsor/${file}`} alt={`${title} ${tr('赞助二维码','sponsorship QR code')}`} />
-                  <strong>{title}</strong><small>{hint}</small>
-                  {file === 'usdt-tron.jpg' && <div className="sx-wallet" onClick={(event) => event.stopPropagation()}><code>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</code><Button className="small" onClick={() => { navigator.clipboard?.writeText('TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr'); setSponsorCopied(true); window.setTimeout(() => setSponsorCopied(false), 1600); }}>{sponsorCopied ? tr('已复制','Copied') : tr('复制地址','Copy address')}</Button></div>}
-                </article>
-              ))}</div>
-              <p className="sx-note">{tr('感谢你的支持，它会直接帮助 Wendaflow 持续改进。','Thank you — your support directly helps Wendaflow keep improving.')}</p>
-            </Page>
-          )}
         </SettingsDialog>
       )}
-      {sponsorPreview && <div className="sponsor-preview-backdrop" role="dialog" aria-modal="true" aria-label={sponsorPreview.title} onPointerDown={(event) => { if (event.target === event.currentTarget) setSponsorPreview(null); }}><section className="sponsor-preview"><button className="sponsor-preview-close" type="button" aria-label={text('close')} onClick={() => setSponsorPreview(null)}>×</button><strong>{sponsorPreview.title}</strong><small>{sponsorPreview.hint}</small><img src={`sponsor/${sponsorPreview.file}`} alt={`${sponsorPreview.title} ${tr('赞助二维码','sponsorship QR code')}`} />{sponsorPreview.file === 'usdt-tron.jpg' && <div className="sponsor-preview-wallet"><code>TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr</code><button type="button" onClick={() => { navigator.clipboard?.writeText('TV6sixoSdkN4GMQRxG2uDoPZifutjyZ3Wr'); setSponsorCopied(true); window.setTimeout(() => setSponsorCopied(false), 1600); }}>{sponsorCopied ? tr('已复制','Copied') : tr('复制地址','Copy address')}</button></div>}</section></div>}
     </div>
   );
 }
