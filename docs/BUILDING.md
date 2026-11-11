@@ -25,7 +25,22 @@ npm run app
 
 ## 服务端与管理端
 
-- `notification-server/`：通知与授权服务端。
+- `notification-server/`：通知服务端。
 - `notification-manager/`：服务端管理桌面应用及 PostgreSQL 部署文件。
 
 部署前复制 `.env.example` 并生成新的随机密钥。不要使用示例值，也不要把 `.env` 提交到仓库。
+
+## Windows 一键版
+
+打包出 `Wendaflow.exe`（Node 单文件可执行程序）加同目录 `dist/`，双击即启动本机服务并打开浏览器；画布保存在 `%APPDATA%\Wendaflow`。
+
+1. 从 nodejs.org 下载与当前 `node -v` 相同版本的 Windows `node.exe`（`https://nodejs.org/dist/vX.Y.Z/win-x64/node.exe`），并用同目录 `SHASUMS256.txt` 校验。
+2. 执行：
+
+```bash
+npm run build:windows -- --node-exe /path/to/node.exe
+```
+
+输出在 `release/windows/Wendaflow/`，整个文件夹压缩成 zip 即可分发。可用 `WENDAFLOW_WEB_PORT`、`WONDERFUL_PORT` 改端口。
+
+已知限制：exe 未做代码签名，Windows SmartScreen 会提示「未知发布者」；动作模式里 Pi 的审批扩展在单文件包中不可用。
