@@ -8,7 +8,6 @@ services:
       PORT: 8788
       DATABASE_URL: postgresql://wendaflow:${POSTGRES_PASSWORD}@postgres:5432/wendaflow
       WENDAFLOW_ADMIN_TOKEN: ${WENDAFLOW_ADMIN_TOKEN}
-      WENDAFLOW_LICENSE_SECRET: ${WENDAFLOW_LICENSE_SECRET}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
     depends_on:
       postgres:

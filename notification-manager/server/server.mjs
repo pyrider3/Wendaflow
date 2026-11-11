@@ -8,42 +8,24 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 const port = Number(process.env.PORT || 8788);
 const adminToken = process.env.WENDAFLOW_ADMIN_TOKEN || '';
-const licenseSecret = process.env.WENDAFLOW_LICENSE_SECRET || '';
 const dataFile = process.env.NOTIFICATION_DATA_FILE || path.join(process.cwd(), 'data', 'notifications.json');
 const clients = new Map();
 const startedAt = new Date().toISOString();
 const rateBuckets = new Map();
 const defaultRelease = { latestVersion: '0.1.0', downloadUrl: '', releaseNotes: '', publishedAt: '' };
-const emptyStore = () => ({ devices: {}, registry: {}, licenses: {}, campaigns: {}, templates: {}, audit: [], release: { ...defaultRelease } });
-async function readStore() { try { const parsed = JSON.parse(await fs.readFile(dataFile, 'utf8')); return { ...emptyStore(), ...parsed, devices: parsed.devices || {}, registry: parsed.registry || {}, licenses: parsed.licenses || {}, campaigns: parsed.campaigns || {}, templates: parsed.templates || {}, audit: parsed.audit || [], release: { ...defaultRelease, ...(parsed.release || {}) } }; } catch { return emptyStore(); } }
+const emptyStore = () => ({ devices: {}, registry: {}, campaigns: {}, templates: {}, audit: [], release: { ...defaultRelease } });
+async function readStore() { try { const parsed = JSON.parse(await fs.readFile(dataFile, 'utf8')); return { ...emptyStore(), ...parsed, devices: parsed.devices || {}, registry: parsed.registry || {}, campaigns: parsed.campaigns || {}, templates: parsed.templates || {}, audit: parsed.audit || [], release: { ...defaultRelease, ...(parsed.release || {}) } }; } catch { return emptyStore(); } }
 async function writeStore(store) { await fs.mkdir(path.dirname(dataFile), { recursive: true }); await fs.writeFile(dataFile, JSON.stringify(store, null, 2), 'utf8'); }
 function secure(req, res, next) { if (!adminToken || req.get('x-admin-token') !== adminToken) return res.status(401).json({ error: 'Unauthorized' }); next(); }
 function rateLimit(limit, windowMs) { return (req,res,next) => { const key = `${req.ip}:${req.path}`; const now = Date.now(); const bucket = (rateBuckets.get(key) || []).filter((time) => now - time < windowMs); if (bucket.length >= limit) return res.status(429).json({ error: 'Too many requests. Try again later.' }); bucket.push(now); rateBuckets.set(key, bucket); next(); }; }
 function audit(store, action, detail = {}) { store.audit.unshift({ id: crypto.randomUUID(), action, detail, createdAt: new Date().toISOString() }); store.audit = store.audit.slice(0, 5000); }
-function notifyDevice(store, deviceId, title, body) { const notification = { id: crypto.randomUUID(), deviceId, title, body, kind: 'license', requiresAcknowledgement: true, createdAt: new Date().toISOString(), read: false }; store.devices[deviceId] = [notification, ...(store.devices[deviceId] || [])].slice(0, 200); for (const socket of clients.get(deviceId) || []) if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'notification', notification })); }
-function codeHash(code) { return crypto.createHash('sha256').update(String(code).trim().toUpperCase()).digest('hex'); }
-function createCode() { return `WDF-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`; }
-// Activation codes remain retrievable only to authenticated administrators.  We
-// encrypt the recoverable value at rest with the existing license secret rather
-// than keeping a plaintext copy in the service data file or export snapshots.
-function codeCipherKey() { return crypto.createHash('sha256').update(`wendaflow-license-code:${licenseSecret}`).digest(); }
-function encryptCode(code) { const iv = crypto.randomBytes(12); const cipher = crypto.createCipheriv('aes-256-gcm', codeCipherKey(), iv); const encrypted = Buffer.concat([cipher.update(String(code), 'utf8'), cipher.final()]); return `${iv.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}.${encrypted.toString('base64url')}`; }
-function decryptCode(value) { try { const [ivValue, tagValue, encryptedValue] = String(value || '').split('.'); if (!ivValue || !tagValue || !encryptedValue || !licenseSecret) return ''; const decipher = crypto.createDecipheriv('aes-256-gcm', codeCipherKey(), Buffer.from(ivValue, 'base64url')); decipher.setAuthTag(Buffer.from(tagValue, 'base64url')); return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8'); } catch { return ''; } }
-function signLicense(payload) { const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url'); const signature = crypto.createHmac('sha256', licenseSecret).update(encoded).digest('base64url'); return `${encoded}.${signature}`; }
-function licenseView(license) { const code = decryptCode(license.codeCiphertext); return { id: license.id, tier: license.tier, label: license.label, maxDevices: license.maxDevices, expiresAt: license.expiresAt, revoked: !!license.revoked, frozen: !!license.frozen, createdAt: license.createdAt, code, codeAvailable: !!code, activatedDevices: Object.values(license.devices || {}).map((device) => ({ deviceId: device.deviceId, activatedAt: device.activatedAt, lastValidatedAt: device.lastValidatedAt, appVersion: device.appVersion })) }; }
-function grantFor(license, deviceId) { return { licenseId: license.id, tier: license.tier, expiresAt: license.expiresAt, deviceId, issuedAt: new Date().toISOString() }; }
-function recipientLicense(store, deviceId) { return Object.values(store.licenses).find((license) => license.devices?.[deviceId] && !license.revoked && !license.frozen && (!license.expiresAt || new Date(license.expiresAt) >= new Date())); }
 function recipientsFor(store, target = {}) {
-  const { audience = 'all', deviceId = '', targetVersion = '', targetLanguage = '', licenseTier = '', activation = '', activeWithinDays = 0 } = target;
+  const { audience = 'all', deviceId = '', targetVersion = '', targetLanguage = '', activeWithinDays = 0 } = target;
   if (audience === 'device') return deviceId ? [deviceId] : [];
   const cutoff = Number(activeWithinDays) > 0 ? Date.now() - Number(activeWithinDays) * 86400000 : 0;
   return Object.entries(store.registry).filter(([id, info]) => {
-    const license = recipientLicense(store, id);
     if (audience === 'version' && info.version !== targetVersion) return false;
     if (audience === 'language' && info.language !== targetLanguage) return false;
-    if (licenseTier && license?.tier !== licenseTier) return false;
-    if (activation === 'activated' && !license) return false;
-    if (activation === 'unactivated' && license) return false;
     if (cutoff && new Date(info.lastSeenAt || 0).getTime() < cutoff) return false;
     return true;
   }).map(([id]) => id);
@@ -65,44 +47,6 @@ app.disable('x-powered-by'); app.use(cors({ origin: true })); app.use(express.js
 app.get('/health', async (_req, res) => { const store = await readStore(); res.json({ ok: true, onlineDevices: clients.size, registeredDevices: Object.keys(store.registry).length, latestVersion: store.release.latestVersion, startedAt, uptimeSeconds: Math.round(process.uptime()), memoryBytes: process.memoryUsage().rss, storage: 'json' }); });
 app.get('/v1/client/latest', async (_req, res) => { const store = await readStore(); res.json(store.release); });
 app.put('/v1/client/latest', secure, async (req, res) => { const { latestVersion, downloadUrl = '', releaseNotes = '' } = req.body || {}; if (!latestVersion) return res.status(400).json({ error: 'latestVersion is required' }); const store = await readStore(); store.release = { latestVersion: String(latestVersion).slice(0, 64), downloadUrl: String(downloadUrl).slice(0, 1000), releaseNotes: String(releaseNotes).slice(0, 3000), publishedAt: new Date().toISOString() }; audit(store, 'release.published', { latestVersion: store.release.latestVersion }); await writeStore(store); res.json(store.release); });
-app.post('/v1/licenses/activate', rateLimit(10, 15 * 60 * 1000), async (req, res) => {
-  if (!licenseSecret) return res.status(503).json({ error: 'License service is not configured' });
-  const { code, deviceId, appVersion = 'unknown' } = req.body || {};
-  if (!code || !deviceId || String(deviceId).length > 160) return res.status(400).json({ error: 'Activation code and device ID are required' });
-  const store = await readStore(); const license = store.licenses[codeHash(code)];
-  if (!license || license.revoked || license.frozen) return res.status(403).json({ error: 'Activation code is invalid, frozen, or revoked' });
-  if (license.expiresAt && new Date(license.expiresAt) < new Date()) return res.status(403).json({ error: 'Activation code has expired' });
-  license.devices ||= {}; const existing = license.devices[deviceId];
-  let displacedDeviceId = '';
-  if (!existing && Object.keys(license.devices).length >= license.maxDevices) {
-    // Seat rotation: a newly activated device takes the oldest activation seat.
-    // The displaced device will fail its next online validation automatically.
-    displacedDeviceId = Object.values(license.devices).sort((a, b) => String(a.activatedAt).localeCompare(String(b.activatedAt)))[0]?.deviceId || '';
-    if (displacedDeviceId) { delete license.devices[displacedDeviceId]; notifyDevice(store, displacedDeviceId, '授权已转移到新设备', '此激活码的设备席位已被新的设备使用。若需恢复，请联系授权管理员。'); }
-  }
-  license.devices[deviceId] = { deviceId, activatedAt: existing?.activatedAt || new Date().toISOString(), lastValidatedAt: new Date().toISOString(), appVersion: String(appVersion).slice(0, 64) };
-  audit(store, 'license.activated', { licenseId: license.id, deviceId, displacedDeviceId }); await writeStore(store); const grant = grantFor(license, deviceId); res.json({ license: { ...grant, token: signLicense(grant) }, displacedDeviceId });
-});
-app.post('/v1/licenses/validate', rateLimit(60, 60 * 1000), async (req, res) => {
-  if (!licenseSecret) return res.status(503).json({ error: 'License service is not configured' });
-  const { token, deviceId, appVersion = 'unknown' } = req.body || {}; if (!token || !deviceId) return res.status(400).json({ error: 'License token and device ID are required' });
-  const [encoded, signature] = String(token).split('.'); const expected = crypto.createHmac('sha256', licenseSecret).update(encoded || '').digest('base64url');
-  const provided = Buffer.from(signature || ''); const expectedBytes = Buffer.from(expected);
-  if (!encoded || !signature || provided.length !== expectedBytes.length || !crypto.timingSafeEqual(provided, expectedBytes)) return res.status(403).json({ error: 'Invalid license token' });
-  let grant; try { grant = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')); } catch { return res.status(403).json({ error: 'Invalid license token' }); }
-  const store = await readStore(); const license = Object.values(store.licenses).find((item) => item.id === grant.licenseId);
-  if (!license || license.revoked || license.frozen || grant.deviceId !== deviceId || !license.devices?.[deviceId] || (license.expiresAt && new Date(license.expiresAt) < new Date())) return res.status(403).json({ error: 'License is no longer valid' });
-  license.devices[deviceId].lastValidatedAt = new Date().toISOString(); license.devices[deviceId].appVersion = String(appVersion).slice(0, 64); await writeStore(store); const refreshed = grantFor(license, deviceId); res.json({ license: { ...refreshed, token: signLicense(refreshed) } });
-});
-app.post('/v1/admin/licenses', secure, async (req, res) => {
-  const { tier = 'pro', label = '', maxDevices = 1, expiresAt = '', quantity = 1 } = req.body || {}; const store = await readStore(); const created = [];
-  for (let index = 0; index < Math.max(1, Math.min(1000, Number(quantity) || 1)); index++) { const code = createCode(); const license = { id: crypto.randomUUID(), tier: String(tier).slice(0, 32), label: String(label).slice(0, 120), maxDevices: Math.max(1, Math.min(50, Number(maxDevices) || 1)), expiresAt: expiresAt ? new Date(expiresAt).toISOString() : '', revoked: false, frozen: false, createdAt: new Date().toISOString(), codeCiphertext: encryptCode(code), devices: {} }; store.licenses[codeHash(code)] = license; created.push({ code, license: licenseView(license) }); }
-  audit(store, 'license.created', { quantity: created.length, tier, maxDevices }); await writeStore(store); res.status(201).json(created.length === 1 ? created[0] : { created });
-});
-app.get('/v1/admin/licenses', secure, async (_req, res) => { const store = await readStore(); res.json({ licenses: Object.values(store.licenses).sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map(licenseView) }); });
-app.post('/v1/admin/licenses/:id/revoke', secure, async (req, res) => { const store = await readStore(); const license = Object.values(store.licenses).find((item) => item.id === req.params.id); if (!license) return res.status(404).json({ error: 'License not found' }); license.revoked = true; license.revokedAt = new Date().toISOString(); audit(store, 'license.revoked', { licenseId: license.id }); await writeStore(store); res.json({ license: licenseView(license) }); });
-app.post('/v1/admin/licenses/:id/freeze', secure, async (req, res) => { const store = await readStore(); const license = Object.values(store.licenses).find((item) => item.id === req.params.id); if (!license) return res.status(404).json({ error: 'License not found' }); license.frozen = !license.frozen; audit(store, license.frozen ? 'license.frozen' : 'license.unfrozen', { licenseId: license.id }); await writeStore(store); res.json({ license: licenseView(license) }); });
-app.delete('/v1/admin/licenses/:id/devices/:deviceId', secure, async (req, res) => { const store = await readStore(); const license = Object.values(store.licenses).find((item) => item.id === req.params.id); if (!license) return res.status(404).json({ error: 'License not found' }); delete license.devices?.[req.params.deviceId]; audit(store, 'license.device_unbound', { licenseId: license.id, deviceId: req.params.deviceId }); await writeStore(store); res.json({ license: licenseView(license) }); });
 app.get('/v1/admin/audit', secure, async (_req, res) => { const store = await readStore(); res.json({ entries: store.audit.slice(0, 300) }); });
 app.get('/v1/admin/campaigns', secure, async (_req, res) => { const store = await readStore(); res.json({ campaigns: Object.values(store.campaigns).sort((a,b) => String(b.createdAt).localeCompare(String(a.createdAt))).map((item) => campaignView(item, store)), templates: Object.values(store.templates).sort((a,b) => String(b.updatedAt).localeCompare(String(a.updatedAt))) }); });
 app.post('/v1/admin/campaigns', secure, async (req, res) => {
@@ -111,7 +55,7 @@ app.post('/v1/admin/campaigns', secure, async (req, res) => {
   if (!Object.keys(validLocales).length) return res.status(400).json({ error: '至少需要填写一种语言的标题' });
   const store = await readStore(); const targetCount = recipientsFor(store, target).length;
   if (status === 'send' && !targetCount) return res.status(404).json({ error: '没有匹配的设备' });
-  const campaign = { id: crypto.randomUUID(), title: String(title || validLocales['zh-CN']?.title || Object.values(validLocales)[0].title).slice(0, 180), locales: validLocales, kind: ['info','update','warning','license'].includes(kind) ? kind : 'info', target, requiresAcknowledgement: !!requiresAcknowledgement, status: status === 'draft' ? 'draft' : scheduledAt && new Date(scheduledAt) > new Date() ? 'scheduled' : 'sending', scheduledAt: scheduledAt || '', recipientCount: targetCount, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const campaign = { id: crypto.randomUUID(), title: String(title || validLocales['zh-CN']?.title || Object.values(validLocales)[0].title).slice(0, 180), locales: validLocales, kind: ['info','update','warning'].includes(kind) ? kind : 'info', target, requiresAcknowledgement: !!requiresAcknowledgement, status: status === 'draft' ? 'draft' : scheduledAt && new Date(scheduledAt) > new Date() ? 'scheduled' : 'sending', scheduledAt: scheduledAt || '', recipientCount: targetCount, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   store.campaigns[campaign.id] = campaign;
   if (templateName) { const templateId = crypto.randomUUID(); store.templates[templateId] = { ...campaign, id: templateId, name: String(templateName).slice(0, 80), status: 'template', updatedAt: new Date().toISOString() }; }
   if (campaign.status === 'sending') await dispatchCampaign(store, campaign); else audit(store, campaign.status === 'draft' ? 'campaign.drafted' : 'campaign.scheduled', { campaignId: campaign.id, targetCount });

@@ -22,10 +22,5 @@ try {
       await q(`INSERT INTO notification_deliveries(notification_id,device_id,read_at,acknowledged_at) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [id, deviceId, notice.read ? new Date() : null, notice.read && notice.requiresAcknowledgement ? new Date() : null]);
     }
   }
-  for (const [codeHash, legacy] of Object.entries(store.licenses || {})) {
-    const id = legacy.id || crypto.randomUUID();
-    await q(`INSERT INTO licenses(id,code_hash,tier,label,max_devices,expires_at,revoked_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(code_hash) DO NOTHING`, [id, codeHash, legacy.tier || 'pro', legacy.label || '', legacy.maxDevices || 1, asDate(legacy.expiresAt), legacy.revoked ? (asDate(legacy.revokedAt) || new Date()) : null, asDate(legacy.createdAt) || new Date()]);
-    for (const device of Object.values(legacy.devices || {})) { await q(`INSERT INTO devices(id) VALUES($1) ON CONFLICT DO NOTHING`, [device.deviceId]); await q(`INSERT INTO license_devices(license_id,device_id,activated_at,last_validated_at,app_version) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, [id, device.deviceId, asDate(device.activatedAt) || new Date(), asDate(device.lastValidatedAt) || new Date(), device.appVersion || 'unknown']); }
-  }
   console.log('Legacy data migration complete.');
 } finally { await pool.end(); }

@@ -12,7 +12,7 @@ const dataPath = path.join(userRoot, 'data', 'notifications.json');
 let serverProcess = null;
 
 const OFFICIAL_URL = 'https://api.qnjyxh.xyz';
-const defaults = { port: 8788, publicUrl: OFFICIAL_URL, adminToken: '', licenseSecret: '', startedAt: '' };
+const defaults = { port: 8788, publicUrl: OFFICIAL_URL, adminToken: '', startedAt: '' };
 async function getSettings() {
   try { return { ...defaults, ...JSON.parse(await readFile(configPath, 'utf8')) }; }
   catch { return defaults; }
@@ -40,7 +40,7 @@ async function startServer() {
   if (current.running) return current;
   serverProcess = fork(serverPath(), [], {
     cwd: userRoot,
-    env: { ...process.env, PORT: String(config.port), WENDAFLOW_ADMIN_TOKEN: config.adminToken, WENDAFLOW_LICENSE_SECRET: config.licenseSecret, NOTIFICATION_DATA_FILE: dataPath, ELECTRON_RUN_AS_NODE: '1' },
+    env: { ...process.env, PORT: String(config.port), WENDAFLOW_ADMIN_TOKEN: config.adminToken, NOTIFICATION_DATA_FILE: dataPath, ELECTRON_RUN_AS_NODE: '1' },
     stdio: 'ignore',
     windowsHide: true,
   });
@@ -62,7 +62,7 @@ app.on('window-all-closed', () => { stopServer(); if (process.platform !== 'darw
 ipcMain.handle('manager:settings', () => getSettings());
 ipcMain.handle('manager:save-settings', async (_event, partial) => {
   const old = await getSettings();
-  const next = { ...old, ...partial, publicUrl: OFFICIAL_URL, port: Math.max(1, Math.min(65535, Number(partial.port || old.port))), licenseSecret: String(partial.licenseSecret || old.licenseSecret || crypto.randomBytes(32).toString('hex')) };
+  const next = { ...old, ...partial, publicUrl: OFFICIAL_URL, port: Math.max(1, Math.min(65535, Number(partial.port || old.port))) };
   return saveSettings(next);
 });
 ipcMain.handle('manager:status', () => status());
@@ -101,14 +101,9 @@ async function adminRequest(pathname, options = {}) {
   const config = await getSettings();
   const response = await fetch(`http://127.0.0.1:${config.port}${pathname}`, { ...options, headers: { 'content-type': 'application/json', 'x-admin-token': config.adminToken, ...(options.headers || {}) } });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || '授权服务请求失败');
+  if (!response.ok) throw new Error(result.error || '服务请求失败');
   return result;
 }
-ipcMain.handle('manager:licenses', () => adminRequest('/v1/admin/licenses'));
-ipcMain.handle('manager:create-license', (_event, payload) => adminRequest('/v1/admin/licenses', { method: 'POST', body: JSON.stringify(payload) }));
-ipcMain.handle('manager:revoke-license', (_event, id) => adminRequest(`/v1/admin/licenses/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }));
-ipcMain.handle('manager:freeze-license', (_event, id) => adminRequest(`/v1/admin/licenses/${encodeURIComponent(id)}/freeze`, { method: 'POST', body: '{}' }));
-ipcMain.handle('manager:remove-license-device', (_event, id, deviceId) => adminRequest(`/v1/admin/licenses/${encodeURIComponent(id)}/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' }));
 ipcMain.handle('manager:audit', () => adminRequest('/v1/admin/audit'));
 ipcMain.handle('manager:notification-history', () => adminRequest('/v1/admin/notifications'));
 ipcMain.handle('manager:revoke-notification', (_event, id) => adminRequest(`/v1/admin/notifications/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }));
@@ -118,7 +113,7 @@ ipcMain.handle('manager:send-campaign', (_event, id) => adminRequest(`/v1/admin/
 ipcMain.handle('manager:revoke-campaign', (_event, id) => adminRequest(`/v1/admin/campaigns/${encodeURIComponent(id)}/revoke`, { method: 'POST', body: '{}' }));
 ipcMain.handle('manager:backup', async () => {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-'); const folder = path.join(userRoot, 'backups', `export-${stamp}`); await mkdir(folder, { recursive: true });
-  try { await copyFile(dataPath, path.join(folder, 'notifications.json')); } catch { await writeFile(path.join(folder, 'notifications.json'), JSON.stringify({ devices: {}, registry: {}, licenses: {}, audit: [] }, null, 2)); }
+  try { await copyFile(dataPath, path.join(folder, 'notifications.json')); } catch { await writeFile(path.join(folder, 'notifications.json'), JSON.stringify({ devices: {}, registry: {}, audit: [] }, null, 2)); }
   const settings = await getSettings(); await writeFile(path.join(folder, 'manifest.json'), JSON.stringify({ exportedAt: new Date().toISOString(), format: 'wendaflow-notification-json-v1', publicUrl: OFFICIAL_URL, storage: 'json', restore: 'Copy notifications.json back into the server data folder while the service is stopped.' }, null, 2)); await writeFile(path.join(folder, 'config.public.json'), JSON.stringify({ port: settings.port, publicUrl: OFFICIAL_URL }, null, 2)); return folder;
 });
 ipcMain.handle('manager:open-folder', () => shell.openPath(userRoot));
