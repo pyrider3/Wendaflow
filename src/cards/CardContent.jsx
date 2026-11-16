@@ -59,6 +59,10 @@ export function CardContent({
     node.type === "action" ? (node.execution?.events || []).slice(-18) : [];
   const activityCollapsed = node.execution?.activityCollapsed !== false;
   const showNodeThinking = shouldShowNodeThinking(node);
+  // Keep right-click available for card-level quick-thought relation dragging.
+  const stopNonRightDown = (event) => {
+    if (event.button !== 2) event.stopPropagation();
+  };
   return (
     <>
       {node.type !== "thought" && <div className="node-topline">
@@ -95,7 +99,7 @@ export function CardContent({
               href={asset.url}
               target="_blank"
               rel="noreferrer"
-              onPointerDown={(event) => event.stopPropagation()}
+              onPointerDown={stopNonRightDown}
               onClick={(event) => {
                 event.stopPropagation();
                 if (node.type !== "action") return;
@@ -228,7 +232,7 @@ export function CardContent({
                       className="image-attachment"
                       draggable={false}
                       href={item.dataUrl}
-                      onPointerDown={(event) => event.stopPropagation()}
+                      onPointerDown={stopNonRightDown}
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
@@ -256,7 +260,7 @@ export function CardContent({
                       className="file-attachment"
                       href={item.dataUrl}
                       download={item.name}
-                      onPointerDown={(event) => event.stopPropagation()}
+                      onPointerDown={stopNonRightDown}
                       onClick={(event) => event.stopPropagation()}
                     >
                       <strong>▱ {item.name}</strong>
@@ -490,7 +494,7 @@ export function CardContent({
                   `Collapse branch (${hiddenCount} nodes)`,
                 )
           }
-          onPointerDown={(event) => event.stopPropagation()}
+          onPointerDown={stopNonRightDown}
           onClick={(event) => {
             event.stopPropagation();
             toggleCollapse(node.id);
@@ -506,7 +510,7 @@ export function CardContent({
             ? tr("取消创建分支", "Cancel branch")
             : tr("从这里创建分支", "Branch from here")
         }
-        onPointerDown={(event) => event.stopPropagation()}
+        onPointerDown={stopNonRightDown}
         onClick={(event) => {
           event.stopPropagation();
           startBranch(node);

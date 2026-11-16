@@ -45,7 +45,7 @@ import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,LatestFrame,a
 import {useCanvasNodes} from './canvas/useCanvasNodes.js';
 import {detachParent} from './canvas/parents.mjs';
 import {diagramPrompt,parseDiagram,applyDiagram} from './canvas/ai-diagram.mjs';
-import {crossedDragThreshold,combineSelection,connectionIntent,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
+import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
 import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
@@ -80,6 +80,12 @@ function isNewerVersion(candidate, current) {
 function hasCopyableTextSelection() {
   const selection = window.getSelection?.();
   return !!selection && !selection.isCollapsed && selection.rangeCount > 0 && !!selection.toString().trim();
+}
+
+function capturePointer(target, pointerId) {
+  try {
+    target?.setPointerCapture?.(pointerId);
+  } catch {}
 }
 
 function openCanvasDb() {
@@ -1192,6 +1198,7 @@ function App() {
     if (branchingFrom) return undefined;
     const clearOnEscape = (event) => {
       if (event.key === 'Escape') {
+        if(contextMenu){setContextMenu(null);return;}
         if(canvasMenuOpen){if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)setCanvasMenuOpen(false);return;}
         if(shortcutHelp){setShortcutHelp(false);return;}
         relationDragRef.current=null;quickBlankClick.current=null;clearQuickSlicePreview();
@@ -1227,7 +1234,7 @@ function App() {
     };
     window.addEventListener('keydown', clearOnEscape);
     return () => window.removeEventListener('keydown', clearOnEscape);
-  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought,shortcutHelp,visibleNodes,nodeSizes,canvasMenuOpen]);
+  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought,shortcutHelp,contextMenu,visibleNodes,nodeSizes,canvasMenuOpen]);
 
   function selectNode(id, options = {}) {
     if (inspectorTimerRef.current) clearTimeout(inspectorTimerRef.current);
@@ -1514,8 +1521,8 @@ function App() {
 
   function beginNodeDrag(event, node) {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
-    if(quickThought && event.button===2 && !event.target.closest('input,textarea,select,a')) {
-      event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture?.(event.pointerId);
+    if(quickThought && event.button===2 && !event.target.closest('input,textarea,select')) {
+      event.preventDefault();event.stopPropagation();capturePointer(event.currentTarget,event.pointerId);
       const ids=selectedIds.has(node.id)?[...cardIds(nodes,selectedIds)]:[node.id];
       const next={sourceId:node.id,sourceIds:ids,x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,targetId:null,quick:true,reference:!!event.shiftKey,moved:false};
       relationDragRef.current=next;setRelationDrag(next);setContextMenu(null);return;
@@ -1544,10 +1551,10 @@ function App() {
       dragIds = [node.id];
       selectNode(node.id);
     }
-    if(quickThought){setInspectorOpen(false);event.currentTarget.setPointerCapture?.(event.pointerId);}
+    if(quickThought){setInspectorOpen(false);capturePointer(event.currentTarget,event.pointerId);}
     const positions = new Map(nodes.filter((item) => dragIds.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]));
     beginHistory();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    capturePointer(event.currentTarget,event.pointerId);
     setDragging({ started:false, ids: dragIds, startX: event.clientX, startY: event.clientY, positions });
   }
 
@@ -1585,7 +1592,7 @@ function App() {
     event.preventDefault();
     event.stopPropagation();
     const size = nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    capturePointer(event.currentTarget,event.pointerId);
     resizingRef.current = node.id;
     setResizing({ axis, id: node.id, startX: event.clientX, startY: event.clientY, width: size.width, height: size.height, compact:node.type==='thought'&&!node.attachments?.length });
   }
@@ -1631,12 +1638,12 @@ function App() {
     if(editingNode && !event.target.closest('.inline-node-editor,.inspector,.ix') && saveNodeEdit()===false)return;
     if(quickThought&&quickEditor&&!event.target.closest('.quick-thought-editor')){saveQuickIdea();}
     if(quickThought && event.button===2 && !event.target.closest('.node,button,textarea,select,.composer')) {
-      event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.preventDefault();capturePointer(event.currentTarget,event.pointerId);
       stopZoomAnimation();
       beginQuickSlice(event);setContextMenu(null);return;
     }
     if(quickThought && event.button===0 && !quickSpace.current && event.pointerType!=='touch' && !event.target.closest('.node,button,textarea,input,select,.composer,.quick-thought-editor')) {
-      event.preventDefault();event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.preventDefault();capturePointer(event.currentTarget,event.pointerId);
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
       marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
@@ -1659,7 +1666,7 @@ function App() {
       return;
     }
     if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought || event.pointerType==='touch'))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
-    event.preventDefault();event.stopPropagation();event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();event.stopPropagation();capturePointer(event.currentTarget,event.pointerId);
     stopZoomAnimation();
     // The DOM transform can be ahead of React state during a wheel zoom.
     // Starting from the state snapshot made the first pan frame jump back,
@@ -1707,17 +1714,12 @@ function App() {
   }
   function movePointer(event) {
     if(quickBlankClick.current){updateQuickSlice(event);return;}
-    if (relationDrag) {
+    const activeRelationDrag = typeof relationDragRef !== 'undefined' ? relationDragRef.current : relationDrag;
+    if (activeRelationDrag) {
       const target = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset?.nodeId)?.dataset.nodeId || null;
-      const current = relationDragRef.current;
-      if (current) {
-        const validTarget=nodes.some(n=>n.id===target);
-        const intent=current.quick&&!current.reference?connectionIntent(nodes,current.sourceId,target):'connect';
-        const invalid=current.quick && ['cycle','self','invalid'].includes(intent);
-        const next = { ...current, intent, extra: event.altKey, invalidTargetId:invalid?target:null, moved:current.moved||Math.hypot(event.clientX-current.startX,event.clientY-current.startY)>5,x: event.clientX, y: event.clientY, targetId: invalid || target === current.sourceId || !validTarget ? null : target };
-        relationDragRef.current = next;
-        setRelationDrag(next);
-      }
+      const next = updateRelationDragState(activeRelationDrag, event, target, nodes, event.altKey);
+      if (typeof relationDragRef !== 'undefined') relationDragRef.current = next;
+      setRelationDrag(next);
     } else if (resizing) {
       const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (resizing.axis==='y'?0:event.clientX - resizing.startX) / viewportRef.current.zoom));
       const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (resizing.axis==='x'?0:event.clientY - resizing.startY) / viewportRef.current.zoom));
@@ -1747,7 +1749,7 @@ function App() {
 
   function endPointer(event) {
     endHistory();
-    const finalRelationDrag = relationDragRef.current;
+    let finalRelationDrag = relationDragRef.current;
     if (quickBlankClick.current) {
       updateQuickSlice(event);
       const press=quickBlankClick.current;quickBlankClick.current=null;clearQuickSlicePreview();
@@ -1757,6 +1759,10 @@ function App() {
     }
     if (finalRelationDrag) {
       relationDragRef.current=null;setRelationDrag(null);
+      if(event.type==='pointerup'&&Number.isFinite(event.clientX)&&Number.isFinite(event.clientY)&&typeof document!=='undefined'){
+        const target=document.elementsFromPoint(event.clientX,event.clientY).find((element)=>element instanceof HTMLElement&&element.dataset?.nodeId)?.dataset.nodeId||null;
+        finalRelationDrag=updateRelationDragState(finalRelationDrag,event,target,nodes,event.altKey);
+      }
       if(finalRelationDrag.quick){
         suppressContextMenuUntilRef.current=Date.now()+300;
         if(event.type==='pointerup') {
@@ -1766,7 +1772,7 @@ function App() {
             if(finalRelationDrag.intent==='connected'){notify(say('这两个想法已连接。','These ideas are already connected.'));return;}
             const next = attachThoughtChild(nodes, finalRelationDrag.sourceId, finalRelationDrag.targetId, !!finalRelationDrag.extra);
             if (next === nodes) setStorageWarning(tr('不能把节点继承到自己的后代。',"Cannot inherit from a descendant"));
-            else { if(finalRelationDrag.extra)notify(say('已添加为另一个父节点。','Added as another parent.'));else if(nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId!==finalRelationDrag.sourceId)notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));setNodes(next); pulseThought(worldRef.current,finalRelationDrag.targetId); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
+            else { if(!finalRelationDrag.extra && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId && nodes.find(n=>n.id===finalRelationDrag.targetId)?.parentId!==finalRelationDrag.sourceId)notify(say('分支已移动到新的父节点，可按 Ctrl+Z 撤销。','Branch moved to a new parent. Press Ctrl+Z to undo.'));setNodes(next); pulseThought(worldRef.current,finalRelationDrag.targetId); setCollapsedIds(current=>new Set([...current].filter(id=>id!==finalRelationDrag.sourceId))); }
           }
           else if(!document.elementsFromPoint(event.clientX,event.clientY).some(el=>el.closest?.('.node,.composer,.inspector,.ix,.quick-thought-editor')))createQuickIdea(clientWorld(event),[finalRelationDrag.sourceId]);
         }
@@ -3715,7 +3721,7 @@ function App() {
             const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
             const deleting = deletingIds.has(node.id) || deletingIds.has(parent.id);
             const connectionKey = `parent:${parent.id}:${node.id}`;
-            return <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
+            return <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && !relationDrag.extra && !extra && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
           })}
         </svg>
         {lineSelectionMenu && selectedConnections.length > 0 && <section className="line-selection-menu" onPointerDown={(event) => event.stopPropagation()}><span>{tr(`已选 ${selectedConnections.length} 条连线`,`${selectedConnections.length} connections selected`)}</span><small>{selectedConnections.some((item) => item.kind === 'parent') ? tr('包含继承关系；删除会解除父子继承。','Includes inheritance links; deleting removes the parent-child relationship.') : tr('可批量移除引用或合并关系。','Remove reference or merge links in a batch.')}</small><div><button onClick={() => { setSelectedConnections([]); setLineSelectionMenu(null); }}>{tr('取消','Cancel')}</button><button className="danger" onClick={() => removeConnections()}>{tr('删除连线','Delete links')}</button></div></section>}
@@ -3793,7 +3799,7 @@ function App() {
         {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row">{renderModeSwitch()}<div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><SuggestTextarea autoFocus value={draft} onChange={setDraft} onSubmit={createFirstNode} placeholder={nodeType === 'draw' ? tr('描述要画的图，例如：画出这个程序的原理图……','Describe the diagram, e.g. the architecture of this app…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) : tr('先在 设置 → 执行器 里启用一个执行器','Enable an agent in Settings → Agents first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} {...suggestProps} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />{(nodeType === 'conversation' || nodeType === 'draw') && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<span className="shortcut">{copy.shortcut}</span><button className="send-button" aria-label={tr("发送","Send")} disabled={!(drawBusy && nodeType === 'draw') && !draft.trim() && !attachments.length} onClick={createFirstNode}>{drawBusy && nodeType === 'draw' ? '■' : '↑'}</button></div></section>}
       </main>
 
-      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留）','Release to add another parent (keeps the current one)'):say('松开将移动分支；按住 Alt 则再加一个父节点','Release to move branch; hold Alt to add another parent instead')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
+      {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留；按住 Alt 改为移动分支）','Release to add another parent (keeps current; hold Alt to move branch)'):say('松开将移动分支（替换原父节点）','Release to move branch (replaces current parent)')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
       {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
       {piImportOpen && <PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} />}

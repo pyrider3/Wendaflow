@@ -18,6 +18,21 @@ export function connectionIntent(nodes,sourceId,targetId) {
   if(parentIdsOf(target).includes(sourceId))return 'connected';
   return target.parentId?'reparent':'connect';
 }
+export function updateRelationDragState(current,point,target,nodes,altKey=false) {
+  const validTarget=nodes.some(n=>n.id===target);
+  const intent=current.quick&&!current.reference?connectionIntent(nodes,current.sourceId,target):'connect';
+  const invalid=current.quick && ['cycle','self','invalid'].includes(intent);
+  return {
+    ...current,
+    intent,
+    extra:intent==='reparent'&&!altKey,
+    invalidTargetId:invalid?target:null,
+    moved:current.moved||Math.hypot(point.clientX-current.startX,point.clientY-current.startY)>DRAG_THRESHOLD,
+    x:point.clientX,
+    y:point.clientY,
+    targetId:invalid||target===current.sourceId||!validTarget?null:target,
+  };
+}
 export function relativeIdeaPoint(node,kind,nodes,sizes) {
   const size=sizes.get(node.id)||{width:95,height:47};
   const x=kind==='child'?node.x+size.width+80:node.x;

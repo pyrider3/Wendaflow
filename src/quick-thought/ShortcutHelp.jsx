@@ -35,7 +35,8 @@ export function ShortcutHelp({quick,say,hints,onToggleHints,onClose}) {
    ...(quick?[[say('方向键','Arrow keys'),say('选择相邻想法','Select nearby idea')]]:[]),
   ]],
   ...(quick?[[say('快速思维','Quick thinking'),[
-   [say('右键从卡片拖动','Right-drag from card'),say('连接母子节点，拖到空白新建子想法','Connect parent/child; drop on blank to create child')],
+   [say('右键从卡片拖动','Right-drag from card'),say('连接或添加另一个父节点；拖到空白新建子想法','Connect or add another parent; drop on blank to create child')],
+   ['Alt + '+say('右键拖到已有父节点的卡片','right-drag onto child'),say('移动分支（替换原父节点）','Move branch (replace current parent)')],
    [say('右键划过空白','Right-drag on blank'),say('划动切除想法或连线','Slice ideas or links')],
    ['Enter',say('完成编辑 / 新建同级想法','Finish editing / New sibling idea')],
    ['Ctrl / ⌘ + Enter',say('完成并新建同级想法','Finish and create sibling')],
