@@ -60,6 +60,4 @@
   /* Small card controls get a generous invisible touch area. */
   :root .app-shell .node .fork-button::after, :root .app-shell .node .relation-handle::after,
   :root .app-shell .node .collapse-button::after, :root .app-shell .node .resize-handle::after { content: ""; position: absolute; inset: -12px; }
-  :root .app-shell .resize-edge-x { width: 22px; right: -10px; }
-  :root .app-shell .resize-edge-y { height: 22px; bottom: -10px; }
 }

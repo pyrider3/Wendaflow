@@ -48,9 +48,3 @@
     background: color-mix(in srgb, oklch(from var(--node-tint) 0.55 min(calc(c * 6), 0.15) h) 34%, var(--dark-panel)) !important;
   }
 }
-
-/* The card's drag-to-resize edges are invisible handles; the generic dark button:hover
-   used to paint them as a solid green bar. Show a thin accent line instead. */
-.resize-edge:hover, .resize-edge:focus-visible { background: transparent; outline: 0; }
-.resize-edge-y:hover { box-shadow: inset 0 -2px 0 var(--card-selection, #80bdff); }
-.resize-edge-x:hover { box-shadow: inset -2px 0 0 var(--card-selection, #80bdff); }

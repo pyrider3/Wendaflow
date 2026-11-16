@@ -351,9 +351,6 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .resize-handle::before { content: ""; position: absolute; right: 5px; bottom: 5px; width: 7px; height: 7px; border-right: 1.5px solid #779087; border-bottom: 1.5px solid #779087; border-radius: 0 0 2px; }
 .node:hover .resize-handle, .node.selected .resize-handle { opacity: .72; }
 .resize-handle:hover { opacity: 1 !important; }
-.resize-edge { position: absolute; z-index: 2; padding: 0; border: 0; background: transparent; }
-.resize-edge-x { top: 16px; bottom: 16px; right: -3px; width: 7px; cursor: ew-resize; }
-.resize-edge-y { left: 16px; right: 16px; bottom: -3px; height: 7px; cursor: ns-resize; }
 .node.summary { width: calc(var(--preview-width, 184px) + (var(--full-width, 224px) - var(--preview-width, 184px)) * (1 - var(--semantic, 0))); min-height: calc(110px + 24px * var(--semantic, 0)); padding: 14px 15px; }
 .node.preview-reserve.summary { box-sizing: border-box; height: calc(var(--preview-height, 110px) + (var(--full-card-height, 180px) - var(--preview-height, 110px)) * (1 - var(--semantic, 0))); min-height: 0; overflow: hidden; }
 .node.preview-reserve .markdown-content { position: absolute; z-index: 1; top: var(--preview-content-top, 69px); left: 15px; width: calc(var(--full-width) - 30px); max-width: calc(var(--full-width) - 30px); max-height: calc(var(--full-card-height, 180px) - var(--preview-content-top, 69px) - 14px); margin: 0; contain: layout paint; }
