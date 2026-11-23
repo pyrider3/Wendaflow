@@ -29,12 +29,15 @@ async function call(base, path, init = {}, fetchImpl = fetch, timeout = 15000) {
 export async function comfyStatus({ endpoint }, fetchImpl = fetch) {
   const base = comfyBase(endpoint);
   const stats = await (await call(base, '/system_stats', {}, fetchImpl, 5000)).json();
-  let checkpoints = [];
-  try {
-    const info = await (await call(base, '/object_info/CheckpointLoaderSimple', {}, fetchImpl, 8000)).json();
-    checkpoints = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-  } catch { /* older builds: still connected */ }
-  return { ok: true, version: stats?.system?.comfyui_version || '', device: stats?.devices?.[0]?.name || '', checkpoints: Array.isArray(checkpoints) ? checkpoints : [] };
+  const options = async (node, field) => {
+    try {
+      const info = await (await call(base, `/object_info/${node}`, {}, fetchImpl, 8000)).json();
+      const list = info?.[node]?.input?.required?.[field]?.[0];
+      return Array.isArray(list) ? list : [];
+    } catch { return []; } // node missing or older build: still connected
+  };
+  const [checkpoints, unets, clips, vaes] = await Promise.all([options('CheckpointLoaderSimple', 'ckpt_name'), options('UNETLoader', 'unet_name'), options('CLIPLoader', 'clip_name'), options('VAELoader', 'vae_name')]);
+  return { ok: true, version: stats?.system?.comfyui_version || '', device: stats?.devices?.[0]?.name || '', checkpoints, unets, clips, vaes };
 }
 
 export async function comfySubmit({ endpoint, workflow, clientId = 'wendaflow' }, fetchImpl = fetch) {

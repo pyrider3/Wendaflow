@@ -8,9 +8,10 @@
    ```bash
    python main.py --listen 127.0.0.1 --port 8188
    ```
-2. 把一个模型放进 `ComfyUI/models/checkpoints/`，二选一：
-   - **SDXL**（默认模板）：如 `sd_xl_base_1.0.safetensors`，或动漫风的 `animagine-xl-3.1.safetensors`。约 25 步，CFG 7。
-   - **Flux**：单文件 checkpoint 版，如 `flux1-schnell-fp8.safetensors`。4 步，CFG 1，出图最快，适合现场演示。
+2. 选一个模板对应的模型：
+   - **NoctQ / Qwen Image**（默认，本机已验证）：`models/diffusion_models/NoctQ_V4_int8_convrot.safetensors` + `models/text_encoders/qwen3vl_8b_int8_convrot.safetensors` + `models/vae/qwen_image_2.1_vae_bf16.safetensors`。参数是 25 步、Euler / simple、CFG 3，和用户保存的「NoctQ-V4-5080生图」工作流一致，能直接理解中文提示词。
+   - **SDXL**：checkpoint 放在 `models/checkpoints/`，如 `sd_xl_base_1.0.safetensors`。约 25 步，CFG 7。
+   - **Flux**：单文件 checkpoint 版，如 `flux1-schnell-fp8.safetensors`。4 步，CFG 1。
 3. 不需要给 ComfyUI 配 CORS：浏览器只访问本机 `server.mjs`（4318 端口），再由它转发到 ComfyUI。
 
 ## 2. 在 Wendaflow 里配置
@@ -20,8 +21,8 @@
 | 项 | 说明 |
 | --- | --- |
 | ComfyUI 地址 | 默认 `http://127.0.0.1:8188` |
-| 工作流模板 | SDXL / Flux / 自定义（API 格式 JSON） |
-| 模型文件 | 点「测试连接」后，下拉框会列出 ComfyUI 里已有的 checkpoint |
+| 工作流模板 | NoctQ（默认）/ SDXL / Flux / 自定义（API 格式 JSON） |
+| 模型文件 / 文本编码器 / VAE | 点「测试连接」后，下拉框会列出 ComfyUI 里已有的模型（NoctQ 模板会多出文本编码器和 VAE 两项） |
 | 统一画风提示词 | 每一格都会加上，用来统一画风，如 `manga comic panel, clean line art, cel shading` |
 | 反向提示词 / 宽高 / 步数 / CFG / 分镜数量 | 分镜数量为 4–8，默认 6 |
 
@@ -35,7 +36,9 @@
 3. 在故事卡上点 **逐张出图**：分镜卡依次显示「ComfyUI 排队中 / 正在出图… N 秒」，出完的图作为附件挂到对应卡片上。单张卡片也可以点 **生成画面**，或点 **重新出图** 换一个随机种子。
 4. 在故事卡上点 **导出长图**，得到一张 1080 宽的 PNG：顶部是标题，下面是编号分镜和台词气泡，还没出图的格子用文字占位。
 
-演示建议：先用 Flux schnell 或较小的 SDXL 提前跑一遍，确认模型已经加载进显存，现场出图会快很多。同一组分镜默认使用相近的种子，并在每格提示词里带上模型写出的英文角色设定，让角色外观尽量一致。
+**实测（RTX 5080 16GB，NoctQ V4，1216×832，25 步）**：冷启动第一张约 48 秒（含加载模型）；模型加载好后每张约 21–24 秒。4 格「逐张出图」从点击到全部完成约 90 秒；导出的长图为 1080×3416，约 4 MB。
+
+演示建议：开讲前先出一张图，让模型提前加载进显存；现场演示时可以只出 1–2 张，其余提前生成好。同一组分镜默认使用相近的种子，并在每格提示词里带上模型写出的英文角色设定，让角色外观尽量一致。
 
 ## 4. 出错时的提示
 

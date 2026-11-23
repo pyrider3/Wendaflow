@@ -89,15 +89,18 @@ export function panelImage(node) {
 // ---- ComfyUI workflow templates (API format) ----
 
 export const COMIC_TEMPLATES = {
+  // Qwen-Image family (e.g. NoctQ V4): separate diffusion model, text encoder and VAE; understands Chinese prompts.
+  noctq: { checkpoint: 'NoctQ_V4_int8_convrot.safetensors', clip: 'qwen3vl_8b_int8_convrot.safetensors', vae: 'qwen_image_2.1_vae_bf16.safetensors', steps: 25, cfg: 3, sampler: 'euler', scheduler: 'simple' },
   sdxl: { checkpoint: 'sd_xl_base_1.0.safetensors', steps: 25, cfg: 7, sampler: 'euler', scheduler: 'normal' },
   flux: { checkpoint: 'flux1-schnell-fp8.safetensors', steps: 4, cfg: 1, sampler: 'euler', scheduler: 'simple' },
 };
 
 export const DEFAULT_COMIC_SETTINGS = {
-  endpoint: 'http://127.0.0.1:8188', template: 'sdxl', checkpoint: COMIC_TEMPLATES.sdxl.checkpoint,
+  endpoint: 'http://127.0.0.1:8188', template: 'noctq', checkpoint: COMIC_TEMPLATES.noctq.checkpoint,
+  clip: COMIC_TEMPLATES.noctq.clip, vae: COMIC_TEMPLATES.noctq.vae,
   style: 'manga comic panel, clean line art, cel shading, vibrant colors, expressive faces',
-  negative: 'lowres, blurry, text, speech bubble, watermark, signature, deformed hands, extra fingers',
-  width: 1216, height: 832, steps: 25, cfg: 7, panels: 6, customWorkflow: '',
+  negative: 'lowres, blurry, text, speech bubble, watermark, signature, logo, brand name, deformed hands, extra fingers',
+  width: 1216, height: 832, steps: 25, cfg: 3, panels: 6, customWorkflow: '',
 };
 
 export function normalizeComicSettings(value) {
@@ -105,9 +108,9 @@ export function normalizeComicSettings(value) {
   const num = (v, min, max, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : d; };
   return {
     ...s, endpoint: String(s.endpoint || DEFAULT_COMIC_SETTINGS.endpoint).trim().replace(/\/+$/, ''),
-    template: ['sdxl', 'flux', 'custom'].includes(s.template) ? s.template : 'sdxl',
+    template: ['noctq', 'sdxl', 'flux', 'custom'].includes(s.template) ? s.template : 'noctq',
     width: Math.round(num(s.width, 256, 2048, 1216) / 8) * 8, height: Math.round(num(s.height, 256, 2048, 832) / 8) * 8,
-    steps: Math.round(num(s.steps, 1, 150, 25)), cfg: num(s.cfg, 0, 30, 7), panels: Math.round(num(s.panels, MIN_PANELS, MAX_PANELS, 6)),
+    steps: Math.round(num(s.steps, 1, 150, 25)), cfg: num(s.cfg, 0, 30, 3), panels: Math.round(num(s.panels, MIN_PANELS, MAX_PANELS, 6)),
   };
 }
 
@@ -128,7 +131,7 @@ function fillPlaceholders(value, vars) {
 
 export function buildComfyWorkflow(rawSettings, { prompt, seed = 0 }) {
   const s = normalizeComicSettings(rawSettings);
-  const vars = { prompt, negative: s.negative, seed, checkpoint: s.checkpoint, width: s.width, height: s.height, steps: s.steps, cfg: s.cfg };
+  const vars = { prompt, negative: s.negative, seed, checkpoint: s.checkpoint, clip: s.clip, vae: s.vae, width: s.width, height: s.height, steps: s.steps, cfg: s.cfg };
   if (s.template === 'custom') {
     let parsed;
     try { parsed = JSON.parse(s.customWorkflow || ''); } catch { throw new Error('自定义工作流不是有效的 JSON（请在 ComfyUI 里用 “Export (API)” 导出）'); }
@@ -137,6 +140,18 @@ export function buildComfyWorkflow(rawSettings, { prompt, seed = 0 }) {
     return fillPlaceholders(parsed.prompt && typeof parsed.prompt === 'object' ? parsed.prompt : parsed, vars);
   }
   const t = COMIC_TEMPLATES[s.template];
+  if (s.template === 'noctq') {
+    return {
+      1: { class_type: 'UNETLoader', inputs: { unet_name: s.checkpoint || t.checkpoint, weight_dtype: 'default' } },
+      2: { class_type: 'CLIPLoader', inputs: { clip_name: s.clip || t.clip, type: 'qwen_image', device: 'default' } },
+      3: { class_type: 'VAELoader', inputs: { vae_name: s.vae || t.vae } },
+      4: { class_type: 'TextEncodeQwenImage21', inputs: { clip: ['2', 0], prompt, negative_prompt: s.negative, resolution: 1024 } },
+      5: { class_type: 'EmptyLatentImage', inputs: { width: s.width, height: s.height, batch_size: 1 } },
+      6: { class_type: 'KSampler', inputs: { model: ['1', 0], positive: ['4', 0], negative: ['4', 1], latent_image: ['5', 0], seed, steps: s.steps, cfg: s.cfg, sampler_name: t.sampler, scheduler: t.scheduler, denoise: 1 } },
+      7: { class_type: 'VAEDecode', inputs: { samples: ['6', 0], vae: ['3', 0] } },
+      8: { class_type: 'SaveImage', inputs: { images: ['7', 0], filename_prefix: 'Wendaflow_comic' } },
+    };
+  }
   const flux = s.template === 'flux';
   return {
     4: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: s.checkpoint || t.checkpoint } },

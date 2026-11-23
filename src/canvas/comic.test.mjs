@@ -41,7 +41,7 @@ test('panels become chained cards in a grid next to a story card', () => {
 });
 
 test('built-in SDXL and Flux workflows carry checkpoint, prompt, seed and size', () => {
-  const sdxl = buildComfyWorkflow({ checkpoint: 'my.safetensors', width: 1000, height: 600 }, { prompt: 'a cat', seed: 42 });
+  const sdxl = buildComfyWorkflow({ template: 'sdxl', checkpoint: 'my.safetensors', width: 1000, height: 600 }, { prompt: 'a cat', seed: 42 });
   assert.equal(sdxl[4].inputs.ckpt_name, 'my.safetensors');
   assert.equal(sdxl[6].inputs.text, 'a cat');
   assert.equal(sdxl[3].inputs.seed, 42);
@@ -54,6 +54,14 @@ test('built-in SDXL and Flux workflows carry checkpoint, prompt, seed and size',
   const prompt = panelImagePrompt(normalizeComicSettings({ style: 'ink style' }), 'red scarf girl', { imagePrompt: 'running in rain' });
   assert.equal(prompt, 'ink style, red scarf girl, running in rain');
   assert.equal(seriesSeed('comic-1', 2), seriesSeed('comic-1', 2));
+});
+
+test('NoctQ (Qwen Image) is the default template, with loaders and a two-output text encoder', () => {
+  const wf = buildComfyWorkflow({}, { prompt: '深夜宿舍', seed: 7 });
+  assert.equal(wf[1].class_type, 'UNETLoader'); assert.equal(wf[1].inputs.unet_name, 'NoctQ_V4_int8_convrot.safetensors');
+  assert.equal(wf[2].inputs.type, 'qwen_image'); assert.equal(wf[3].inputs.vae_name, 'qwen_image_2.1_vae_bf16.safetensors');
+  assert.equal(wf[4].inputs.prompt, '深夜宿舍'); assert.deepEqual(wf[6].inputs.negative, ['4', 1]);
+  assert.equal(wf[6].inputs.seed, 7); assert.equal(wf[6].inputs.cfg, 3); assert.equal(wf[8].class_type, 'SaveImage');
 });
 
 test('custom API-format workflows get placeholders filled and typed', () => {

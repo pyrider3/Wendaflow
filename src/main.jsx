@@ -591,7 +591,7 @@ function App() {
   // AI comic studio: ComfyUI settings live in this browser; jobs are tracked per card.
   const [comicSettings, setComicSettings] = useState(() => { try { return normalizeComicSettings(JSON.parse(localStorage.getItem('wendaflow-comic-v1') || 'null')); } catch { return normalizeComicSettings(null); } });
   useEffect(() => { try { localStorage.setItem('wendaflow-comic-v1', JSON.stringify(comicSettings)); } catch { /* storage blocked */ } }, [comicSettings]);
-  const [comfyState, setComfyState] = useState({ tone: 'idle', text: '', checkpoints: [] });
+  const [comfyState, setComfyState] = useState({ tone: 'idle', text: '', checkpoints: [], unets: [], clips: [], vaes: [] });
   const comicJobsRef = useRef(new Set());
   const [focusMode, setFocusMode] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -2579,8 +2579,8 @@ function App() {
     setComfyState((current) => ({ ...current, tone: 'idle', text: tr('正在连接 ComfyUI…','Connecting to ComfyUI…') }));
     try {
       const status = await comfyCall('/comfy/status', { endpoint: comicSettings.endpoint });
-      const found = status.checkpoints?.length || 0;
-      setComfyState({ tone: 'ok', checkpoints: status.checkpoints || [], text: tr(`已连接 ComfyUI ${status.version || ''} · ${status.device || ''} · ${found} 个模型文件`,`Connected to ComfyUI ${status.version || ''} · ${status.device || ''} · ${found} checkpoints`) });
+      const found = (comicSettings.template === 'noctq' ? status.unets : status.checkpoints)?.length || 0;
+      setComfyState({ tone: 'ok', checkpoints: status.checkpoints || [], unets: status.unets || [], clips: status.clips || [], vaes: status.vaes || [], text: tr(`已连接 ComfyUI ${status.version || ''} · ${status.device || ''} · ${found} 个模型文件`,`Connected to ComfyUI ${status.version || ''} · ${status.device || ''} · ${found} checkpoints`) });
       return { status };
     } catch (error) { setComfyState((current) => ({ ...current, tone: 'error', text: error.message })); return { error: error.message }; }
   }
@@ -4227,13 +4227,16 @@ function App() {
                   <Fields>
                     <Field label={tr('ComfyUI 地址','ComfyUI address')} span><Input value={comicSettings.endpoint} onChange={(event) => setComicSettings((current) => ({ ...current, endpoint: event.target.value }))} onBlur={() => set({})} placeholder="http://127.0.0.1:8188" /></Field>
                     <Field label={tr('工作流模板','Workflow template')}>
-                      <Select value={comicSettings.template} onChange={(event) => { const template = event.target.value; const preset = COMIC_TEMPLATES[template]; set(preset ? { template, checkpoint: preset.checkpoint, steps: preset.steps, cfg: preset.cfg } : { template }); }}>
+                      <Select value={comicSettings.template} onChange={(event) => { const template = event.target.value; const preset = COMIC_TEMPLATES[template]; set(preset ? { template, checkpoint: preset.checkpoint, steps: preset.steps, cfg: preset.cfg, ...(preset.clip ? { clip: preset.clip, vae: preset.vae } : {}) } : { template }); }}>
+                        <option value="noctq">NoctQ / Qwen Image</option>
                         <option value="sdxl">SDXL</option>
                         <option value="flux">Flux</option>
                         <option value="custom">{tr('自定义工作流（API 格式）','Custom workflow (API format)')}</option>
                       </Select>
                     </Field>
-                    <Field label={tr('模型文件（checkpoint）','Checkpoint file')}><Input list="comfy-checkpoints" value={comicSettings.checkpoint} onChange={(event) => set({ checkpoint: event.target.value })} /><datalist id="comfy-checkpoints">{comfyState.checkpoints.map((name) => <option key={name} value={name} />)}</datalist></Field>
+                    <Field label={tr('模型文件（checkpoint）','Checkpoint file')}><Input list="comfy-checkpoints" value={comicSettings.checkpoint} onChange={(event) => set({ checkpoint: event.target.value })} /><datalist id="comfy-checkpoints">{(comicSettings.template === 'noctq' ? comfyState.unets : comfyState.checkpoints).map((name) => <option key={name} value={name} />)}</datalist></Field>
+                    {comicSettings.template === 'noctq' && <Field label={tr('文本编码器','Text encoder')}><Input list="comfy-clips" value={comicSettings.clip} onChange={(event) => set({ clip: event.target.value })} /><datalist id="comfy-clips">{comfyState.clips.map((name) => <option key={name} value={name} />)}</datalist></Field>}
+                    {comicSettings.template === 'noctq' && <Field label="VAE"><Input list="comfy-vaes" value={comicSettings.vae} onChange={(event) => set({ vae: event.target.value })} /><datalist id="comfy-vaes">{comfyState.vaes.map((name) => <option key={name} value={name} />)}</datalist></Field>}
                     <Field label={tr('统一画风提示词','Shared style prompt')} span><Input value={comicSettings.style} onChange={(event) => set({ style: event.target.value })} /></Field>
                     <Field label={tr('反向提示词','Negative prompt')} span><Input value={comicSettings.negative} onChange={(event) => set({ negative: event.target.value })} /></Field>
                     <Field label={tr('宽 × 高','Width × height')}><div className="comic-size"><Input type="number" step="64" value={comicSettings.width} onChange={(event) => setComicSettings((current) => ({ ...current, width: event.target.value }))} onBlur={() => set({})} /><Input type="number" step="64" value={comicSettings.height} onChange={(event) => setComicSettings((current) => ({ ...current, height: event.target.value }))} onBlur={() => set({})} /></div></Field>
