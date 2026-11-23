@@ -2,6 +2,7 @@ import common from './common.mjs';
 import actions from './actions.mjs';
 import settings from './settings.mjs';
 import workflow from './workflow.mjs';
+import comic from './comic.mjs';
 import sourceIndex from './source-index.json' with { type: 'json' };
 
 export const locales = ['zh-TW','ja','ko','es','fr','de','pt-BR','ru','ar'];
@@ -23,7 +24,7 @@ export function buildCatalog(copy, phrases, complete, extras = []) {
     for (const [key,value] of Object.entries(copy[locale] || {})) if (copy.en[key]) catalog[locale][copy.en[key]] = value;
     Object.assign(catalog[locale], phrases[locale], complete[locale]);
   }
-  for (const section of [common,actions,settings,workflow,...extras]) for (const line of section.split('\n').filter(line => line.trim())) {
+  for (const section of [common,actions,settings,workflow,comic,...extras]) for (const line of section.split('\n').filter(line => line.trim())) {
     const row = line.split('|');
     if (row.length !== locales.length + 1 || row.some(value => !value.trim())) throw new Error(`Invalid localization row: ${row[0]}`);
     locales.forEach((locale,index) => { catalog[locale][row[0]] = row[index+1]; });

@@ -88,6 +88,9 @@ export function CardContent({
     beginRelationDrag,
     toggleCollapse,
     startBranch,
+    generateComicPanel,
+    generateComicSeries,
+    exportComicStrip,
   } = actions;
   const { statusLabel, outputAssets, actionArtifacts, shouldShowNodeThinking } =
     helpers;
@@ -301,6 +304,53 @@ export function CardContent({
                 );
               })}
             </div>
+          )}
+        </div>
+      )}
+      {!editing && node.comic && (
+        <div
+          className="comic-bar"
+          onPointerDown={stopNonRightDown}
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
+          {node.comic.role === "panel" && node.comic.status === "running" ? (
+            <div className="generation-progress streaming">
+              <i />
+              {node.comic.phase || tr("ComfyUI 正在出图…", "ComfyUI is drawing…")}
+            </div>
+          ) : node.comic.role === "panel" ? (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                generateComicPanel?.(node);
+              }}
+            >
+              {node.attachments?.some((item) => item.comfy)
+                ? tr("重新出图", "Redraw")
+                : tr("生成画面", "Generate image")}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  generateComicSeries?.(node);
+                }}
+              >
+                {tr("逐张出图", "Draw all panels")}
+              </button>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  exportComicStrip?.(node);
+                }}
+              >
+                {tr("导出长图", "Export long image")}
+              </button>
+            </>
+          )}
+          {node.comic.status === "error" && node.comic.error && (
+            <small className="comic-error">{node.comic.error}</small>
           )}
         </div>
       )}

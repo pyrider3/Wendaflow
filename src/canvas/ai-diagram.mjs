@@ -22,7 +22,7 @@ export function diagramPrompt(request, existing = []) {
 }
 
 // Complete `{...}` objects inside the array under `key`, even while the text is still streaming.
-function scanObjects(text, key) {
+export function scanObjects(text, key) {
   const at = text.indexOf(`"${key}"`);
   if (at < 0) return [];
   const open = text.indexOf('[', at);

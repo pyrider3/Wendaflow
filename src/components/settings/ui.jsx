@@ -144,6 +144,7 @@ export const icons = {
   agents: <path d="M12 3a3 3 0 0 1 3 3v1h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V6a3 3 0 0 1 3-3ZM9.5 13h.01M14.5 13h.01M10 16.5h4" />,
   plugins: <path d="M10 4h4v3a2 2 0 1 0 4 0h2v6h-3a2 2 0 1 0 0 4h3v3H5v-5a2 2 0 1 1 0-4V4h5Z" />,
   project: <path d="M4 6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" />,
+  comic: <path d="M4 5h16v14H4zM4 12h7M11 5v14M14 9h3M14 13h3" />,
   about: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5M12 8h.01" />,
 };
 
