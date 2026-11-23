@@ -7,6 +7,7 @@ import { approvalPreview } from './src/agents/approval-preview.mjs';
 import { takeSnapshot, diffSnapshot, fileDiff, rollbackFiles, removeSnapshot, copyWorkspace, applyChanges } from './src/agents/snapshot.mjs';
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
+import { createAgentApi, agentApiEnabled, ConflictError } from './src/agent-api/index.mjs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +21,8 @@ const PORT = Number(process.env.WONDERFUL_PORT || 4318);
 const DATA_ROOT = process.env.WONDERFUL_DATA_DIR || process.cwd();
 const CANVAS_DIR = path.join(DATA_ROOT, 'data', 'canvases');
 const canvasFiles = canvasStorage(DATA_ROOT);
+// External agents (MCP, CLI) edit canvases through this; off on public deployments.
+const agentApi = agentApiEnabled({ publicWeb: PUBLIC_WEB }) ? createAgentApi({ canvasDir: CANVAS_DIR, save: (payload) => canvasFiles.save(payload) }) : null;
 // Where an action runs when its card names no folder. Kept on the server, so it holds in every browser.
 const AGENT_CONFIG_FILE = path.join(DATA_ROOT, 'agents-config.json');
 let defaultWorkspace = '';
@@ -830,6 +833,7 @@ const server = http.createServer(async (req, res) => {
     if(!publicRequestAllowed(req.method,req.url)){reply(res,403,{error:'此功能仅限本机版本；公开版不提供服务器文件或命令执行。'});return;}
     if(req.method==='POST' && !String(req.headers['content-type']||'').startsWith('application/json')){reply(res,415,{error:'JSON required'});return;}
   }
+  if (agentApi && await agentApi.handle(req, res)) return;
   if (req.method === 'OPTIONS') { res.writeHead(204, allowedHeaders); res.end(); return; }
   if (req.method === 'GET' && req.url === '/health') { reply(res, 200, { ok: true, service: 'branchspace-local-proxy' }); return; }
   if (req.method === 'GET' && req.url === '/canvases') {
@@ -869,10 +873,11 @@ const server = http.createServer(async (req, res) => {
       // WDF is deliberately self-contained so moving one file between devices
       // preserves nodes, layout and every attachment. IndexedDB is only the
       // browser's working cache and is not part of the portable file format.
-      await canvasFiles.save(payload);
+      // With the agent link on, a save that missed some agent edits gets them merged back in.
+      const outcome = agentApi ? await agentApi.hub.browserSave(payload) : await canvasFiles.save(payload);
       // Preserve legacy split assets referenced by historical versions.
-      reply(res, 200, { ok: true });
-    } catch (error) { reply(res, 400, { error: error.message }); }
+      reply(res, 200, { ok: true, ...(outcome?.revision != null ? { agentRev: outcome.revision } : {}) });
+    } catch (error) { reply(res, error instanceof ConflictError ? 409 : 400, { error: error.message, ...(error instanceof ConflictError ? { conflict: true } : {}) }); }
     return;
   }
   if (req.method === 'POST' && req.url === '/canvases/delete') {
@@ -1220,4 +1225,8 @@ const server = http.createServer(async (req, res) => {
   } catch (error) { reply(res, 400, { error: error.message }); }
 });
 
-server.listen(PORT, HOST, () => console.log(`Wendaflow local proxy: http://${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => {
+  console.log(`Wendaflow local proxy: http://${HOST}:${PORT}`);
+  if (agentApi) agentApi.publish(`http://${HOST}:${PORT}`).then(() => console.log(`Wendaflow agent API: http://${HOST}:${PORT}/agent-api/v1 (token in ${agentApi.discovery})`), (error) => console.error('Agent API discovery file not written:', error.message));
+});
+for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void (agentApi?.cleanup() || Promise.resolve()).finally(() => process.exit(0)); });

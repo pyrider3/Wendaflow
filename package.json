@@ -4,6 +4,10 @@
   "version": "0.2.15",
   "license": "AGPL-3.0-only",
   "description": "AI conversations on a branching canvas",
+  "bin": {
+    "wendaflow": "scripts/wendaflow.mjs",
+    "wendaflow-mcp": "scripts/wendaflow-mcp.mjs"
+  },
   "homepage": "https://cn.qnjyxh.xyz",
   "type": "module",
   "scripts": {
@@ -16,7 +20,10 @@
     "audit:i18n": "node scripts/audit-i18n.mjs",
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
-    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs",
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/agent-api/*.test.mjs",
+    "test:agent-api": "node --test src/agent-api/*.test.mjs",
+    "mcp": "node scripts/wendaflow-mcp.mjs",
+    "wendaflow": "node scripts/wendaflow.mjs",
     "test:public": "node --test deployment/*.test.mjs",
     "test:cloud": "node --test cloud/*.test.mjs",
     "build:windows": "npm run build && node scripts/windows/build.mjs"
