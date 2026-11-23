@@ -124,6 +124,16 @@ Wendaflow 不绑定单一服务商，可同时配置并切换：
 - **手机端与 PWA**：适配移动端触控、双指缩放平移、底部导航栏与可安装 Web App。
 - **多格式导出**：除可迁移的完整 `.wdf` 存档（及多画布 ZIP 打包）外，还支持直接导出 **PNG 图片、独立 HTML 网页、Markdown 大纲、SVG 矢量图**。
 
+## 让 AI Agent 操控 Wendaflow
+
+Claude Code、Codex、Cursor 等外部 Agent 可以通过 MCP（或 CLI、本地 HTTP 接口）新建画布、加节点、分岔提问、多父汇合、模型擂台、AI 绘图、自动整理和导出，浏览器里打开的画布会实时显示每一步修改。
+
+```bash
+claude mcp add wendaflow -- node /绝对路径/Wendaflow/scripts/wendaflow-mcp.mjs
+```
+
+启动方式、工具列表、同步机制和安全设计见 [AGENT_API.md](AGENT_API.md)。
+
 ## 快速思维操作
 
 打开左上角「快速思维」开关，卡片按文字内容紧凑显示，适合高密度头脑风暴与结构梳理：

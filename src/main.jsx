@@ -41,6 +41,9 @@ import {detachParent} from './canvas/parents.mjs';
 import {diagramPrompt,parseDiagram,applyDiagram} from './canvas/ai-diagram.mjs';
 import {usePlugins,PLUGINS} from './plugins/registry.js';
 import {useComicPlugin} from './plugins/comic/useComicPlugin.jsx';
+import {useAgentBridge} from './agent-api/useAgentBridge.js';
+import {applyNodeOps,canvasMeta} from './agent-api/ops.mjs';
+import './agent-api/agent-badge.css';
 import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
@@ -2308,8 +2311,12 @@ function App() {
         setCanvases(items=>items.map(item=>item.id===savingId?canvas:item));
         setStorageWarning('');setSaveStatus('已保存');return;
       }
-      const response = await fetch(`${LOCAL_PROXY_URL}/canvases/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'branchspace-wdf', version: 1, canvas, nodes:snapshot, selectedId, collapsedIds: [...collapsedIds], viewport: snapshotViewport }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error);
+      // agentRev: the newest external-agent edit this tab has applied, so the server can merge any it missed.
+      const agentRev = typeof agentBridge === 'object' && agentBridge?.revisionOf ? agentBridge.revisionOf(savingId) : undefined;
+      const response = await fetch(`${LOCAL_PROXY_URL}/canvases/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: 'branchspace-wdf', version: 1, canvas, nodes:snapshot, selectedId, collapsedIds: [...collapsedIds], viewport: snapshotViewport, ...(agentRev != null ? { agentRev } : {}) }) });
+      const result = await response.json();
+      if (response.status === 409 && result.conflict && typeof agentBridge === 'object') void agentBridge?.reconcile?.(savingId);
+      if (!response.ok) throw new Error(result.error);
       localStorage.setItem(CANVAS_INDEX_KEY,JSON.stringify(durableCanvasIndex(canvases.map(item=>item.id===savingId?canvas:item),savingId,{...autosavePolicyRef.current,[savingId]:true},discardedCanvasIdsRef.current)));
       if(!silent)enableCanvasAutosave(savingId);
       if(archiveTombstones.current.has(savingId) && silent)return;
@@ -2325,6 +2332,62 @@ function App() {
   }
   saveCanvasRef.current = saveCanvas;
 
+  // External agents (MCP / CLI) edit canvases through the local server; this tab
+  // shows their edits live and lends them the model connections set up here.
+  const agentHandlersRef = useRef(null);
+  agentHandlersRef.current = {
+    activeCanvasId: () => activeCanvasIdRef.current,
+    activeCanvasName: () => canvasesRef.current.find((canvas) => canvas.id === activeCanvasIdRef.current)?.name || '',
+    knownCanvasIds: () => canvasesRef.current.map((canvas) => canvas.id),
+    models: () => ({
+      defaultModel: model,
+      profiles: [...cloudProfiles.map((p) => ({ value: `cloud:${p.id}`, kind: 'cloud', name: p.name, model: p.model, format: p.format, endpoint: p.endpoint, apiKey: p.apiKey, chatOptions: p.chatOptions })),
+        ...localProfiles.map((p) => ({ value: `local:${p.id}`, kind: 'local', name: p.name, model: p.model, endpoint: p.endpoint, chatOptions: p.chatOptions }))],
+    }),
+    applyOps: applyAgentOps,
+    open: async (id) => { await openSavedCanvas(id); if (activeCanvasIdRef.current === id) enableCanvasAutosave(id); },
+    flush: async (id) => { if (id !== activeCanvasIdRef.current) return; if (autosavePolicyRef.current[id] !== true) enableCanvasAutosave(id); await saveCanvasRef.current?.(true); },
+    arrange: async (id) => { if (id !== activeCanvasIdRef.current) return false; autoLayout(); await saveCanvasRef.current?.(true); return true; },
+    reload: reloadCanvasFromFile,
+  };
+  const agentBridge = useAgentBridge({ enabled: !PUBLIC_WEB, baseUrl: LOCAL_PROXY_URL, handlersRef: agentHandlersRef, activeCanvasId, activeCanvasName: activeCanvas?.name || '', modelsKey: `${model}|${cloudProfiles.map((p) => `${p.id}:${p.model}:${p.apiKey ? 1 : 0}`).join(',')}|${localProfiles.map((p) => `${p.id}:${p.model}`).join(',')}` });
+
+  function applyAgentOps(canvasId, ops, { transient = false } = {}) {
+    const name = canvasMeta(ops).name;
+    if (name && !transient) setCanvases((items) => items.map((canvas) => canvas.id === canvasId ? { ...canvas, name, updatedAt: new Date().toISOString() } : canvas));
+    if (canvasId === activeCanvasIdRef.current) {
+      if (!transient && autosavePolicyRef.current[canvasId] !== true) enableCanvasAutosave(canvasId);
+      setNodesBackground((items) => applyNodeOps(items, ops));
+      return true;
+    }
+    if (transient || !canvasesRef.current.some((canvas) => canvas.id === canvasId)) return false;
+    const previous = canvasWriteQueueRef.current.get(canvasId) || Promise.resolve();
+    const next = previous.then(async () => {
+      const state = canvasDraftsRef.current.get(canvasId) || await readCanvasState(canvasId);
+      if (!Array.isArray(state?.nodes)) return;
+      const nextState = { ...state, nodes: applyNodeOps(state.nodes, ops) };
+      canvasDraftsRef.current.set(canvasId, nextState);
+      if (autosavePolicyRef.current[canvasId] === true) await writeCanvasState(canvasId, nextState);
+    }).catch((error) => console.error('Agent edit persistence failed', error));
+    canvasWriteQueueRef.current.set(canvasId, next);
+    return true;
+  }
+
+  // Used when this tab missed agent edits that the server can no longer replay.
+  async function reloadCanvasFromFile(id) {
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/canvases/open?id=${encodeURIComponent(id)}`);
+      const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const payload = normalizeWdf(data);
+      const state = { nodes: payload.nodes || [], selectedId: payload.selectedId || null, collapsedIds: payload.collapsedIds || [], viewport: payload.viewport || { x: 20, y: 20, zoom: .9 } };
+      canvasDraftsRef.current.set(id, state);
+      await writeCanvasState(id, state).catch(() => {});
+      if (activeCanvasIdRef.current === id) { replaceNodes(state.nodes, id); setCollapsedIds(new Set(state.collapsedIds)); }
+      notify(tr('已载入外部 Agent 对画布的最新修改。','Loaded the latest changes an external agent made to this canvas.'));
+      return true;
+    } catch (error) { console.error('Agent reload failed', error); return false; }
+  }
+
   async function openSavedCanvas(id) {
     if(canvases.some(canvas=>canvas.id===id)){await switchCanvas(id);closeFloatingPanel('canvas',setCanvasMenuOpen);return;}
     const token=++transitionRequestRef.current;
@@ -2334,6 +2397,7 @@ function App() {
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       const payload=normalizeWdf(data);
       if(token!==transitionRequestRef.current)return;
+      if(typeof agentBridge==='object'&&Number.isFinite(payload.agentRevision))agentBridge?.noteRevision?.(id,payload.agentRevision);
       const canvas = {...payload.canvas,temporary:false};
       setCanvases((items) => items.some((item) => item.id === id) ? items.map((item) => item.id === id ? canvas : item) : [...items, canvas]);
       await writeCanvasState(id, { nodes: payload.nodes || [], selectedId: payload.selectedId || null, collapsedIds: payload.collapsedIds || [], viewport: payload.viewport || { x: 20, y: 20, zoom: .9 } });
@@ -3030,7 +3094,10 @@ function App() {
   }, []);
 
   function stopGeneration(id) {
-    generationRef.current.get(id)?.abort();
+    const local = generationRef.current.get(id);
+    if (local) { local.abort(); return; }
+    // Answers an external agent asked for are generated by the local server.
+    if (typeof agentBridge === 'object' && agentBridge?.stop) void agentBridge.stop(id);
   }
 
   async function retryGeneration(node, overrideModel = node.modelValue || model) {
@@ -3760,6 +3827,7 @@ function App() {
     <div className="app-shell">
       {shortcutHelp && <Suspense fallback={null}><ShortcutHelp quick={quickThought} say={say} hints={editorHints} onToggleHints={()=>setEditorHints(value=>!value)} onClose={()=>setShortcutHelp(false)} /></Suspense>}
       {feedback && <div className="interaction-feedback" role="status">{feedback.message}</div>}
+      {agentBridge.editing && <div className="agent-live-badge" role="status">{tr('Agent 正在编辑','Agent editing')}</div>}
       {(storageWarning||cacheWarning) && <div className="storage-warning" role="alert">{systemText(storageWarning||cacheWarning)}{saveStatus==='保存失败' && <button className="warning-retry" onClick={()=>saveCanvas()}>{say('重试保存','Retry save')}</button>}<button onClick={() => {setStorageWarning('');setCacheWarning('');}} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
       {notificationDetail && <div className="modal-backdrop notification-detail-backdrop" onPointerDown={(event) => { if (!notificationDetail.requiresAcknowledgement && event.target === event.currentTarget) setNotificationDetail(null); }}><section className="notification-detail-card" role="dialog" aria-modal="true" aria-label={notificationDetail.title}><header><div><small>{notificationDetail.kind === 'update' ? tr('版本更新','Version update') : tr('通知详情','Notification details')}</small><h2>{notificationDetail.title}</h2></div>{!notificationDetail.requiresAcknowledgement && <button onClick={() => setNotificationDetail(null)} aria-label={tr('关闭','Close')}>×</button>}</header><div className="notification-detail-content"><p>{notificationDetail.body}</p><time>{new Date(notificationDetail.createdAt).toLocaleString(uiLanguage)}</time></div><footer>{notificationDetail.downloadUrl && <button onClick={() => openExternalUrl(notificationDetail.downloadUrl)}>{tr('打开下载页','Open download page')}</button>}<button className="primary" onClick={() => confirmNotification(notificationDetail)}>{notificationDetail.requiresAcknowledgement ? tr('确认','Acknowledge') : tr('完成','Done')}</button></footer></section></div>}
       <header className="topbar" style={canvasMenuOpen?{zIndex:80}:undefined}>
