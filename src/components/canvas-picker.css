@@ -44,3 +44,12 @@
 @keyframes picker-actions-in {from{opacity:0;translate:0 -3px}to{opacity:1;translate:0 0}}
 @media(max-width:600px){.canvas-picker{left:64px;top:76px;width:calc(100vw - 76px);max-width:320px;max-height:calc(100dvh - 92px)}.picker-row-actions{opacity:1}}
 @media(prefers-reduced-motion:reduce){.canvas-picker,.picker-context-menu{animation:none}.picker-row,.picker-row-actions,.picker-create{transition:none}}
+
+/* Row highlight: one soft accent-tinted pill for the whole row. Inner buttons stay transparent so
+   dark-theme generic `button:hover` fills (a grey-green) never show through as a second block. */
+.canvas-picker .picker-row {position:relative;border-radius:9px;}
+.canvas-picker .picker-row.is-highlighted {background:color-mix(in srgb,var(--workspace-accent) 11%,transparent);}
+.canvas-picker .picker-row:has(.picker-row-open[aria-current="page"]) .picker-row-name {color:var(--workspace-accent);}
+.canvas-picker .picker-row-open,.canvas-picker .picker-row-open:hover,.canvas-picker .picker-row-open:active {background:transparent;box-shadow:none;}
+.canvas-picker .picker-row-actions {background:transparent;}
+.canvas-picker .picker-row-actions:hover,.canvas-picker .picker-row-actions.is-visible {background:color-mix(in srgb,var(--workspace-accent) 16%,transparent);color:var(--workspace-accent);}
