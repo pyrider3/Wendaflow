@@ -1,10 +1,50 @@
-import React from "react";
+import React, { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AgentControls } from "./AgentControls.jsx";
 import { ChangesPanel } from "./ChangesPanel.jsx";
 import { UsageLine } from "./UsageLine.jsx";
 import { ToolEvent } from "./ToolEvent.jsx";
+
+const REMARK_PLUGINS = [remarkGfm];
+const EMPTY_ARRAY = [];
+
+const MarkdownBody = memo(function MarkdownBody({
+  content,
+  isAction,
+  artifacts,
+  openActionArtifact,
+}) {
+  const components = useMemo(
+    () => ({
+      a: ({ href, children, ...props }) => (
+        <a
+          {...props}
+          href={href}
+          onClick={(event) => {
+            if (!isAction) return;
+            const label = String(children || "");
+            const artifact = artifacts.find(
+              (item) => item.href === href || item.name === label,
+            );
+            if (!artifact) return;
+            event.preventDefault();
+            event.stopPropagation();
+            openActionArtifact(artifact);
+          }}
+        >
+          {children}
+        </a>
+      ),
+    }),
+    [isAction, artifacts, openActionArtifact],
+  );
+  return (
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={components}>
+      {content}
+    </ReactMarkdown>
+  );
+});
 
 // Content is separate from the canvas gesture and position shell.
 export function CardContent({
@@ -53,8 +93,11 @@ export function CardContent({
     helpers;
   const ideaIsBody = node.type === "thought" && !!node.content &&
     node.content.trim().replace(/\s+/g, " ") === displayTitle.trim().replace(/\s+/g, " ");
-  const assets = outputAssets(node.content);
-  const artifacts = node.type === "action" ? actionArtifacts(node) : [];
+  const assets = useMemo(() => outputAssets(node.content), [outputAssets, node.content]);
+  const artifacts = useMemo(
+    () => (node.type === "action" ? actionArtifacts(node) : EMPTY_ARRAY),
+    [actionArtifacts, node.type, node.content, node.execution?.artifacts, node.execution?.jobId, node.execution?.after?.status],
+  );
   const liveEvents =
     node.type === "action" ? (node.execution?.events || []).slice(-18) : [];
   const activityCollapsed = node.execution?.activityCollapsed !== false;
@@ -189,32 +232,12 @@ export function CardContent({
           onWheel={handleContentWheel}
         >
           {!ideaIsBody && (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ href, children, ...props }) => (
-                  <a
-                    {...props}
-                    href={href}
-                    onClick={(event) => {
-                      if (node.type !== "action") return;
-                      const label = String(children || "");
-                      const artifact = artifacts.find(
-                        (item) => item.href === href || item.name === label,
-                      );
-                      if (!artifact) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      openActionArtifact(artifact);
-                    }}
-                  >
-                    {children}
-                  </a>
-                ),
-              }}
-            >
-              {node.content}
-            </ReactMarkdown>
+            <MarkdownBody
+              content={node.content}
+              isAction={node.type === "action"}
+              artifacts={artifacts}
+              openActionArtifact={openActionArtifact}
+            />
           )}
           {showNodeThinking && (
             <details className="thinking-output">

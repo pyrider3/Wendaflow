@@ -9,10 +9,8 @@ import {isTemporaryCanvas,durableCanvasIndex,LIBRARY_KEY,mergeCanvases,loadLibra
 import {storedZip} from './canvas/zip.mjs';
 import {CanvasHome} from './components/CanvasWorkspace.jsx';
 import {canEditCard,cardIds,pastedCardNodes} from './cards/interaction-policy.mjs';
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react';
 import { createRoot } from 'react-dom/client';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { ThoughtEditor, quickThoughtCopy } from './quick-thought/QuickThought.jsx';
 import { thoughtIds, boxThoughtIds, marqueeBounds, completeThoughtMarquee, attachThoughtChild, newThought, deletionBackups, removeNodeRecords } from './quick-thought/ideas.js';
 import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
@@ -20,11 +18,7 @@ import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL, PUBLIC_WEB } from './localProxy.js';
 import {CanvasCard} from './cards/CanvasCard.jsx';
 import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs';
-import {AppearancePanel} from './components/AppearancePanel.jsx';
-import {AgentsPanel} from './components/AgentsPanel.jsx';
 import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} from './components/PiOptions.jsx';
-import {CompareView} from './cards/CompareView.jsx';
-import {PiSessionImport} from './components/PiSessionImport.jsx';
 import {SuggestTextarea} from './components/SuggestTextarea.jsx';
 import {TaskOverview} from './components/TaskOverview.jsx';
 import {EffortSlider, ModelList, piEffortLevels, piModelGroups} from './components/ModelPanel.jsx';
@@ -40,22 +34,27 @@ import './themes/dark-controls.css';
 import './cards/thought-text.css';
 import './quick-thought/motion.css';
 import { normalizeWdf, remapNodes } from './canvas/document.mjs';
-import {createGraphIndex} from './canvas/graph-index.mjs';
+import {createGraphIndex, updateGraphIndex} from './canvas/graph-index.mjs';
 import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,LatestFrame,advanceViewport} from './canvas/camera.mjs';
 import {useCanvasNodes} from './canvas/useCanvasNodes.js';
 import {detachParent} from './canvas/parents.mjs';
 import {diagramPrompt,parseDiagram,applyDiagram} from './canvas/ai-diagram.mjs';
 import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
-import {ShortcutHelp} from './quick-thought/ShortcutHelp.jsx';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
 import './themes/black-readability.css';
 import './themes/gallery.css';
 import './components/export-menu.css';
 import './themes/dark-popovers.css';
-import { toSVG, toMarkdown, toHTML } from './canvas/export.mjs';
 import './components/polish.css';
 import './components/mobile.css';
+
+const AppearancePanel = lazy(() => import('./components/AppearancePanel.jsx').then((m) => ({ default: m.AppearancePanel })));
+const AgentsPanel = lazy(() => import('./components/AgentsPanel.jsx').then((m) => ({ default: m.AgentsPanel })));
+const CompareView = lazy(() => import('./cards/CompareView.jsx').then((m) => ({ default: m.CompareView })));
+const PiSessionImport = lazy(() => import('./components/PiSessionImport.jsx').then((m) => ({ default: m.PiSessionImport })));
+const ShortcutHelp = lazy(() => import('./quick-thought/ShortcutHelp.jsx').then((m) => ({ default: m.ShortcutHelp })));
+const EMPTY_LIST = [];
 import { pulseThought, animateSlice } from './quick-thought/motion.js';
 import { buildCatalog, translate, localizeKnown } from './i18n/catalog.mjs';
 import { chatOptionSupport, contextAttachments, contextMessages, contextPlan, listOllamaModels, streamCloud, streamOllama } from './modelGateway';
@@ -88,23 +87,35 @@ function capturePointer(target, pointerId) {
   } catch {}
 }
 
+let canvasDbPromise = null;
 function openCanvasDb() {
-  return new Promise((resolve, reject) => {
+  if (canvasDbPromise) return canvasDbPromise;
+  canvasDbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(CANVAS_DB_NAME, CANVAS_DB_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(CANVAS_STORE)) request.result.createObjectStore(CANVAS_STORE);
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error(tr('无法打开画布数据库',"Cannot open canvas database")));
+    request.onsuccess = () => {
+      const db = request.result;
+      const reset = () => { canvasDbPromise = null; };
+      db.onclose = reset;
+      db.onversionchange = () => { db.close(); reset(); };
+      resolve(db);
+    };
+    request.onerror = () => {
+      canvasDbPromise = null;
+      reject(request.error || new Error(tr('无法打开画布数据库',"Cannot open canvas database")));
+    };
   });
+  return canvasDbPromise;
 }
 
 async function readCanvasState(id, raw = false) {
   const db = await openCanvasDb();
   return new Promise((resolve, reject) => {
     const request = db.transaction(CANVAS_STORE, 'readonly').objectStore(CANVAS_STORE).get(id);
-    request.onsuccess = () => {db.close();try{const saved=request.result;resolve(saved?(raw?saved:normalizeWdf({...saved,format:saved.format||'branchspace-wdf'})):null);}catch(error){reject(error);}};
-    request.onerror = () => { db.close(); reject(request.error); };
+    request.onsuccess = () => {try{const saved=request.result;resolve(saved?(raw?saved:normalizeWdf({...saved,format:saved.format||'branchspace-wdf'})):null);}catch(error){reject(error);}};
+    request.onerror = () => reject(request.error);
   });
 }
 
@@ -113,8 +124,8 @@ async function writeCanvasState(id, state) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(CANVAS_STORE, 'readwrite');
     transaction.objectStore(CANVAS_STORE).put(state, id);
-    transaction.oncomplete = () => { db.close(); resolve(); };
-    transaction.onerror = () => { db.close(); reject(transaction.error); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 
@@ -123,8 +134,8 @@ async function deleteCanvasState(id) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(CANVAS_STORE, 'readwrite');
     transaction.objectStore(CANVAS_STORE).delete(id);
-    transaction.oncomplete = () => { db.close(); resolve(); };
-    transaction.onerror = () => { db.close(); reject(transaction.error); };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 
@@ -202,14 +213,23 @@ const COMPLETE_UI_PACKS = {
   ar: { 'About':'حول','Notifications':'الإشعارات','Current version':'الإصدار الحالي','Official website':'الموقع الرسمي','Notification service':'خدمة الإشعارات','Model connections':'اتصالات النماذج','Appearance':'المظهر','Project data':'بيانات المشروع','Local models':'النماذج المحلية','Cloud model library':'مكتبة النماذج السحابية','API configuration':'إعداد API','Display name':'اسم العرض','Server URL':'عنوان الخادم','Model name':'اسم النموذج','Test connection':'اختبار الاتصال','In-app notifications':'إشعارات داخل التطبيق','Receive notifications':'تلقي الإشعارات','Activation code':'رمز التفعيل','Export WDF':'تصدير WDF','Import WDF':'استيراد WDF','Save':'حفظ','Close':'إغلاق','Delete':'حذف','Cancel':'إلغاء','Done':'تم' },
 };
 
-const TRANSLATIONS = buildCatalog(UI_COPY, PHRASE_PACKS, COMPLETE_UI_PACKS);
+let cachedTranslations = null;
+function getTranslations() {
+  if (!cachedTranslations) cachedTranslations = buildCatalog(UI_COPY, PHRASE_PACKS, COMPLETE_UI_PACKS);
+  return cachedTranslations;
+}
+function translateLocale(locale, chinese, english) {
+  if (locale === 'zh-CN') return chinese;
+  if (locale === 'en') return english;
+  return translate(getTranslations(), locale, chinese, english);
+}
 
 function readUiLanguage() {
   const value = localStorage.getItem('wendaflow-ui-language');
   return UI_LANGUAGES.some(([id]) => id === value) ? value : 'zh-CN';
 }
 // Helpers outside React resolve the current persisted locale on each invocation.
-function tr(chinese, english) { return translate(TRANSLATIONS, readUiLanguage(), chinese, english); }
+function tr(chinese, english) { return translateLocale(readUiLanguage(), chinese, english); }
 
 function loadState(canvasId) {
   try {
@@ -235,7 +255,7 @@ function loadCanvasBoot() {
 }
 
 function formatCanvasTime(value, language = 'zh-CN') {
-  if (!value) return translate(TRANSLATIONS,language,'未知','Unknown');
+  if (!value) return translateLocale(language,'未知','Unknown');
   return new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
@@ -259,7 +279,7 @@ function ancestors(nodes, id) {
 }
 
 function statusLabel(status, language = 'zh-CN') {
-  const tr = (zh,en) => translate(TRANSLATIONS,language,zh,en);
+  const tr = (zh,en) => translateLocale(language,zh,en);
   const labels = {done:tr('已完成','Completed'),queued:tr('排队中','Queued'),running:tr('执行中','Running'),thinking:tr('思考中','Thinking'),streaming:tr('生成中','Generating'),approval:tr('等待授权','Awaiting approval'),failed:tr('失败','Failed'),stopped:tr('已暂停','Stopped')};
   return labels[status] || '';
 }
@@ -341,7 +361,7 @@ function actionArtifacts(node) {
 }
 
 function ModelPicker({ value, onChange, options, language }) {
-  const tr = (zh,en) => translate(TRANSLATIONS,language,zh,en);
+  const tr = (zh,en) => translateLocale(language,zh,en);
   const [open, setOpen] = useState(false);
   const selected = options.find((item) => item.value === value) || options[0];
   return <div className="model-picker">
@@ -405,7 +425,7 @@ function App() {
   const quickSpace=useRef(false);
   const quickCopy=quickThoughtCopy(uiLanguage);
   useEffect(()=>{localStorage.setItem('wendaflow-quick-thought',quickThought?'1':'0');},[quickThought]);
-  useEffect(()=>{panFramesRef.current?.clear();panInputRef.current=null;cameraGestureRef.current=false;if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
+  useEffect(()=>{panFramesRef.current?.clear();dragFramesRef.current?.clear();resizeFramesRef.current?.clear();relationFramesRef.current?.clear();marqueeRectRef.current=null;relationRectRef.current=null;panInputRef.current=null;cameraGestureRef.current=false;if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
   useEffect(()=>{
     const down=e=>{if(e.key===' '&&!e.target.closest?.('input,textarea,select,button,[contenteditable="true"]')){quickSpace.current=true;canvasRef.current?.classList.add('space-panning');e.preventDefault();}};
     const up=e=>{if(e.key===' '){quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');}};const blur=()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');};
@@ -413,8 +433,8 @@ function App() {
     return()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);};
   },[quickThought]);
 
-  const tr = (chinese, english) => translate(TRANSLATIONS, uiLanguage, chinese, english);
-  const systemText = (value) => localizeKnown(TRANSLATIONS, uiLanguage, value);
+  const tr = (chinese, english) => translateLocale(uiLanguage, chinese, english);
+  const systemText = (value) => value ? localizeKnown(getTranslations(), uiLanguage, value) : value;
   const openExternalUrl = (url) => {
     if (!url) return;
     if (window.wonderfulWindow?.openExternal) {
@@ -425,7 +445,7 @@ function App() {
   };
   const colorLabel = (id) => ({default:tr('默认','Default'),sage:tr('雾青','Mist'),amber:tr('琥珀','Amber'),rose:tr('玫瑰','Rose'),sky:tr('晴空','Sky'),lilac:tr('紫雾','Lilac')})[id] || tr('默认','Default');
   const mergeGoalLabel = (goal) => ({'综合结论':tr('综合结论','Synthesize conclusions'),'并列比较':tr('并列比较','Compare side by side'),'找出冲突':tr('找出冲突','Find conflicts'),'制定行动':tr('制定行动','Plan actions')})[goal];
-  const copy = Object.fromEntries(Object.entries(UI_COPY.en).map(([key,english]) => [key,tr(UI_COPY['zh-CN'][key],english)]));
+  const copy = useMemo(() => Object.fromEntries(Object.entries(UI_COPY.en).map(([key,english]) => [key,tr(UI_COPY['zh-CN'][key],english)])), [uiLanguage]);
   const text = (key, chinese = key) => copy[key] ?? chinese;
   // "Classic preview" is deliberately kept separate from camera zoom.  It
   // restores the reliable title-only preview that existed before the recent
@@ -668,9 +688,40 @@ function App() {
   const panFramesRef=useRef(null);
   const panCommitRef=useRef(null);
   if(!panFramesRef.current)panFramesRef.current=new LatestFrame(next=>panCommitRef.current(next,false));
-  useLayoutEffect(()=>{panCommitRef.current=commitViewport;});
+  const marqueeRectRef=useRef(null);
+  const relationRectRef=useRef(null);
+  const dragFramesRef=useRef(null);
+  const dragCommitRef=useRef(null);
+  if(!dragFramesRef.current)dragFramesRef.current=new LatestFrame(payload=>dragCommitRef.current(payload));
+  const resizeFramesRef=useRef(null);
+  const resizeCommitRef=useRef(null);
+  if(!resizeFramesRef.current)resizeFramesRef.current=new LatestFrame(payload=>resizeCommitRef.current(payload));
+  const relationFramesRef=useRef(null);
+  const relationCommitRef=useRef(null);
+  if(!relationFramesRef.current)relationFramesRef.current=new LatestFrame(payload=>relationCommitRef.current(payload));
+  useLayoutEffect(()=>{
+    panCommitRef.current=commitViewport;
+    dragCommitRef.current=({positions,dx,dy})=>{
+      setNodes((items)=>items.map((node)=>{
+        const origin=positions.get(node.id);
+        return origin?{...node,x:origin.x+dx,y:origin.y+dy}:node;
+      }));
+    };
+    resizeCommitRef.current=({id,width,height})=>{
+      setNodes((items)=>items.map((node)=>node.id===id?{...node,manualWidth:Math.round(width),manualHeight:Math.round(height)}:node));
+    };
+    relationCommitRef.current=({clientX,clientY,altKey})=>{
+      const current=relationDragRef.current;
+      if(!current)return;
+      const target=document.elementsFromPoint(clientX,clientY).find((element)=>element instanceof HTMLElement&&element.dataset?.nodeId)?.dataset.nodeId||null;
+      const next=updateRelationDragState(current,{clientX,clientY},target,currentNodes(),altKey);
+      relationDragRef.current=next;
+      setRelationDrag(next);
+    };
+  });
   const sizePublishTimerRef=useRef(null);
   const graphRef=useRef(null);
+  const prevGeometryNodesRef=useRef(new Map());
   const geometryRef=useRef(null);
   const viewportAnimatingRef = useRef(false);
   const zoomTimeRef=useRef(null);
@@ -693,7 +744,7 @@ function App() {
   const canvasHydratedRef = useRef(false);
   const canvasWriteQueueRef = useRef(new Map());
 
-  const graph=useMemo(()=>createGraphIndex(nodes),[nodes]);
+  const graph=useMemo(()=>updateGraphIndex(graphRef.current,nodes),[nodes]);
   graphRef.current=graph;
   if(!geometryRef.current)geometryRef.current=new ConnectionGeometry({getNode:id=>graphRef.current.byId.get(id),getSize:id=>nodeSizesRef.current.get(id)});
   const selected = graph.byId.get(selectedId) || null;
@@ -778,13 +829,16 @@ function App() {
   const ollama = localProfiles.find((profile) => profile.id === activeLocalId) || localProfiles[0] || DEFAULT_OLLAMA;
   const selectedCloud = model.startsWith('cloud:') ? cloudProfiles.find((profile) => profile.id === model.slice(6)) : null;
   const selectedLocal = model.startsWith('local:') ? localProfiles.find((profile) => profile.id === model.slice(6)) : ollama;
-  const modelOptions = [...cloudProfiles.map((profile) => ({ value: `cloud:${profile.id}`, label: `${profile.name} · ${profile.model}` })), ...localProfiles.map((profile) => ({ value: `local:${profile.id}`, label: `${profile.name} · ${profile.model}` }))];
+  const modelOptions = useMemo(() => [...cloudProfiles.map((profile) => ({ value: `cloud:${profile.id}`, label: `${profile.name} · ${profile.model}` })), ...localProfiles.map((profile) => ({ value: `local:${profile.id}`, label: `${profile.name} · ${profile.model}` }))], [cloudProfiles, localProfiles]);
+  const unreadNotificationCount = useMemo(() => notifications.reduce((count, item) => count + (item.read ? 0 : 1), 0), [notifications]);
   const searchResults = useMemo(() => {
+    if (!searchOpen) return EMPTY_LIST;
     const query = searchQuery.trim().toLocaleLowerCase();
     if (!query) return nodes.slice(0, 8);
     return nodes.filter((node) => [node.title, node.prompt, node.content, node.model].some((value) => value?.toLocaleLowerCase().includes(query))).slice(0, 20);
-  }, [nodes, searchQuery]);
+  }, [searchOpen, nodes, searchQuery]);
   const libraryItems = useMemo(() => {
+    if (!libraryOpen) return EMPTY_LIST;
     const items = [];
     const seen = new Set();
     for (const node of nodes) for (const attachment of node.attachments || []) {
@@ -793,15 +847,21 @@ function App() {
     }
     for (const attachment of attachments) if (!seen.has(attachment.id)) { seen.add(attachment.id); items.push({ ...attachment, nodeId: null, nodeTitle: tr('当前输入',"Current input") }); }
     return items;
-  }, [nodes, attachments]);
+  }, [libraryOpen, nodes, attachments, uiLanguage]);
   const miniBounds = useMemo(() => {
-    if (!visibleNodes.length) return { minX: 0, minY: 0, width: 1, height: 1 };
-    const minX = Math.min(...visibleNodes.map((node) => node.x));
-    const minY = Math.min(...visibleNodes.map((node) => node.y));
-    const maxX = Math.max(...visibleNodes.map((node) => node.x + (nodeSizes.get(node.id)?.width || 224)));
-    const maxY = Math.max(...visibleNodes.map((node) => node.y + (nodeSizes.get(node.id)?.height || 110)));
+    if (!minimapOpen || !visibleNodes.length) return { minX: 0, minY: 0, width: 1, height: 1 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let i = 0; i < visibleNodes.length; i++) {
+      const node = visibleNodes[i];
+      const size = nodeSizes.get(node.id);
+      const w = size?.width || 224, h = size?.height || 110;
+      if (node.x < minX) minX = node.x;
+      if (node.y < minY) minY = node.y;
+      if (node.x + w > maxX) maxX = node.x + w;
+      if (node.y + h > maxY) maxY = node.y + h;
+    }
     return { minX, minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
-  }, [visibleNodes, nodeSizes]);
+  }, [minimapOpen, visibleNodes, nodeSizes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -860,8 +920,12 @@ function App() {
   useEffect(() => {try{localStorage.setItem(CANVAS_INDEX_KEY,JSON.stringify(durableCanvasIndex(canvases,activeCanvasId,autosavePolicyRef.current,discardedCanvasIdsRef.current)));}catch(error){setStorageWarning(error.message);}},[canvases,activeCanvasId]);
   useEffect(() => {
     if (metadataCanvasRef.current !== activeCanvasId) { metadataCanvasRef.current = activeCanvasId; return; }
-    setCanvases((items) => items.map((canvas) => canvas.id === activeCanvasId ? { ...canvas, updatedAt: new Date().toISOString() } : canvas));
-  }, [nodes]);
+    const canvasId = activeCanvasId;
+    const timer = window.setTimeout(() => {
+      setCanvases((items) => items.map((canvas) => canvas.id === canvasId ? { ...canvas, updatedAt: new Date().toISOString() } : canvas));
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [nodes, activeCanvasId]);
 
   useEffect(() => localStorage.setItem('branchspace-local-profiles', JSON.stringify(localProfiles)), [localProfiles]);
   useEffect(() => localStorage.setItem('branchspace-minimap', String(minimapOpen)), [minimapOpen]);
@@ -1146,15 +1210,31 @@ function App() {
   },[activeCanvasId,renderedNodeKey]);
 
   useLayoutEffect(()=>{
-    let pruned=false;for(const id of nodeSizesRef.current.keys())if(!graph.byId.has(id)){nodeSizesRef.current.delete(id);pruned=true;}
-    geometryRef.current.bind(connectionsRef.current);if(pruned)publishNodeSizes();
+    prevGeometryNodesRef.current = graphRef.current?.byId || new Map();
+    geometryRef.current.bind(connectionsRef.current);
     return()=>geometryRef.current.cancel();
-  },[activeCanvasId,graph,renderedNodeKey,renderedEdgeKey,nodeSizes]);
+  },[activeCanvasId,renderedEdgeKey]);
+
+  useLayoutEffect(()=>{
+    let pruned=false;
+    for(const id of nodeSizesRef.current.keys())if(!graph.byId.has(id)){nodeSizesRef.current.delete(id);pruned=true;}
+    const prev=prevGeometryNodesRef.current;
+    const changed=[];
+    for(const [id,node] of graph.byId){
+      const old=prev.get(id);
+      if(!old || (old!==node && (old.x!==node.x || old.y!==node.y || old.manualWidth!==node.manualWidth || old.manualHeight!==node.manualHeight))){
+        changed.push(id);
+      }
+    }
+    prevGeometryNodesRef.current=graph.byId;
+    if(changed.length){geometryRef.current.invalidate(changed);geometryRef.current.flush();}
+    if(pruned)publishNodeSizes();
+  },[activeCanvasId,graph]);
 
   useEffect(()=>{
     const observer=new ResizeObserver(entries=>{const box=entries[0]?.contentRect;if(!box)return;
       const previous=viewportSizeRef.current;if(Math.abs(previous.width-box.width)<.5&&Math.abs(previous.height-box.height)<.5)return;
-      wheelRectRef.current=null;viewportSizeRef.current={width:box.width,height:box.height};viewportSnapshotRef.current=viewportRef.current;setViewport({...viewportRef.current});
+      wheelRectRef.current=null;marqueeRectRef.current=null;relationRectRef.current=null;viewportSizeRef.current={width:box.width,height:box.height};viewportSnapshotRef.current=viewportRef.current;setViewport({...viewportRef.current});
     });
     if(canvasRef.current)observer.observe(canvasRef.current);
     return()=>observer.disconnect();
@@ -1173,6 +1253,9 @@ function App() {
     if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);
     geometryRef.current?.cancel();
     panFramesRef.current?.clear();
+    dragFramesRef.current?.clear();
+    resizeFramesRef.current?.clear();
+    relationFramesRef.current?.clear();
     if (zoomFrameRef.current) cancelAnimationFrame(zoomFrameRef.current);
     if (connectionFrameRef.current) cancelAnimationFrame(connectionFrameRef.current);
     if (canvasTransitionTimerRef.current) clearTimeout(canvasTransitionTimerRef.current);
@@ -1523,6 +1606,7 @@ function App() {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(quickThought && event.button===2 && !event.target.closest('input,textarea,select')) {
       event.preventDefault();event.stopPropagation();capturePointer(event.currentTarget,event.pointerId);
+      relationRectRef.current=canvasRef.current?.getBoundingClientRect()||null;
       const ids=selectedIds.has(node.id)?[...cardIds(nodes,selectedIds)]:[node.id];
       const next={sourceId:node.id,sourceIds:ids,x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,targetId:null,quick:true,reference:!!event.shiftKey,moved:false};
       relationDragRef.current=next;setRelationDrag(next);setContextMenu(null);return;
@@ -1563,6 +1647,7 @@ function App() {
     if (event.button !== 0) return;
     event.preventDefault(); event.stopPropagation();
     setRelationMenu(null);
+    relationRectRef.current = canvasRef.current?.getBoundingClientRect() || null;
     const next = { sourceId: node.id, x: event.clientX, y: event.clientY, targetId: null };
     relationDragRef.current = next;
     setRelationDrag(next);
@@ -1628,6 +1713,8 @@ function App() {
   // A second finger turns whatever the first one started (pan, card drag, marquee) into a pinch.
   function cancelCanvasGesture() {
     if (panInputRef.current) { panFramesRef.current.flush(); panInputRef.current = null; }
+    dragFramesRef.current?.clear(); resizeFramesRef.current?.clear(); relationFramesRef.current?.clear();
+    marqueeRectRef.current = null; relationRectRef.current = null;
     setPanning(null); setDragging(null); setMarquee(null);
     marqueeLiveRef.current = null;
     endHistory();
@@ -1646,6 +1733,7 @@ function App() {
       event.preventDefault();capturePointer(event.currentTarget,event.pointerId);
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
+      marqueeRectRef.current=rect;
       marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
@@ -1657,6 +1745,7 @@ function App() {
     if (!quickThought && event.button === 2 && !event.target.closest('.node, button, textarea, select, .composer')) {
       event.preventDefault();
       const rect = canvasRef.current.getBoundingClientRect();
+      marqueeRectRef.current = rect;
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       setSelectedConnections([]);
@@ -1716,17 +1805,25 @@ function App() {
     if(quickBlankClick.current){updateQuickSlice(event);return;}
     const activeRelationDrag = typeof relationDragRef !== 'undefined' ? relationDragRef.current : relationDrag;
     if (activeRelationDrag) {
-      const target = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset?.nodeId)?.dataset.nodeId || null;
-      const next = updateRelationDragState(activeRelationDrag, event, target, nodes, event.altKey);
-      if (typeof relationDragRef !== 'undefined') relationDragRef.current = next;
-      setRelationDrag(next);
+      if (typeof relationFramesRef !== 'undefined' && relationFramesRef.current) {
+        relationFramesRef.current.enqueue({ clientX: event.clientX, clientY: event.clientY, altKey: event.altKey });
+      } else {
+        const target = document.elementsFromPoint(event.clientX, event.clientY).find((element) => element instanceof HTMLElement && element.dataset?.nodeId)?.dataset.nodeId || null;
+        const next = updateRelationDragState(activeRelationDrag, event, target, nodes, event.altKey);
+        if (typeof relationDragRef !== 'undefined') relationDragRef.current = next;
+        setRelationDrag(next);
+      }
     } else if (resizing) {
       const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (resizing.axis==='y'?0:event.clientX - resizing.startX) / viewportRef.current.zoom));
       const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (resizing.axis==='x'?0:event.clientY - resizing.startY) / viewportRef.current.zoom));
-      setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
-      window.requestAnimationFrame(syncConnectionGeometry);
+      if (typeof resizeFramesRef !== 'undefined' && resizeFramesRef.current) {
+        resizeFramesRef.current.enqueue({ id: resizing.id, width, height });
+      } else {
+        setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
+        window.requestAnimationFrame(syncConnectionGeometry);
+      }
     } else if (marquee) {
-      const rect = canvasRef.current.getBoundingClientRect();
+      const rect = (typeof marqueeRectRef !== 'undefined' && marqueeRectRef.current) || canvasRef.current.getBoundingClientRect();
       marqueeLiveRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
       if (!marqueeFrameRef.current) marqueeFrameRef.current = window.requestAnimationFrame(runMarqueeFrame);
     } else if (dragging) {
@@ -1734,10 +1831,14 @@ function App() {
       if(!dragging.started)setDragging({...dragging,started:true});
       const dx = (event.clientX - dragging.startX) / viewportRef.current.zoom;
       const dy = (event.clientY - dragging.startY) / viewportRef.current.zoom;
-      setNodes((items) => items.map((node) => {
-        const origin = dragging.positions.get(node.id);
-        return origin ? { ...node, x: origin.x + dx, y: origin.y + dy } : node;
-      }));
+      if (typeof dragFramesRef !== 'undefined' && dragFramesRef.current) {
+        dragFramesRef.current.enqueue({ positions: dragging.positions, dx, dy });
+      } else {
+        setNodes((items) => items.map((node) => {
+          const origin = dragging.positions.get(node.id);
+          return origin ? { ...node, x: origin.x + dx, y: origin.y + dy } : node;
+        }));
+      }
     } else if (panInputRef.current) {
       const pan=panInputRef.current;
       pan.moved ||= Math.hypot(event.clientX-pan.startX,event.clientY-pan.startY)>4;
@@ -1748,6 +1849,11 @@ function App() {
   }
 
   function endPointer(event) {
+    if (typeof dragFramesRef !== 'undefined') { if (event.type === 'pointerup') dragFramesRef.current?.flush(); else dragFramesRef.current?.clear(); }
+    if (typeof resizeFramesRef !== 'undefined') { if (event.type === 'pointerup') resizeFramesRef.current?.flush(); else resizeFramesRef.current?.clear(); }
+    if (typeof relationFramesRef !== 'undefined') relationFramesRef.current?.clear();
+    if (typeof relationRectRef !== 'undefined') relationRectRef.current = null;
+    if (typeof marqueeRectRef !== 'undefined') marqueeRectRef.current = null;
     endHistory();
     let finalRelationDrag = relationDragRef.current;
     if (quickBlankClick.current) {
@@ -2112,6 +2218,7 @@ function App() {
       const name = (activeCanvas?.name || 'wendaflow').replace(/[\\/:*?"<>|]/g, '_');
       const bg = getComputedStyle(document.querySelector('.canvas') || document.body).backgroundColor.match(/\d+/g) || [255, 255, 255];
       const theme = (0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]) < 128 ? 'dark' : 'light';
+      const { toSVG, toMarkdown, toHTML } = await import('./canvas/export.mjs');
       if (kind === 'md') await saveExport(toMarkdown(list, { title: name }), `${name}.md`, 'text/markdown;charset=utf-8');
       else if (kind === 'html') await saveExport(toHTML(list, { theme, title: name }), `${name}.html`, 'text/html;charset=utf-8');
       else if (kind === 'svg') await saveExport(toSVG(list, { theme, title: name }).svg, `${name}.svg`, 'image/svg+xml;charset=utf-8');
@@ -2357,7 +2464,7 @@ function App() {
       const view = viewportRef.current;
       const origin = nodes.length ? { x: maxX + 160, y: Math.min(...nodes.map((node) => node.y)) } : { x: rect ? (120 - view.x) / view.zoom : 120, y: rect ? (110 - view.y) / view.zoom : 110 };
       const baseNodes = nodes, baseIds = nodes.map((node) => node.id), stamp = Date.now();
-      let buffer = '', shown = 0, fitTimer = 0;
+      let buffer = '', shown = 0, fitTimer = 0, drawTimer = 0;
       // Cards appear while the model is still writing; one undo step covers the whole drawing.
       beginHistory();
       const show = (text, final) => {
@@ -2371,15 +2478,19 @@ function App() {
         window.clearTimeout(fitTimer); fitTimer = window.setTimeout(() => { setNewNodeId(null); fitViewRef.current?.(); }, 260);
         return result;
       };
-      const onToken = (text) => { buffer = text; show(text, false); };
+      const onToken = (text) => {
+        buffer = text;
+        if (!drawTimer) drawTimer = window.setTimeout(() => { drawTimer = 0; show(buffer, false); }, 60);
+      };
       let result = null;
       try {
         const answer = profile
           ? await streamCloud({ ...profile, messages, chatOptions, signal: controller.signal, onToken })
           : await streamOllama({ endpoint: localProfile.endpoint, model: localProfile.model, messages, chatOptions, signal: controller.signal, onToken });
+        window.clearTimeout(drawTimer); drawTimer = 0;
         result = show(answer || buffer, true);
         if (!result) parseDiagram(answer || buffer, baseIds);
-      } finally { endHistory(); }
+      } finally { window.clearTimeout(drawTimer); endHistory(); }
       if (!result) throw new Error(tr('模型没有画出任何节点','The model drew no nodes'));
       setDraft('');
       if (branchingFrom) closeBranch();
@@ -2648,12 +2759,43 @@ function App() {
       heartbeat = window.setInterval(() => updateTaskNode(taskCanvasId, id, (item) => item.status === 'thinking' ? { ...item, generationPhase: tr(`模型正在思考，等待首个输出（${Math.max(1, Math.floor((Date.now() - startedAt) / 1000))} 秒）…`,`Waiting for first output (${Math.max(1, Math.floor((Date.now() - startedAt) / 1000))} seconds)…`) } : item), 1000);
       // Do not kill a model just because it is still reasoning. The visible
       // Stop button is the user's explicit cancellation control.
-      const onToken = (partial) => updateTaskNode(taskCanvasId, id, (item) => ({ ...patchLatestRequest(item, { status: 'streaming', firstTokenAt: item.requestRecord?.firstTokenAt || new Date().toISOString() }), content: partial, status: 'streaming', generationPhase: tr('模型正在逐字输出…',"Streaming response…") }));
-      const onThinking = (partial) => updateTaskNode(taskCanvasId, id, (item) => ({ ...patchLatestRequest(item, { status: item.content ? 'streaming' : 'thinking' }), thinking: `${item.thinking || ''}${partial}`, status: item.content ? 'streaming' : 'thinking', generationPhase: tr('模型正在思考…',"Thinking…") }));
+      let pendingToken = null, pendingThinking = '', streamRaf = null, streamTimer = null;
+      const flushStream = () => {
+        if (streamRaf !== null) { window.cancelAnimationFrame(streamRaf); streamRaf = null; }
+        if (streamTimer !== null) { window.clearTimeout(streamTimer); streamTimer = null; }
+        if (pendingToken === null && !pendingThinking) return;
+        const nextContent = pendingToken, nextThinking = pendingThinking;
+        pendingToken = null; pendingThinking = '';
+        updateTaskNode(taskCanvasId, id, (item) => {
+          const content = nextContent !== null ? nextContent : item.content;
+          const thinking = nextThinking ? `${item.thinking || ''}${nextThinking}` : item.thinking;
+          const streaming = Boolean(nextContent !== null || item.content);
+          return {
+            ...patchLatestRequest(item, {
+              status: streaming ? 'streaming' : 'thinking',
+              ...(nextContent !== null ? { firstTokenAt: item.requestRecord?.firstTokenAt || new Date().toISOString() } : {}),
+            }),
+            content,
+            ...(nextThinking ? { thinking } : {}),
+            status: streaming ? 'streaming' : 'thinking',
+            generationPhase: streaming ? tr('模型正在逐字输出…',"Streaming response…") : tr('模型正在思考…',"Thinking…"),
+          };
+        });
+      };
+      const scheduleStream = () => {
+        if (streamRaf !== null || streamTimer !== null) return;
+        if (typeof document !== 'undefined' && document.hidden) streamTimer = window.setTimeout(flushStream, 60);
+        else streamRaf = window.requestAnimationFrame(flushStream);
+      };
+      const onToken = (partial) => { pendingToken = partial; scheduleStream(); };
+      const onThinking = (partial) => { pendingThinking += partial; scheduleStream(); };
       const messages = contextMessages(sourceNodes, parentId, text, requestAttachments, contextExclusions, extraRelations);
       if (profile && !profile.apiKey) throw new Error(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`));
       const chatOptions = normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {});
-      const content = profile ? await streamCloud({ ...profile, messages, chatOptions, signal: controller.signal, onToken, onThinking }) : await streamOllama({ endpoint: localProfile.endpoint, model: localProfile.model, messages, chatOptions, signal: controller.signal, onToken, onThinking });
+      let content;
+      try {
+        content = profile ? await streamCloud({ ...profile, messages, chatOptions, signal: controller.signal, onToken, onThinking }) : await streamOllama({ endpoint: localProfile.endpoint, model: localProfile.model, messages, chatOptions, signal: controller.signal, onToken, onThinking });
+      } finally { flushStream(); }
       generationRef.current.delete(id);
       window.clearInterval(heartbeat); window.clearTimeout(timeout);
       updateTaskNode(taskCanvasId, id, (item) => ({ ...patchLatestRequest(item, { status: 'done', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, outputChars: content.length }), content, status: 'done', generationPhase: null, model: profile?.model || localProfile.model, error: null }));
@@ -3182,10 +3324,23 @@ function App() {
         result = await first.json();
         if (!first.ok) throw new Error(result.error);
       }
-      let announcedApproval = '';
+      let announcedApproval = '', lastFingerprint = '';
       while (result.status === 'running') {
         if (result.pending?.[0]?.id && result.pending[0].id !== announcedApproval) { announcedApproval = result.pending[0].id; notify(tr(`${runnerName} 正在等待你的批准。`, `${runnerName} is waiting for your approval.`)); desktopNotify(tr('需要你的批准', 'Approval needed'), `${runnerName} · ${result.pending[0].tool}`, actionId); }
-        updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
+        const lastEv = result.events?.[result.events.length - 1];
+        const fingerprint = JSON.stringify([
+          result.status, result.canSteer === true,
+          (result.pending || []).map((p) => p.id),
+          result.events?.length || 0, lastEv?.id || '', lastEv?.text?.length || 0, lastEv?.output?.length || 0,
+          result.terminal?.length || 0, result.artifacts?.length || 0,
+          result.before?.status || '', result.after?.status || '',
+          result.changes?.files?.length || 0, result.changes?.applied || false, result.changes?.rolledBack || false,
+          result.usage?.input || 0, result.usage?.output || 0, result.usage?.cost || 0,
+        ]);
+        if (fingerprint !== lastFingerprint) {
+          lastFingerprint = fingerprint;
+          updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
+        }
         await new Promise((resolve) => window.setTimeout(resolve, 280));
         const statusResponse = await fetch(`${LOCAL_PROXY_URL}/agent/status?id=${encodeURIComponent(jobId)}`); result = await statusResponse.json();
         if (!statusResponse.ok) throw new Error(result.error);
@@ -3595,7 +3750,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      {shortcutHelp && <ShortcutHelp quick={quickThought} say={say} hints={editorHints} onToggleHints={()=>setEditorHints(value=>!value)} onClose={()=>setShortcutHelp(false)} />}
+      {shortcutHelp && <Suspense fallback={null}><ShortcutHelp quick={quickThought} say={say} hints={editorHints} onToggleHints={()=>setEditorHints(value=>!value)} onClose={()=>setShortcutHelp(false)} /></Suspense>}
       {feedback && <div className="interaction-feedback" role="status">{feedback.message}</div>}
       {(storageWarning||cacheWarning) && <div className="storage-warning" role="alert">{systemText(storageWarning||cacheWarning)}{saveStatus==='保存失败' && <button className="warning-retry" onClick={()=>saveCanvas()}>{say('重试保存','Retry save')}</button>}<button onClick={() => {setStorageWarning('');setCacheWarning('');}} aria-label={tr('关闭提示','Dismiss message')}>×</button></div>}
       {notificationDetail && <div className="modal-backdrop notification-detail-backdrop" onPointerDown={(event) => { if (!notificationDetail.requiresAcknowledgement && event.target === event.currentTarget) setNotificationDetail(null); }}><section className="notification-detail-card" role="dialog" aria-modal="true" aria-label={notificationDetail.title}><header><div><small>{notificationDetail.kind === 'update' ? tr('版本更新','Version update') : tr('通知详情','Notification details')}</small><h2>{notificationDetail.title}</h2></div>{!notificationDetail.requiresAcknowledgement && <button onClick={() => setNotificationDetail(null)} aria-label={tr('关闭','Close')}>×</button>}</header><div className="notification-detail-content"><p>{notificationDetail.body}</p><time>{new Date(notificationDetail.createdAt).toLocaleString(uiLanguage)}</time></div><footer>{notificationDetail.downloadUrl && <button onClick={() => openExternalUrl(notificationDetail.downloadUrl)}>{tr('打开下载页','Open download page')}</button>}<button className="primary" onClick={() => confirmNotification(notificationDetail)}>{notificationDetail.requiresAcknowledgement ? tr('确认','Acknowledge') : tr('完成','Done')}</button></footer></section></div>}
@@ -3609,7 +3764,7 @@ function App() {
           {PUBLIC_WEB&&<PersonalCloud base={LOCAL_PROXY_URL} current={canvases.find(c=>c.id===activeCanvasId)} changeToken={nodes} getSnapshot={(commit=true)=>cloudSnapshot(activeCanvasId,commit)} canReceive={!quickEditor&&!editingNode&&!dragging&&!marquee&&!relationDrag} onOpen={openCloudCanvas} onAttach={attachCloudCanvas} onLogout={logoutCloud} onNew={createCanvas}/>}
           {!PUBLIC_WEB && <TaskOverview nodes={nodes} tr={tr} runnerLabels={AGENT_LABELS} onFocus={focusSearchResult} onRespond={respondAgentApproval} />}
           <div className="notification-anchor">
-            <button className={`quiet-button notification-button ${notificationsOpen ? 'active' : ''}`} aria-label={tr('通知','Notifications')} onClick={() => setNotificationsOpen((value) => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{notifications.filter((item) => !item.read).length > 0 && <b>{Math.min(99, notifications.filter((item) => !item.read).length)}</b>}</button>
+            <button className={`quiet-button notification-button ${notificationsOpen ? 'active' : ''}`} aria-label={tr('通知','Notifications')} onClick={() => setNotificationsOpen((value) => !value)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{unreadNotificationCount > 0 && <b>{Math.min(99, unreadNotificationCount)}</b>}</button>
             {notificationToast && <section className={`notification-toast ${notificationToast.requiresAcknowledgement ? 'requires-confirmation' : ''}`} role="status" onClick={() => openNotificationDetail(notificationToast)}><i>{notificationToast.kind === 'update' ? '↑' : '●'}</i><div><strong>{notificationToast.title}</strong><p>{notificationToast.body}</p></div>{!notificationToast.requiresAcknowledgement && <button aria-label={tr('关闭','Close')} onClick={(event) => { event.stopPropagation(); setNotificationToast(null); }}>×</button>}</section>}
             {notificationsOpen && <section className="notification-center" onPointerDown={(event) => event.stopPropagation()}>
               <header><div><small>{tr('通知中心','Notification center')}</small><strong>{tr('应用内通知','In-app notifications')}</strong></div><button onClick={() => setNotificationsOpen(false)} aria-label={text('close')}>×</button></header>
@@ -3690,7 +3845,7 @@ function App() {
             const source = graph.byId.get(relationDrag.sourceId);
             if (!source) return null;
             const size = nodeSizes.get(source.id) || {width: 95, height: 47};
-            const rect = canvasRef.current.getBoundingClientRect();
+            const rect = relationRectRef.current || canvasRef.current.getBoundingClientRect();
             const x1 = source.x + size.width, y1 = source.y + size.height / 2;
             const x2 = (relationDrag.x - rect.left - viewport.x) / viewport.zoom;
             const y2 = (relationDrag.y - rect.top - viewport.y) / viewport.zoom;
@@ -3802,8 +3957,8 @@ function App() {
       {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留；按住 Alt 改为移动分支）','Release to add another parent (keeps current; hold Alt to move branch)'):say('松开将移动分支（替换原父节点）','Release to move branch (replaces current parent)')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
       {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
-      {piImportOpen && <PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} />}
-      {compareGroupOpen && <CompareView cards={nodes.filter((node) => node.compareGroup === compareGroupOpen).sort((x, y) => String(x.variant).localeCompare(String(y.variant)))} tr={tr} runnerLabels={AGENT_LABELS} applyAgentChanges={applyAgentChanges} onClose={() => setCompareGroupOpen(null)} notify={notify} />}
+      {piImportOpen && <Suspense fallback={null}><PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} /></Suspense>}
+      {compareGroupOpen && <Suspense fallback={null}><CompareView cards={nodes.filter((node) => node.compareGroup === compareGroupOpen).sort((x, y) => String(x.variant).localeCompare(String(y.variant)))} tr={tr} runnerLabels={AGENT_LABELS} applyAgentChanges={applyAgentChanges} onClose={() => setCompareGroupOpen(null)} notify={notify} /></Suspense>}
       {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? detachParent(node, contextMenu.parentId) : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
       {editingRelation && <div className={`relation-editor-popover ${relationEditorClosing ? 'closing' : ''}`}><span>{tr('正在编辑','Editing ')}{editingRelation.type === 'merge' ? tr('合并','merge') : tr('引用','reference')}{tr('连线',' link')}</span><div>{[['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} className={editingRelation.type === type ? 'active' : ''} onClick={() => { commitRelation(editingRelation.sourceId, editingRelation.targetId, type); setEditingRelation({ ...editingRelation, type }); }}>{label}</button>)}<button className="remove" onClick={() => { const relation = { ...editingRelation }; closeRelationEditor(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除','Delete')}</button></div><button className="relation-cancel" onClick={() => closeRelationEditor()}>{tr('完成','Done')}</button></div>}
       {mergeWorkbench && selectedIds.size > 1 && <section className="merge-workbench"><header><div><small>{tr("合并工作台","Merge workspace")}</small><strong>{tr(`${selectedIds.size} 个节点将作为显式上下文`,`${selectedIds.size} nodes will be explicit context`)}</strong></div><button onClick={() => setMergeWorkbench(false)}>×</button></header><div className="merge-goals">{['综合结论','并列比较','找出冲突','制定行动'].map((goal) => <button key={goal} className={mergeGoal === goal ? 'active' : ''} onClick={() => setMergeGoal(goal)}>{mergeGoalLabel(goal)}</button>)}</div><div className="merge-items">{[...selectedIds].map((id, index) => { const node = nodes.find((item) => item.id === id); return node && <span key={id}><i>{index + 1}</i>{node.title}</span>; })}</div><footer><small>{tr("第一个选中节点为起点；其余节点只会附加到这一次新分支的上下文，不会改写原节点关系。","The first node is the starting point. Other nodes add context to this branch only; existing links stay unchanged.")}</small><button onClick={() => { const ids = [...selectedIds]; const sourceId = selectedId && ids.includes(selectedId) ? selectedId : ids[0]; const source = nodes.find((node) => node.id === sourceId); const mergeRelations = ids.filter((id) => id !== sourceId).map((targetId, index) => ({ id: `merge-${Date.now()}-${index}`, targetId, type: 'merge' })); setPendingContextRelations(mergeRelations); setMergeWorkbench(false); setNodeType('conversation'); setDraft(tr(`请基于已合并的 ${ids.length} 个节点，${mergeGoal}。`,`Based on the ${ids.length} merged nodes: ${mergeGoalLabel(mergeGoal)}.`)); if (source) startBranch(source, { preservePendingContext: true }); }}>{tr("创建合并分支","Create merged branch")}</button></footer></section>}
@@ -3885,8 +4040,8 @@ function App() {
               </Group>
             </Page>
           )}
-          {settingsSection === 'appearance' && <AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} />}
-          {settingsSection === 'agents' && <AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} systemNotifications={systemNotifications} onSystemNotificationsChange={changeSystemNotifications} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} />}
+          {settingsSection === 'appearance' && <Suspense fallback={null}><AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} /></Suspense>}
+          {settingsSection === 'agents' && <Suspense fallback={null}><AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} systemNotifications={systemNotifications} onSystemNotificationsChange={changeSystemNotifications} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} /></Suspense>}
           {settingsSection === 'notifications' && (
             <Page title={tr('应用内通知','In-app notifications')} description={tr('仅当 Wendaflow 正在运行时接收通知；关闭软件后不会保留后台连接。','Receive notifications only while Wendaflow is running. No background connection is kept after you close the app.')}>
               <Group>

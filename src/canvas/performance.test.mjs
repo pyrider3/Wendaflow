@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {parse} from '@babel/parser';
-import {createGraphIndex} from './graph-index.mjs';import {ConnectionGeometry,connectionPath,viewportTransform,needsViewportSnapshot} from './camera.mjs';
+import {createGraphIndex,updateGraphIndex} from './graph-index.mjs';import {ConnectionGeometry,connectionPath,viewportTransform,needsViewportSnapshot} from './camera.mjs';
 const nodes=[{id:'a',x:0,y:0},{id:'b',x:200,y:0,parentId:'a'},{id:'c',x:400,y:0,parentId:'b'},{id:'d',x:200,y:100,parentId:'a'},{id:'root',x:0,y:200}];
 test('graph index matches children, ancestors, descendants and collapsed visibility',()=>{const g=createGraphIndex(nodes);assert.equal(g.children.get('a').length,2);assert.equal(g.descendantCount.get('a'),3);assert.equal(g.descendantCount.get('b'),1);assert.equal(g.isDescendant('c','a'),true);assert.equal(g.isDescendant('a','c'),false);assert.deepEqual(g.ancestors('c').map(n=>n.id),['a','b','c']);assert.deepEqual([...g.ancestorIds(['c','d'])].sort(),['a','b','c','d']);assert.deepEqual(g.visibleNodes(new Set(['b'])).map(n=>n.id),['a','b','d','root']);assert.strictEqual(g.visibleNodes(new Set()),nodes);});
 test('deep 20000-node chains have bounded iterative index construction and queries',()=>{const input=Array.from({length:20000},(_,i)=>({id:String(i),parentId:i?String(i-1):null}));const g=createGraphIndex(input);assert.equal(g.descendantCount.get('0'),19999);assert.equal(g.isDescendant('19999','0'),true);assert.equal(g.visibleNodes(new Set(['10000'])).length,10001);});
@@ -53,4 +53,50 @@ test('camera paints immediately while scene updates may remain deferred',()=>{
   vm.createContext(context);vm.runInContext(source.slice(handler.start,handler.end),context);const next={x:-800,y:0,zoom:.8};context.commitViewport(next,false);
   assert.equal(rendered,undefined);assert.equal(pending.length,1);assert.equal(context.viewportRef.current,next);assert.equal(context.worldRef.current.style.transform,viewportTransform(next));assert.equal(context.viewportSnapshotRef.current,start);
   pending[0]();assert.equal(rendered,next);
+});
+test('updateGraphIndex reuses topology tables for position/content changes and rebuilds on structural edits',()=>{
+  const base=[{id:'a',x:0,y:0,content:'A'},{id:'b',x:200,y:0,parentId:'a',content:'B'}];
+  const g1=createGraphIndex(base);
+  const moved=[base[0],{...base[1],x:260,y:40,content:'B2'}];
+  const g2=updateGraphIndex(g1,moved);
+  assert.strictEqual(g2.children,g1.children);
+  assert.strictEqual(g2.descendantCount,g1.descendantCount);
+  assert.equal(g2.byId.get('b').x,260);
+  assert.equal(g2.ancestors('b')[1].content,'B2');
+  const reparented=[base[0],{...base[1],parentId:null}];
+  const g3=updateGraphIndex(g2,reparented);
+  assert.notStrictEqual(g3.children,g2.children);
+  assert.equal(g3.children.get('a').length,0);
+});
+test('high-frequency card drag and marquee reuse cached frame/rect state and flush before endHistory',()=>{
+  const moveNode=app.body.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='movePointer');
+  const endNode=app.body.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='endPointer');
+  const order=[];let latestDrag=null,rectReads=0;
+  const dragFrames={enqueue(v){latestDrag=v;},flush(){order.push('flush');},clear(){order.push('clear');}};
+  const ctx={
+    quickBlankClick:{current:null},relationDrag:null,relationDragRef:{current:null},resizing:null,marquee:null,
+    dragging:{startX:100,startY:100,positions:new Map([['a',{x:10,y:20}]]),ids:['a'],started:true},
+    viewportRef:{current:{zoom:2}},crossedDragThreshold:()=>true,dragFramesRef:{current:dragFrames},
+    resizeFramesRef:{current:{flush(){},clear(){}}},relationFramesRef:{current:{clear(){}}},
+    relationRectRef:{current:{left:0,top:0}},marqueeRectRef:{current:{left:10,top:20}},
+    canvasRef:{current:{getBoundingClientRect(){rectReads++;return{left:10,top:20};}}},
+    marqueeLiveRef:{current:null},marqueeFrameRef:{current:1},runMarqueeFrame(){},
+    window:{requestAnimationFrame(){return 1;}},
+    endHistory(){order.push('endHistory');},
+    panInputRef:{current:null},resizingRef:{current:null},
+    setDragging(){},setPanning(){},setMarquee(){},setResizing(){},setNodes(){throw new Error('should coalesce into dragFramesRef');},
+  };
+  vm.createContext(ctx);
+  vm.runInContext(source.slice(moveNode.start,moveNode.end)+'\n'+source.slice(endNode.start,endNode.end),ctx);
+  for(let i=1;i<=30;i++)ctx.movePointer({clientX:100+i*4,clientY:100+i*2});
+  assert.equal(latestDrag.dx,60);assert.equal(latestDrag.dy,30);
+  // Marquee uses cached marqueeRectRef without touching getBoundingClientRect.
+  ctx.dragging=null;ctx.marquee={startX:0,startY:0,x:0,y:0};
+  for(let i=1;i<=10;i++)ctx.movePointer({clientX:50+i,clientY:60+i});
+  assert.equal(rectReads,0);assert.deepEqual({...ctx.marqueeLiveRef.current},{x:50,y:50});
+  ctx.marquee=null;
+  ctx.endPointer({type:'pointerup',clientX:220,clientY:160});
+  assert.deepEqual(order,['flush','endHistory']);
+  assert.equal(ctx.marqueeRectRef.current,null);
+  assert.equal(ctx.relationRectRef.current,null);
 });

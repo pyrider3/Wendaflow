@@ -1,11 +1,30 @@
 // Field patches preserve unrelated streaming updates; references share immutable assets.
+function changedKeys(old, next) {
+  const keys = [];
+  for (const k in old) if (Object.hasOwn(old, k) && !Object.is(old[k], next[k])) keys.push(k);
+  for (const k in next) if (Object.hasOwn(next, k) && !Object.hasOwn(old, k)) keys.push(k);
+  return keys;
+}
 function difference(before,after) {
+  // Fast path for in-place updates (drag, resize, streaming, edits) where node order and ids are unchanged.
+  if (before.length === after.length) {
+    let aligned = true;
+    const changes = [];
+    for (let i = 0; i < before.length; i++) {
+      const old = before[i], next = after[i];
+      if (old === next) continue;
+      if (!old || !next || old.id !== next.id) { aligned = false; break; }
+      const keys = changedKeys(old, next);
+      if (keys.length) changes.push({ id: old.id, old, next, keys });
+    }
+    if (aligned) return changes;
+  }
   const a=new Map(before.map(n=>[n.id,n])), b=new Map(after.map(n=>[n.id,n])), changes=[];
   for(const id of new Set([...a.keys(),...b.keys()])) {
     const old=a.get(id), next=b.get(id);
     if(old===next)continue;
     if(!old || !next) {changes.push({id,old,next});continue;}
-    const keys=[...new Set([...Object.keys(old),...Object.keys(next)])].filter(k=>!Object.is(old[k],next[k]));
+    const keys=changedKeys(old,next);
     if(keys.length)changes.push({id,old,next,keys});
   }
   return changes;
