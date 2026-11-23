@@ -1,5 +1,5 @@
 // Long comic image: storyboard panels stacked top to bottom as one SVG (rendered to PNG in the browser).
-import { escapeXml, wrapText } from './export.mjs';
+import { escapeXml, wrapText } from '../../canvas/export.mjs';
 
 const STRIP = { light: { bg: '#f4f1ea', panel: '#ffffff', ink: '#1b1b1f', muted: '#5d5f66', border: '#1b1b1f', bubble: '#fffbe8' }, dark: { bg: '#121318', panel: '#1c1e26', ink: '#f1f2f6', muted: '#a8adbb', border: '#e7e9f0', bubble: '#2a2c36' } };
 

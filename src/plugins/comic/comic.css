@@ -1,0 +1,8 @@
+/* AI comic studio: actions under storyboard cards */
+.comic-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.comic-bar button { border: 1px solid color-mix(in srgb, currentColor 22%, transparent); background: color-mix(in srgb, currentColor 6%, transparent); color: inherit; border-radius: 999px; padding: 4px 11px; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.comic-bar button:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.comic-bar .generation-progress { margin: 0; font-size: 11px; }
+.comic-error { flex-basis: 100%; color: #c0503a; font-size: 11px; line-height: 1.4; word-break: break-word; }
+.comic-size { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.comic-workflow { min-height: 140px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }

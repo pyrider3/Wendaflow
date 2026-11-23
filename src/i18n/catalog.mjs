@@ -2,7 +2,7 @@ import common from './common.mjs';
 import actions from './actions.mjs';
 import settings from './settings.mjs';
 import workflow from './workflow.mjs';
-import comic from './comic.mjs';
+import comic from '../plugins/comic/i18n.mjs';
 import sourceIndex from './source-index.json' with { type: 'json' };
 
 export const locales = ['zh-TW','ja','ko','es','fr','de','pt-BR','ru','ar'];

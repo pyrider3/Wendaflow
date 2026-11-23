@@ -16,7 +16,7 @@
     "audit:i18n": "node scripts/audit-i18n.mjs",
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
-    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs",
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/plugins/*.test.mjs src/plugins/*/*.test.mjs",
     "test:public": "node --test deployment/*.test.mjs",
     "test:cloud": "node --test cloud/*.test.mjs",
     "build:windows": "npm run build && node scripts/windows/build.mjs"

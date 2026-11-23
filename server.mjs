@@ -4,7 +4,9 @@ import { matchesRule, suggestRule, sameRule } from './src/agents/allow-rules.mjs
 import { expandMentions, listWorkspaceFiles } from './src/agents/mentions.mjs';
 import { listPiSessions, readPiSession } from './src/agents/pi-sessions.mjs';
 import { approvalPreview } from './src/agents/approval-preview.mjs';
-import { comfyRoutes } from './src/canvas/comfy-proxy.mjs';
+import { comfyRoutes } from './src/plugins/comic/comfy-proxy.mjs';
+import { createPluginGate } from './src/plugins/server-gate.mjs';
+const plugins = createPluginGate({ comic: comfyRoutes });
 import { takeSnapshot, diffSnapshot, fileDiff, rollbackFiles, removeSnapshot, copyWorkspace, applyChanges } from './src/agents/snapshot.mjs';
 import http from 'node:http';
 import {canvasStorage} from './canvas-storage.mjs';
@@ -833,9 +835,11 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'OPTIONS') { res.writeHead(204, allowedHeaders); res.end(); return; }
   if (req.method === 'GET' && req.url === '/health') { reply(res, 200, { ok: true, service: 'branchspace-local-proxy' }); return; }
-  if (req.method === 'POST' && Object.hasOwn(comfyRoutes, req.url)) {
-    // AI comic studio: ComfyUI is reached only through this loopback proxy.
-    try { reply(res, 200, await comfyRoutes[req.url](await readJson(req, 4_000_000))); }
+  const pluginRoute = plugins.route(req.method, req.url);
+  if (pluginRoute) {
+    // Optional plugins (e.g. the AI comic studio's ComfyUI proxy) answer 403 until enabled in Settings → Plugins.
+    if (!pluginRoute.apply) { reply(res, pluginRoute.status, pluginRoute.body); return; }
+    try { reply(res, 200, await pluginRoute.apply(await readJson(req, 4_000_000))); }
     catch (error) { reply(res, error.status || 500, { error: error.message || String(error) }); }
     return;
   }

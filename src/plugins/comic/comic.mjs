@@ -1,7 +1,7 @@
 // AI comic studio: one sentence of plot → a streamed storyboard of panel cards →
 // one ComfyUI text-to-image job per panel → a single long comic image.
 // Pure functions only (no DOM, no fetch) so the whole pipeline is testable.
-import { scanObjects } from './ai-diagram.mjs';
+import { scanObjects } from '../../canvas/ai-diagram.mjs';
 
 export const MIN_PANELS = 4, MAX_PANELS = 8;
 const COLS = 4, X_GAP = 380, Y_GAP = 500;
