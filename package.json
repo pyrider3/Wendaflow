@@ -10,6 +10,9 @@
   },
   "homepage": "https://cn.qnjyxh.xyz",
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "dev": "vite",
     "proxy": "node server.mjs",
@@ -20,15 +23,15 @@
     "audit:i18n": "node scripts/audit-i18n.mjs",
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
-    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/plugins/*.test.mjs src/plugins/*/*.test.mjs src/agent-api/*.test.mjs",
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/plugins/*.test.mjs src/plugins/*/*.test.mjs src/agent-api/*.test.mjs src/themes/*.test.mjs",
     "test:agent-api": "node --test src/agent-api/*.test.mjs",
     "mcp": "node scripts/wendaflow-mcp.mjs",
     "wendaflow": "node scripts/wendaflow.mjs",
     "test:public": "node --test deployment/*.test.mjs",
-    "test:cloud": "node --test cloud/*.test.mjs",
-    "build:windows": "npm run build && node scripts/windows/build.mjs"
+    "test:cloud": "node --test cloud/*.test.mjs"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.4.0",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",

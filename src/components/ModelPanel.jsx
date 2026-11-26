@@ -21,22 +21,34 @@ export function EffortSlider({ levels, value, onChange, label, defaultLabel, dis
 }
 
 // Models grouped by provider; picking one applies immediately. `groups` = [{ title, items: [{ value, label, hint }] }].
-export function ModelList({ groups, value, onChange, searchable, tr }) {
+// With `favorites` (a Set of values) and `onToggleFavorite`, each model gets a star and starred ones are listed
+// first under "Frequently used", so the models someone actually switches between are one click away.
+export function ModelList({ groups, value, onChange, searchable, tr, favorites, onToggleFavorite }) {
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const shown = groups.map((group) => ({ ...group, items: group.items.filter((item) => !needle || `${item.label} ${item.hint || ""}`.toLowerCase().includes(needle)) })).filter((group) => group.items.length);
+  const starrable = !!onToggleFavorite;
+  const all = groups.flatMap((group) => group.items);
+  const pinned = starrable ? all.filter((item) => item.value && favorites?.has(item.value)) : [];
+  const withPinned = pinned.length ? [{ title: tr("常用", "Frequently used"), pinned: true, items: pinned }, ...groups] : groups;
+  const shown = withPinned.map((group) => ({ ...group, items: group.items.filter((item) => !needle || `${item.label} ${item.hint || ""}`.toLowerCase().includes(needle)) })).filter((group) => group.items.length);
   return (
     <div className="model-list">
       {searchable && <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr("搜索模型…", "Search models…")} aria-label={tr("搜索模型…", "Search models…")} spellCheck={false} />}
       <div className="model-list-scroll" role="radiogroup" aria-label={tr("模型", "Model")}>
         {shown.map((group) => (
-          <div key={group.title || "-"}>
+          <div key={group.pinned ? "*pinned" : group.title || "-"} className={group.pinned ? "model-group pinned" : "model-group"}>
             {group.title && <small>{group.title}</small>}
-            {group.items.map((item) => (
-              <button key={item.value} role="radio" aria-checked={item.value === value} className={item.value === value ? "selected" : ""} onClick={() => onChange(item.value)}>
-                <span>{item.label}{item.hint && <em>{item.hint}</em>}</span><i aria-hidden="true">✓</i>
-              </button>
-            ))}
+            {group.items.map((item) => {
+              const starred = starrable && favorites?.has(item.value);
+              return (
+                <div key={item.value} className={`model-row ${item.value === value ? "selected" : ""}`}>
+                  <button role="radio" aria-checked={item.value === value} className={item.value === value ? "selected" : ""} onClick={() => onChange(item.value)}>
+                    <span>{item.label}{item.hint && <em>{item.hint}</em>}</span><i aria-hidden="true">✓</i>
+                  </button>
+                  {starrable && item.value && <button className={`model-star ${starred ? "on" : ""}`} aria-pressed={starred} aria-label={starred ? tr("从常用中移除", "Remove from frequently used") : tr("设为常用", "Add to frequently used")} title={starred ? tr("从常用中移除", "Remove from frequently used") : tr("设为常用", "Add to frequently used")} onClick={() => onToggleFavorite(item.value)}>{starred ? "★" : "☆"}</button>}
+                </div>
+              );
+            })}
           </div>
         ))}
         {!shown.length && <p className="option-note">{tr("没有匹配的模型", "No matching models")}</p>}
@@ -50,11 +62,16 @@ export function piModelGroups(info, selection, tr) {
   const current = info?.current;
   const groups = [{ title: "", items: [{ value: "", label: current ? tr("默认 · {0}", "Default · {0}").replace("{0}", `${current.provider} / ${current.id}`) : tr("使用 Pi 的默认设置", "Use Pi's default") }] }];
   if (selection && !models.some((model) => `${model.provider}::${model.id}` === selection)) groups[0].items.push({ value: selection, label: selection.replace("::", " / ") });
+  // Models from Settings → Model connections reach Pi as "wendaflow-…" providers: show them first, under one
+  // readable heading, and pinned to the menu's main list so they are never buried among Pi's own catalog.
+  const connected = { title: tr("已连接的模型", "Connected models"), items: [] };
   for (const model of models) {
-    let group = groups.find((item) => item.title === model.provider);
+    const mine = /^wendaflow-/.test(model.provider || "");
+    let group = mine ? connected : groups.find((item) => item.title === model.provider);
     if (!group) groups.push((group = { title: model.provider, items: [] }));
-    group.items.push({ value: `${model.provider}::${model.id}`, label: model.name || model.id, hint: model.name && model.name !== model.id ? model.id : "" });
+    group.items.push({ value: `${model.provider}::${model.id}`, label: model.name || model.id, hint: model.name && model.name !== model.id ? model.id : "", ...(mine ? { pinned: true } : {}) });
   }
+  if (connected.items.length) groups.splice(1, 0, connected);
   return groups;
 }
 

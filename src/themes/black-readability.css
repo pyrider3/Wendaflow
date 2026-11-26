@@ -1,6 +1,6 @@
 /* Complete Nightfall / Graphite surfaces and foregrounds together. Scoped to this theme:
    light-only gradients and inherited button text must not mix with dark UI. */
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) {
+:root:is([data-theme="contrast-black"]) {
   --black-surface: #181818;
   --black-raised: #252525;
   --black-border: #626262;
@@ -8,48 +8,44 @@
   --black-muted: #c2c2c2;
   --black-link: #a9d0ff;
 }
-:root[data-theme="graphite"] { --black-surface: #303334; --black-raised: #3b3e40; --black-border: #747c80; }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(input, textarea)::placeholder {
+:root:is([data-theme="contrast-black"]) :is(input, textarea)::placeholder {
   color: #b5b5b5; opacity: 1;
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(
-  .node-tags span, .status, .output-assets a, .thinking-output summary,
-  .action-live-feed article > i
-) { background-color: #283a32; color: #d6f1e3; border-color: #789d89; }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.status.failed, .status.stopped) {
+:root:is([data-theme="contrast-black"]) :is(.node-tags span, .status, .output-assets a, .thinking-output summary, .action-live-feed article > i) { background-color: #283a32; color: #d6f1e3; border-color: #789d89; }
+:root:is([data-theme="contrast-black"]) :is(.status.failed, .status.stopped) {
   background: #4b252b; color: #ffd0d5;
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) ::selection { background: #265d96; color: #fff; }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.model-picker > button i, .agent-summary-button i) {
+:root:is([data-theme="contrast-black"]) ::selection { background: #265d96; color: #fff; }
+:root:is([data-theme="contrast-black"]) :is(.model-picker > button i, .agent-summary-button i) {
   color: var(--black-muted);
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) :is(.context-menu .danger, .library-actions .remove):hover {
+:root:is([data-theme="contrast-black"]) :is(.context-menu .danger, .library-actions .remove):hover {
   color: #ffc2c6;
 }
 
 /* Keep the composer a single surface instead of an inset black form field. */
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer {
+:root:is([data-theme="contrast-black"]) .composer {
   background: var(--black-surface);
   border-color: #555f5a;
   box-shadow: 0 12px 36px rgba(0,0,0,.28);
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer::before {
+:root:is([data-theme="contrast-black"]) .composer::before {
   background: none;
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer textarea {
+:root:is([data-theme="contrast-black"]) .composer textarea {
   background: transparent;
   color: var(--black-text);
   border: 0;
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer .composer-close {
+:root:is([data-theme="contrast-black"]) .composer .composer-close {
   background: transparent;
   border-color: transparent;
   color: var(--black-muted);
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer .composer-close:hover {
+:root:is([data-theme="contrast-black"]) .composer .composer-close:hover {
   background: rgba(255,255,255,.08);
 }
-:root:is([data-theme="contrast-black"], [data-theme="graphite"]) .composer.branching {
+:root:is([data-theme="contrast-black"]) .composer.branching {
   border-color: #647f71;
   box-shadow: 0 12px 36px rgba(0,0,0,.28);
 }

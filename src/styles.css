@@ -204,7 +204,7 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .node { position: absolute; width: 224px; min-height: 110px; padding: 14px 15px; border: 1px solid rgba(255,255,255,.52); border-radius: 15px; background: var(--node-tint, rgba(255, 255, 255, .66)); box-shadow: 0 5px 18px rgba(29, 48, 39, .045); backdrop-filter: blur(9px) saturate(118%); cursor: pointer; transform-origin: 0 0; interpolate-size: allow-keywords; transition: transform .42s var(--ease-out), width .34s var(--ease-out), min-height .34s var(--ease-out), height .34s var(--ease-out), opacity .16s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out), background-color .18s var(--ease-out); user-select: none; }
 /* Match the existing zoom fast path during direct panning too. The card
    animations and static glass styling are retained. */
-.canvas:is(.viewport-animating, .panning) .node { backdrop-filter: none; }
+.canvas:is(.viewport-animating, .panning, .dragging-cards) .node { backdrop-filter: none; }
 .node.medium-answer { width: 290px; --read-height: 210px; }
 .node.long-answer { width: 380px; --read-height: 320px; }
 .node.short-answer { --read-height: 110px; }
@@ -681,3 +681,47 @@ article.node[style*="--node-tint"] { background: var(--node-tint) !important; }
 .steer-box input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
 .steer-box button:disabled { opacity: .45; cursor: default; }
 .steer-error { margin: 0; color: var(--sx-danger, #a34f45); font-size: 11.5px; }
+/* Questions, status and panels from Pi extensions on a running card. */
+.extension-dialog p { margin: 6px 0 8px; font-size: 12px; white-space: pre-wrap; }
+.extension-dialog .extension-options { flex-wrap: wrap; margin-top: 6px; }
+.extension-dialog form { display: grid; gap: 8px; margin-top: 6px; }
+.extension-dialog input, .extension-dialog textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 8px; background: transparent; color: inherit; font: 12px/1.5 inherit; }
+.extension-dialog textarea { font-family: ui-monospace, monospace; resize: vertical; }
+.extension-status { margin: 0 0 6px; color: var(--sx-muted, #64766a); font-size: 11.5px; }
+.extension-widget { margin: 0 0 8px; padding: 8px 10px; max-height: 160px; overflow: auto; border-radius: 10px; background: color-mix(in srgb, currentColor 6%, transparent); white-space: pre-wrap; font: 11px/1.5 ui-monospace, monospace; }
+/* Live steps on a running Pi card. */
+.live-steps { display: grid; gap: 3px; margin: 0 0 6px; padding: 0; list-style: none; font-size: 11.5px; }
+.live-steps li { display: flex; align-items: center; gap: 6px; min-width: 0; animation: live-step-in .22s var(--ease-out, ease) both; }
+.live-steps li i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sx-accent, #247b56); }
+.live-steps li.running i { animation: pi-pulse 1.2s ease-in-out infinite; }
+.live-steps li.done i { background: color-mix(in srgb, var(--sx-accent, #247b56) 55%, transparent); }
+.live-steps li.error i { background: var(--sx-danger, #c0392b); }
+.live-steps li b { flex: none; font-weight: 600; }
+.live-steps li code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sx-muted, #6f7e76); font: 11px ui-monospace, monospace; }
+.live-steps .diffstat { flex: none; display: inline-flex; gap: 4px; margin-left: auto; font: 600 11px ui-monospace, monospace; }
+.live-steps .diffstat ins { color: #2f9e62; text-decoration: none; }
+.live-steps .diffstat del { color: #d0574a; text-decoration: none; }
+@keyframes live-step-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes pi-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live-steps li, .live-steps li.running i { animation: none; } }
+/* A light travelling along the line into a Pi card that is still running. */
+.connection-flow { fill: none; stroke: var(--sx-accent, #247b56); stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: .08 .92; pointer-events: none; animation: connection-flow 1.6s linear infinite; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sx-accent, #247b56) 70%, transparent)); }
+@keyframes connection-flow { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .connection-flow { animation: none; stroke-dasharray: none; opacity: .5; } }
+/* Plan-first checklist */
+.plan-steps { display: grid; gap: 4px; max-height: 220px; margin: 6px 0 10px; padding: 0; overflow: auto; list-style: none; counter-reset: plan; }
+.plan-steps li { counter-increment: plan; transition: opacity .16s ease; }
+.plan-steps label { display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 12.5px; line-height: 1.45; }
+.plan-steps label:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+.plan-steps input { margin-top: 2px; accent-color: var(--sx-accent, #247b56); }
+.plan-steps span::before { content: counter(plan) ". "; font-weight: 600; }
+.plan-steps li.skipped { opacity: .45; }
+.plan-steps li.skipped span { text-decoration: line-through; }
+.pi-card-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.live-switch { position: relative; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.live-switch > button { height: 26px; padding: 0 10px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 999px; background: transparent; color: inherit; font-size: 11.5px; cursor: pointer; transition: border-color .15s, background .15s; }
+.live-switch > button i { font-style: normal; opacity: .6; }
+.live-switch > button:hover, .live-switch > button.open { border-color: var(--sx-accent, #247b56); background: color-mix(in srgb, var(--sx-accent, #247b56) 8%, transparent); }
+.live-switch-menu { flex-basis: 100%; display: grid; gap: 1px; max-height: 180px; overflow: auto; padding: 4px; border: 1px solid var(--sx-line, #cad8d1); border-radius: 10px; background: var(--sx-raised, #fff); animation: chip-pop-in .16s var(--ease-out, ease) both; }
+.live-switch-menu button { height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.live-switch-menu button:hover { background: color-mix(in srgb, var(--sx-accent, #247b56) 10%, transparent); }

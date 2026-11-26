@@ -1,6 +1,7 @@
 import React from "react";
 import { ThemePicker } from "./ThemePicker.jsx";
-import { Button, Group, Page, Row, Select, Switch } from "./settings/ui.jsx";
+import { CustomThemeEditor } from "./CustomThemeEditor.jsx";
+import { Group, Page, Row, Select, Switch } from "./settings/ui.jsx";
 
 export function AppearancePanel({
   theme,
@@ -14,7 +15,6 @@ export function AppearancePanel({
   onCanvasHintsChange,
   customTheme,
   onCustomThemeChange,
-  onRestoreColors,
   text,
   copy,
   tr,
@@ -31,42 +31,7 @@ export function AppearancePanel({
             label={text("interfaceTheme")}
           />
         </div>
-        {theme === "custom" && (
-          <div>
-            <div className="sx-colors">
-              {[
-                ["background", tr("背景", "Background")],
-                ["surface", tr("卡片", "Cards")],
-                ["text", tr("文字", "Text")],
-                ["accent", tr("强调色", "Accent")],
-                ["grid", tr("网格", "Grid")],
-              ].map(([key, label]) => (
-                <label key={key} className="sx-color">
-                  <input
-                    type="color"
-                    value={customTheme[key]}
-                    onChange={(event) =>
-                      onCustomThemeChange((value) => ({
-                        ...value,
-                        [key]: event.target.value,
-                      }))
-                    }
-                  />
-                  <div>
-                    <span>{label}</span>
-                    <code>{customTheme[key]}</code>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="sx-actionbar">
-              <span className="sx-note">{text("customThemeHint")}</span>
-              <Button kind="ghost" className="small" onClick={onRestoreColors}>
-                {text("restoreColors")}
-              </Button>
-            </div>
-          </div>
-        )}
+        {theme === "custom" && <CustomThemeEditor value={customTheme} onChange={onCustomThemeChange} tr={tr} />}
       </Group>
       <Group>
         <Row title={copy.language} hint={copy.languageHint}>

@@ -14,3 +14,14 @@ export function approvalPreview(tool, input) {
   if (file && typeof input.content === 'string') return { kind: 'write', path: String(file), content: clip(input.content), bytes: Buffer.byteLength(input.content) };
   return { kind: 'text', text: clip(JSON.stringify(input, null, 2)) };
 }
+
+// Lines added and removed by a file-editing tool call, for the "+N −M" badge on a running card.
+// Returns null for calls that do not change a file.
+export function diffStat(input) {
+  if (!input || typeof input !== 'object') return null;
+  const lines = (text) => (typeof text === 'string' && text.length ? text.replace(/\n$/, '').split('\n').length : 0);
+  const edits = Array.isArray(input.edits) ? input.edits : (typeof input.oldText === 'string' || typeof input.old_string === 'string') ? [{ oldText: input.oldText ?? input.old_string, newText: input.newText ?? input.new_string }] : null;
+  if (edits) return edits.reduce((sum, edit) => ({ added: sum.added + lines(edit?.newText), removed: sum.removed + lines(edit?.oldText) }), { added: 0, removed: 0 });
+  if ((input.path || input.file_path || input.file) && typeof input.content === 'string') return { added: lines(input.content), removed: 0 };
+  return null;
+}

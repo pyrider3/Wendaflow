@@ -57,11 +57,11 @@
 
 **在线体验：** [公开网页版](https://api.qnjyxh.xyz/)（每位访客自行配置模型密钥，画布保存在当前浏览器；本地行动执行器需在本机运行）。
 
-新建画布在首次手动保存前属于临时草稿：切换标签会保留当前会话内容，关闭或刷新后丢弃。首次保存成功后启用该画布自动保存；已保存、导入、复制的画布关闭后仍保留。可随时导出 WDF 备份。
+新建画布在写下第一张卡片后就会自动保存；一张卡片都没有的空白画布关闭或刷新后不保留。已保存、导入、复制的画布关闭后仍保留。可随时导出 WDF 备份。
 
 ### 本机源码运行（推荐，支持本地模型与 Agent）
 
-准备好 Node.js（20.19+ 或 22.12+）与 npm：
+Wendaflow 只通过 GitHub 分发，不提供安装包。准备好 Node.js 22.19+ 与 npm：
 
 ```bash
 git clone https://github.com/pyrider3/Wendaflow.git
@@ -72,8 +72,10 @@ npm run app
 
 打开 **[http://localhost:5173/](http://localhost:5173/)** 即可使用。保持终端命令运行，它会同时启动前端 Vite 与本机后端 `server.mjs`（默认端口 `4318`）。
 
+行动模式用的 Pi 已经随 `npm ci` 一起装好（版本锁定在 `package.json` 里），不用另外安装；它直接使用你在 设置 → 模型连接 里填好的模型。Claude Pro/Max、ChatGPT 等订阅账号可以在 设置 → 执行器 里打开终端登录。
+
 - 详细运行说明见 [WEB_START.md](WEB_START.md)。
-- 需要打包 **Windows 一键运行版（`Wendaflow.exe`）** 或部署公开版 / 个人云同步，见 [docs/BUILDING.md](docs/BUILDING.md)、[deployment/PUBLIC_WEB.md](deployment/PUBLIC_WEB.md) 与 [deployment/PERSONAL_CLOUD.md](deployment/PERSONAL_CLOUD.md)。
+- 构建、部署公开版或个人云同步，见 [docs/BUILDING.md](docs/BUILDING.md)、[deployment/PUBLIC_WEB.md](deployment/PUBLIC_WEB.md) 与 [deployment/PERSONAL_CLOUD.md](deployment/PERSONAL_CLOUD.md)。
 
 ## 它解决什么问题
 
@@ -183,7 +185,7 @@ claude mcp add wendaflow -- node /绝对路径/Wendaflow/scripts/wendaflow-mcp.m
 - `src/agents/`：执行器目录、权限放行规则、`@` 文件提及、文件快照/回滚与 Pi 会话读取
 - `src/components/`、`src/themes/`、`src/i18n/`、`src/cloud/`：面板组件、多主题样式、11 语言词表与个人云同步客户端
 - `server.mjs`、`canvas-storage.mjs`：本机模型代理、WDF 持久化与本地 Agent 运行服务
-- `scripts/`：国际化完整性审计（`audit-i18n.mjs`）、Playwright 检查脚本与 Windows 单文件打包（`scripts/windows/`）
+- `scripts/`：国际化完整性审计（`audit-i18n.mjs`）与 Playwright 检查脚本
 - `deployment/`、`cloud/`、`notification-server/`、`notification-manager/`、`website/`：公开部署、个人云存储、通知服务与官网文件
 
 运行全量测试与生产构建（构建会自动执行 11 语言 `audit:i18n` 校验与 Vite 分包构建）：

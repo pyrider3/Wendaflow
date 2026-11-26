@@ -242,3 +242,6 @@
 @media (prefers-reduced-motion: reduce) {
   .ix, .ix *, .open-inspector { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; }
 }
+/* The inspector shows the same structured run as the card, with more room for long outputs. */
+.ix-timeline.wide { gap: 6px; }
+.ix-timeline.wide article.tool pre, .ix-timeline.wide article pre { max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-word; }

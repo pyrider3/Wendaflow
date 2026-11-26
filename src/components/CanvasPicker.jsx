@@ -40,7 +40,8 @@ function PickerActions({item,menu,groups,onClose,onSearch,onView,onRename,onStar
 export function CanvasPicker({items,meta,activeId,onOpen,onClose,onCreate,onManage,onRename,onStar,onDuplicate,onMove,onTrash,say}) {
   const [query,setQuery]=useState(''),[index,setIndex]=useState(0),[menu,setMenu]=useState(null),[editing,setEditing]=useState(null),[name,setName]=useState(''),[opening,setOpening]=useState(false);
   const root=useRef(null),input=useRef(null),trigger=useRef(null);
-  const choices=useMemo(()=>pickerChoices(items,query),[items,query]);
+  // Recent canvases are not capped at a handful: the list scrolls.
+  const choices=useMemo(()=>pickerChoices(items,query,200),[items,query]);
   const current=choices[Math.min(index,Math.max(0,choices.length-1))];
   const menuItem=menu&&items.find(item=>item.id===menu.id&&!item.trashedAt);
   useLayoutEffect(()=>{

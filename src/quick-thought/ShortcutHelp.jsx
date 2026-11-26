@@ -1,4 +1,5 @@
 import React,{useEffect,useRef} from 'react';
+import {useExitAnimation} from '../components/useExitAnimation.js';
 import '../components/settings/settings.css';
 import '../components/polish.css';
 
@@ -17,6 +18,7 @@ function Keys({value}) {
 
 export function ShortcutHelp({quick,say,hints,onToggleHints,onClose}) {
  const ref=useRef(null);
+ useExitAnimation(ref);
  useEffect(()=>{const previous=document.activeElement;ref.current?.querySelector('button')?.focus();return()=>previous?.isConnected&&previous.focus?.({preventScroll:true});},[]);
  const groups=[
   [say('画布','Canvas'),[
@@ -28,8 +30,8 @@ export function ShortcutHelp({quick,say,hints,onToggleHints,onClose}) {
   ]],
   [say('选择与移动','Selecting and moving'),[
    [say(quick?'左键框选':'右键框选',quick?'Left-drag marquee':'Right-drag marquee'),say('接触卡片即选中','Select intersecting cards')],
-   ['Shift + '+say('点击卡片','click card'),say('切换多选','Toggle card selection')],
-   ['Shift + '+say('框选','marquee'),say('追加选择','Add to selection')],
+   ['Shift / Ctrl + '+say('点击卡片','click card'),say('切换多选','Toggle card selection')],
+   ['Shift / Ctrl + '+say('框选','marquee'),say('追加选择','Add to selection')],
    ['Alt + '+say('框选','marquee'),say('减去选择','Subtract selection')],
    ['Alt + '+say('拖动卡片','drag card'),say('一起移动子树','Move the subtree')],
    ...(quick?[[say('方向键','Arrow keys'),say('选择相邻想法','Select nearby idea')]]:[]),

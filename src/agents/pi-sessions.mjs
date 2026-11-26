@@ -106,3 +106,101 @@ export async function readPiSession(id, { root = piSessionsRoot(), maxEvents = 1
   const shown = events.slice(-maxEvents).map((event, index) => ({ id: index + 1, at: summary.updatedAt, ...event }));
   return { session: summary, events: shown, output, prompt: events.find((event) => event.type === 'user')?.text || summary.title };
 };
+
+// Spending and tokens across every Pi session (Wendaflow's and the terminal's) in the last `days` days,
+// per day and per model, read from the usage Pi records on each assistant message.
+export async function piUsage({ root = piSessionsRoot(), days = 30, now = Date.now() } = {}) {
+  const since = now - days * 86_400_000;
+  const byDay = new Map(), byModel = new Map();
+  const totals = { cost: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, turns: 0, sessions: 0 };
+  let folders = [];
+  try { folders = await readdir(root, { withFileTypes: true }); } catch { folders = []; }
+  for (const folder of folders.filter((entry) => entry.isDirectory())) {
+    let files = [];
+    try { files = await readdir(path.join(root, folder.name)); } catch { continue; }
+    for (const name of files.filter((file) => file.endsWith('.jsonl'))) {
+      const file = path.join(root, folder.name, name);
+      let info; try { info = await stat(file); } catch { continue; }
+      if (info.mtimeMs < since || info.size > 200_000_000) continue;
+      let text; try { text = await readFile(file, 'utf8'); } catch { continue; }
+      let counted = false;
+      for (const line of text.split('\n')) {
+        if (!line.includes('"usage"')) continue;
+        let record; try { record = JSON.parse(line); } catch { continue; }
+        const message = record?.message;
+        if (message?.role !== 'assistant' || !message.usage) continue;
+        const at = Date.parse(record.timestamp || '') || Number(message.timestamp) || info.mtimeMs;
+        if (at < since) continue;
+        const usage = message.usage, cost = Number(usage.cost?.total) || 0;
+        const day = new Date(at).toISOString().slice(0, 10), model = `${message.provider || '?'}/${message.model || '?'}`;
+        const tokens = (usage.input || 0) + (usage.output || 0) + (usage.cacheRead || 0) + (usage.cacheWrite || 0);
+        const d = byDay.get(day) || { date: day, cost: 0, tokens: 0, turns: 0 };
+        d.cost += cost; d.tokens += tokens; d.turns += 1; byDay.set(day, d);
+        const m = byModel.get(model) || { model, cost: 0, tokens: 0, turns: 0 };
+        m.cost += cost; m.tokens += tokens; m.turns += 1; byModel.set(model, m);
+        totals.cost += cost; totals.input += usage.input || 0; totals.output += usage.output || 0; totals.cacheRead += usage.cacheRead || 0; totals.cacheWrite += usage.cacheWrite || 0; totals.turns += 1;
+        counted = true;
+      }
+      if (counted) totals.sessions += 1;
+    }
+  }
+  const daysList = [];
+  for (let at = since; at <= now; at += 86_400_000) { const day = new Date(at).toISOString().slice(0, 10); daysList.push(byDay.get(day) || { date: day, cost: 0, tokens: 0, turns: 0 }); }
+  return { days: [...new Map(daysList.map((item) => [item.date, item])).values()], models: [...byModel.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens), totals };
+}
+
+// The file of a saved Pi session by its id, wherever it is stored. Pi files sessions under the folder they
+// ran in, so a session started in an isolated copy is only found by id from that same folder; passing the
+// file path to --fork / --session works from anywhere.
+export async function findPiSessionFile(id, root = piSessionsRoot()) {
+  const wanted = String(id || '');
+  if (!/^[\w-]{6,80}$/.test(wanted)) return '';
+  let folders = [];
+  try { folders = await readdir(root, { withFileTypes: true }); } catch { return ''; }
+  for (const folder of folders.filter((entry) => entry.isDirectory())) {
+    let files = [];
+    try { files = await readdir(path.join(root, folder.name)); } catch { continue; }
+    const hit = files.find((name) => name.endsWith(`_${wanted}.jsonl`));
+    if (hit) return path.join(root, folder.name, hit);
+  }
+  return '';
+}
+
+// Every model Pi has in its cached provider catalogs (models-store.json), for filling in what Wendaflow's
+// own model connections do not say (context window, limits, price).
+export async function piModelCatalog(agentDir = path.dirname(piSessionsRoot())) {
+  try {
+    const store = JSON.parse(await readFile(path.join(agentDir, 'models-store.json'), 'utf8'));
+    return Object.values(store || {}).flatMap((entry) => (Array.isArray(entry?.models) ? entry.models : []));
+  } catch { return []; }
+}
+
+// Pi's session tree (get_tree) boiled down for display: what the user said, the first words of each
+// answer, compaction points and branch summaries, with labels. Tool calls and settings changes are
+// skipped (their children move up). `active` marks the branch the session is on; `forkable` the user
+// messages Pi can branch from (get_fork_messages).
+export function summarizePiTree(roots, leafId = '', forkableIds = []) {
+  const forkable = new Set(forkableIds), parentOf = new Map();
+  const index = (node, parent) => { const id = node?.entry?.id; if (id) parentOf.set(id, parent); for (const child of node?.children || []) index(child, id); };
+  for (const root of Array.isArray(roots) ? roots : []) index(root, null);
+  const active = new Set();
+  for (let id = leafId; id; id = parentOf.get(id)) active.add(id);
+  const kindOf = (entry) => {
+    if (entry?.type === 'message' && entry.message?.role === 'user') return ['user', unwrapPrompt(blocksText(entry.message.content))];
+    if (entry?.type === 'message' && entry.message?.role === 'assistant') { const text = blocksText(entry.message.content).trim(); return text ? ['assistant', text] : null; }
+    if (entry?.type === 'compaction') return ['compaction', entry.summary || ''];
+    if (entry?.type === 'branch_summary') return ['branch', entry.summary || ''];
+    return null;
+  };
+  let count = 0;
+  const build = (node) => {
+    if (count > 600) return [];
+    const children = (node?.children || []).flatMap(build);
+    const kind = kindOf(node?.entry);
+    if (!kind) return children;
+    count += 1;
+    const id = node.entry.id;
+    return [{ id, kind: kind[0], text: clip(kind[1], kind[0] === 'user' ? 400 : 160), label: node.label || '', active: active.has(id), forkable: forkable.has(id), tokensBefore: node.entry.tokensBefore ?? null, children }];
+  };
+  return (Array.isArray(roots) ? roots : []).flatMap(build);
+}

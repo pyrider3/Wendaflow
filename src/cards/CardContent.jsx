@@ -1,4 +1,5 @@
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState } from "react";
+import { planSteps } from "../agents/plan-steps.mjs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ComicCardBar } from "../plugins/comic/ComicCardBar.jsx";
@@ -6,8 +7,35 @@ import { AgentControls } from "./AgentControls.jsx";
 import { ChangesPanel } from "./ChangesPanel.jsx";
 import { UsageLine } from "./UsageLine.jsx";
 import { ToolEvent } from "./ToolEvent.jsx";
+import { ActivityIcon } from "./ActivityIcon.jsx";
 
 const REMARK_PLUGINS = [remarkGfm];
+
+// A finished "plan first" card: the plan's steps as a checklist, so only the kept ones are carried out.
+function PlanReady({ node, tr, executePlan }) {
+  const steps = useMemo(() => planSteps(node.content), [node.content]);
+  const [skipped, setSkipped] = useState(() => new Set());
+  const kept = steps.filter((_, index) => !skipped.has(index));
+  const toggle = (index) => setSkipped((current) => { const next = new Set(current); if (next.has(index)) next.delete(index); else next.add(index); return next; });
+  return (
+    <section className="plan-ready" onPointerDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
+      <p>{tr("这是计划，还没有动手。", "This is a plan; nothing has been changed yet.")}</p>
+      {steps.length > 1 && (
+        <ol className="plan-steps">
+          {steps.map((step, index) => (
+            <li key={index} className={skipped.has(index) ? "skipped" : ""}>
+              <label><input type="checkbox" checked={!skipped.has(index)} onChange={() => toggle(index)} /><span>{step}</span></label>
+            </li>
+          ))}
+        </ol>
+      )}
+      <button disabled={steps.length > 1 && !kept.length} onClick={(event) => { event.stopPropagation(); executePlan(node, steps.length > 1 && kept.length < steps.length ? kept : null); }}>
+        {steps.length > 1 && kept.length < steps.length ? tr("执行选中的 {0} 步", "Run the {0} selected steps").replace("{0}", kept.length) : tr("按计划执行", "Run the plan")}
+      </button>
+      <small>{tr("想改计划？从这张卡片分支，告诉 Pi 怎么改。", "Want changes? Branch from this card and tell the agent what to adjust.")}</small>
+    </section>
+  );
+}
 const EMPTY_ARRAY = [];
 
 const MarkdownBody = memo(function MarkdownBody({
@@ -74,6 +102,7 @@ export function CardContent({
     setInlineEditSize,
     saveNodeEdit,
     handleContentWheel,
+    handleCardWheel,
     openActionArtifact,
     downloadActionArtifact,
     openLibraryItem,
@@ -83,6 +112,10 @@ export function CardContent({
     applyAgentChanges,
     openCompare,
     executePlan,
+    openPiHistory,
+    compactPiSession,
+    switchPiModel,
+    piModelChoices,
     steerAgent,
     stopGeneration,
     beginResize,
@@ -202,7 +235,7 @@ export function CardContent({
           </div>
         </div>
       ) : (
-        <h2 className="node-drag-title" title={view.dragHint} onWheel={handleContentWheel} hidden={view.captionless}>{ideaIsBody ? node.content : displayTitle}</h2>
+        <h2 className="node-drag-title" title={view.dragHint} onWheel={handleCardWheel} hidden={view.captionless}>{ideaIsBody ? node.content : displayTitle}</h2>
       )}
       {node.type === "conversation" &&
         ["queued", "thinking", "streaming"].includes(node.status) && (
@@ -230,7 +263,7 @@ export function CardContent({
       {!editing && (node.type === "thought" || previewContentPhase !== "hidden") && (
         <div
           className={`markdown-content preview-content-${node.type === "thought" ? "visible" : previewContentPhase}`}
-          onWheel={handleContentWheel}
+          onWheel={handleCardWheel}
         >
           {!ideaIsBody && (
             <MarkdownBody
@@ -309,9 +342,15 @@ export function CardContent({
         <ComicCardBar node={node} actions={actions} tr={tr} stopPointer={stopNonRightDown} />
       )}
       {node.type === "action" && node.status === "running" && node.actionRunner === "pi" && (
-        <AgentControls node={node} tr={tr} respondAgentApproval={respondAgentApproval} steerAgent={steerAgent} />
+        <AgentControls node={node} tr={tr} respondAgentApproval={respondAgentApproval} steerAgent={steerAgent} switchPiModel={switchPiModel} piModelChoices={piModelChoices} />
       )}
       {node.type === "action" && <UsageLine usage={node.execution?.usage} tr={tr} />}
+      {node.type === "action" && node.actionRunner === "pi" && node.execution?.sessionId && node.status !== "running" && openPiHistory && (
+        <div className="pi-card-links" onPointerDown={(event) => event.stopPropagation()}>
+          <button className="pi-history-open" onClick={(event) => { event.stopPropagation(); openPiHistory(node); }}>{tr("会话记录 · 从任意一句分岔", "Session history · branch from any message")}</button>
+          {compactPiSession && <button className="pi-history-open" title={tr("把这次会话的历史压缩成摘要，之后从这张卡片继续会更省 token", "Summarize this session's history so continuing from this card uses fewer tokens")} onClick={(event) => { event.stopPropagation(); void compactPiSession(node); }}>{tr("压缩会话", "Compact session")}</button>}
+        </div>
+      )}
       {node.type === "action" && liveEvents.length > 0 && (
         <section
           className={`action-live-feed ${activityCollapsed ? "collapsed" : ""}`}
@@ -341,21 +380,12 @@ export function CardContent({
             </button>
           </header>
           <div>
-            {liveEvents.map((event) => event.meta?.tool ? <ToolEvent key={event.id} event={event} tr={tr} /> : (
+            {liveEvents.filter((event) => event.type !== "config").map((event) => event.meta?.tool ? <ToolEvent key={event.id} event={event} tr={tr} /> : event.type === "status" ? (
+              // Progress notes ("snapshot taken", "approved"…) are quiet one-liners, not cards.
+              <p key={event.id} className="activity-status">{event.text}</p>
+            ) : (
               <article key={event.id} className={event.type}>
-                <i>
-                  {event.type === "thinking"
-                    ? tr("思", "TH")
-                    : event.type === "command"
-                      ? "›_"
-                      : event.type === "file"
-                        ? tr("文", "FI")
-                        : event.type === "message"
-                          ? tr("答", "RE")
-                          : event.type === "user"
-                            ? tr("你", "YOU")
-                            : "·"}
-                </i>
+                <ActivityIcon kind={["thinking", "message", "user", "file", "stderr", "command"].includes(event.type) ? (event.type === "command" ? "bash" : event.type) : "status"} />
                 <span>
                   <strong>
                     {event.type === "thinking"
@@ -390,79 +420,33 @@ export function CardContent({
           {tr("方案 {0} · 并排对比", "Variant {0} · compare").replace("{0}", node.variant || "")}
         </button>
       )}
-      {node.type === "action" && node.actionPlanFirst && !node.planApproved && node.status === "done" && (
-        <section className="plan-ready" onPointerDown={(event) => event.stopPropagation()}>
-          <p>{tr("这是计划，还没有动手。", "This is a plan; nothing has been changed yet.")}</p>
-          <button onClick={(event) => { event.stopPropagation(); executePlan(node); }}>{tr("按计划执行", "Run the plan")}</button>
-          <small>{tr("想改计划？从这张卡片分支，告诉 Pi 怎么改。", "Want changes? Branch from this card and tell the agent what to adjust.")}</small>
-        </section>
-      )}
+      {node.type === "action" && node.actionPlanFirst && !node.planApproved && node.status === "done" && <PlanReady node={node} tr={tr} executePlan={executePlan} />}
       {node.type === "action" && <ChangesPanel node={node} tr={tr} applyAgentChanges={applyAgentChanges} />}
-      {node.type === "action" && (
-        <section
-          className={`action-artifacts ${artifacts.length ? "" : "empty"}`}
-        >
-          <header>
-            <span>{tr("产物", "Artifacts")}</span>
-            <small>
-              {artifacts.length
-                ? `${artifacts.length} ${tr("项", "items")}`
-                : node.status === "running"
-                  ? tr("正在收集…", "Collecting…")
-                  : tr("暂无", "None")}
-            </small>
-          </header>
-          {artifacts.length > 0 && (
-            <div>
-              {artifacts.map((artifact) =>
-                artifact.href || artifact.localPath ? (
-                  <div
-                    className="artifact-item"
-                    key={artifact.id}
-                    onPointerDown={(event) => event.stopPropagation()}
-                  >
-                    <i>{artifact.image ? tr("图", "IMG") : tr("档", "FILE")}</i>
-                    <span>
-                      <strong>{artifact.name}</strong>
-                      <small>{systemText(artifact.state)}</small>
-                    </span>
-                    <button
-                      title={tr(
-                        "下载到指定位置",
-                        "Download to a selected location",
-                      )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        downloadActionArtifact(artifact);
-                      }}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      title={tr(
-                        "用系统默认程序打开",
-                        "Open with the default app",
-                      )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openActionArtifact(artifact);
-                      }}
-                    >
-                      ↗
-                    </button>
-                  </div>
-                ) : (
-                  <div key={artifact.id}>
-                    <i>{tr("文", "DOC")}</i>
-                    <span>
-                      <strong>{artifact.name}</strong>
-                      <small>{systemText(artifact.state)}</small>
-                    </span>
-                  </div>
-                ),
-              )}
-            </div>
-          )}
+      {node.type === "action" && artifacts.length > 0 && (
+        // The files this run produced or changed: what each one is, and what you can do with it.
+        <section className="action-artifacts v2" onPointerDown={(event) => event.stopPropagation()}>
+          <header><span>{tr("生成的文件", "Files from this run")}</span><small>{artifacts.length}</small></header>
+          <ul>
+            {artifacts.map((artifact) => {
+              const name = String(artifact.name || "");
+              const base = name.split(/[\\/]/).pop() || name;
+              const folder = name.slice(0, Math.max(0, name.length - base.length)).replace(/[\\/]$/, "");
+              const ext = (base.match(/\.([a-z0-9]{1,6})$/i)?.[1] || "").toLowerCase();
+              const kind = artifact.image || ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext) ? "image" : ["md", "txt", "doc", "docx", "pdf"].includes(ext) ? "doc" : ["js", "jsx", "ts", "tsx", "py", "mjs", "css", "html", "json", "sh", "go", "rs"].includes(ext) ? "code" : "file";
+              const openable = artifact.href || artifact.localPath;
+              return (
+                <li key={artifact.id} className={`artifact-row ${kind}`}>
+                  <span className="artifact-type">{ext ? ext.toUpperCase().slice(0, 4) : kind === "image" ? "IMG" : "FILE"}</span>
+                  <span className="artifact-text">
+                    <strong title={name}>{base}</strong>
+                    <small>{[systemText(artifact.state), folder].filter(Boolean).join(" · ")}</small>
+                  </span>
+                  {openable && <button className="artifact-action" onClick={(event) => { event.stopPropagation(); openActionArtifact(artifact); }}>{tr("打开", "Open")}</button>}
+                  {openable && <button className="artifact-action quiet" title={tr("另存到你选的位置", "Save a copy where you choose")} onClick={(event) => { event.stopPropagation(); downloadActionArtifact(artifact); }}>{tr("另存为", "Save as")}</button>}
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
       {["running", "queued", "thinking", "streaming"].includes(node.status) && (

@@ -1,14 +1,16 @@
 // Turns a canvas into things other people can open: Markdown outline, SVG, standalone HTML.
 // Pure functions, no DOM, so they are testable and PNG rendering can reuse the SVG.
 import { parentIdsOf } from './parents.mjs';
+import { tidyLayout } from './tidy-layout.mjs';
 
-const CARD_W = 264;
-const PAD = 14;
-const MARGIN = 48;
-const TITLE_LINE = 21;
-const BODY_LINE = 18;
-const TITLE_LINES = 2;
-const BODY_LINES = 7;
+const CARD_W = 300;
+const PAD = 16;
+const MARGIN = 56;
+const TITLE_LINE = 23;
+const BODY_LINE = 20;
+const TITLE_LINES = 3;
+const BODY_LINES = 8;
+const IMAGE_H = 170;
 
 const PALETTES = {
   light: { bg: '#f6f8f6', dot: '#d3dcd6', card: '#ffffff', border: '#c9d4cd', title: '#1d2823', body: '#51605a', muted: '#7a8780', line: '#9db0a6', accent: '#2c7a5b', ref: '#c07a3a' },
@@ -41,13 +43,48 @@ export function nodeLabel(node) {
   return plain(node.title) || plain(node.prompt) || plain(node.content).slice(0, 40) || (node.type === 'thought' ? 'Idea' : 'Untitled');
 }
 
+// Pixel size of a PNG, JPEG or WebP data URL, read from its header, so images keep their shape.
+export function imageSize(dataUrl) {
+  try {
+    const comma = dataUrl.indexOf(',');
+    const head = globalThis.atob(dataUrl.slice(comma + 1, comma + 1 + 87_384));
+    const at = (i) => head.charCodeAt(i);
+    const be16 = (i) => (at(i) << 8) | at(i + 1), le16 = (i) => at(i) | (at(i + 1) << 8), le24 = (i) => at(i) | (at(i + 1) << 8) | (at(i + 2) << 16);
+    if (head.startsWith('\x89PNG')) return { width: (be16(16) << 16) | be16(18), height: (be16(20) << 16) | be16(22) };
+    if (head.startsWith('RIFF') && head.slice(8, 12) === 'WEBP') {
+      const kind = head.slice(12, 16);
+      if (kind === 'VP8X') return { width: le24(24) + 1, height: le24(27) + 1 };
+      if (kind === 'VP8 ') return { width: le16(26) & 0x3fff, height: le16(28) & 0x3fff };
+      if (kind === 'VP8L') { const b = [at(21), at(22), at(23), at(24)]; return { width: 1 + (((b[1] & 0x3f) << 8) | b[0]), height: 1 + (((b[3] & 0xf) << 10) | (b[2] << 2) | ((b[1] & 0xc0) >> 6)) }; }
+    }
+    if (at(0) === 0xff && at(1) === 0xd8) {
+      for (let i = 2; i < head.length - 9;) {
+        if (at(i) !== 0xff) { i += 1; continue; }
+        const marker = at(i + 1), length = be16(i + 2);
+        if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { width: be16(i + 7), height: be16(i + 5) };
+        i += 2 + length;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+// Images a card carries (data URLs only, so the export stays self-contained).
+const cardImages = (node) => (Array.isArray(node.attachments) ? node.attachments : []).filter((item) => item && typeof item.dataUrl === 'string' && /^data:image\//.test(item.dataUrl)).slice(0, 2);
+
 function layoutCard(node) {
-  const label = nodeLabel(node);
-  const title = wrapText(label, CARD_W - PAD * 2, 14, TITLE_LINES);
+  const images = cardImages(node);
+  const hasText = !!(plain(node.title) || plain(node.prompt) || plain(node.content));
+  // An image-only idea is just its image: no made-up "Idea" heading.
+  const label = images.length && !hasText ? '' : nodeLabel(node);
+  const title = label ? wrapText(label, CARD_W - PAD * 2, 15, TITLE_LINES) : [];
   const text = plain(node.title) ? (node.prompt && node.type !== 'thought' ? `${plain(node.prompt)} — ${plain(node.content)}` : node.content) : node.content;
-  const body = node.type === 'thought' && !plain(node.title) ? [] : wrapText(text === label ? '' : text, CARD_W - PAD * 2, 12, BODY_LINES);
-  const height = PAD + title.length * TITLE_LINE + (body.length ? 6 + body.length * BODY_LINE : 0) + PAD - 2;
-  return { node, title, body, w: CARD_W, h: Math.max(48, height), x: Number(node.x) || 0, y: Number(node.y) || 0 };
+  const body = node.type === 'thought' && !plain(node.title) ? [] : wrapText(text === label ? '' : text, CARD_W - PAD * 2, 13, BODY_LINES);
+  const imagesTop = PAD + title.length * TITLE_LINE + (body.length ? 6 + body.length * BODY_LINE : 0) + (title.length || body.length ? 8 : 0);
+  // Each image at its own aspect ratio across the card's width (capped, so a tall screenshot stays compact).
+  const placed = images.map((image) => { const size = imageSize(image.dataUrl); const h = size && size.width ? Math.round(Math.min(360, Math.max(60, (CARD_W - PAD * 2) * size.height / size.width))) : IMAGE_H; return { ...image, h }; });
+  const height = imagesTop + placed.reduce((sum, image) => sum + image.h + 8, 0) + PAD - 2;
+  return { node, title, body, images: placed, imagesTop, w: CARD_W, h: Math.max(52, height), x: Number(node.x) || 0, y: Number(node.y) || 0 };
 }
 
 function anchorPoint(a, b) {
@@ -65,9 +102,31 @@ function curve(p, q) {
   return `M${p.x.toFixed(1)} ${p.y.toFixed(1)}C${(p.x + ax).toFixed(1)} ${(p.y + ay).toFixed(1)} ${(q.x + bx).toFixed(1)} ${(q.y + by).toFixed(1)} ${q.x.toFixed(1)} ${q.y.toFixed(1)}`;
 }
 
-export function toSVG(nodes, { theme = 'light', title = '' } = {}) {
+// tidy: lay the cards out as a clean tree (the default for exports, which are meant to be read) instead of
+// keeping where they happen to sit on the canvas.
+export function toSVG(nodes, { theme = 'light', title = '', tidy = true } = {}) {
   const p = PALETTES[theme] || PALETTES.light;
   const cards = nodes.map(layoutCard);
+  if (tidy && cards.length) {
+    const size = new Map(cards.map((c) => [c.node.id, { width: c.w, height: c.h }]));
+    const ids = new Set(cards.map((c) => c.node.id));
+    const rootOf = (node) => { let cursor = node; const seen = new Set(); while (cursor.parentId && ids.has(cursor.parentId) && !seen.has(cursor.id)) { seen.add(cursor.id); cursor = cards.find((c) => c.node.id === cursor.parentId).node; } return cursor.id; };
+    const trees = new Map();
+    for (const c of cards) { const root = rootOf(c.node); if (!trees.has(root)) trees.set(root, []); trees.get(root).push(c); }
+    const boxes = [...trees.values()].map((group) => {
+      const at = tidyLayout(group.map((c) => c.node), (node) => size.get(node.id), { left: 0, top: 0, columnGap: 90, rowGap: 22, treeGap: 60 });
+      for (const c of group) { const spot = at.get(c.node.id); c.x = spot.x; c.y = spot.y; }
+      return { group, w: Math.max(...group.map((c) => c.x + c.w)), h: Math.max(...group.map((c) => c.y + c.h)), top: Math.min(...group.map((c) => Number(c.node.y) || 0)) };
+    }).sort((a, b) => a.top - b.top);
+    const area = boxes.reduce((sum, box) => sum + (box.w + 60) * (box.h + 60), 0);
+    const targetHeight = Math.max(...boxes.map((box) => box.h), Math.sqrt(area * 0.75));
+    let colX = 0, colY = 0, colW = 0;
+    for (const box of boxes) {
+      if (colY > 0 && colY + box.h > targetHeight) { colX += colW + 80; colY = 0; colW = 0; }
+      for (const c of box.group) { c.x += colX; c.y += colY; }
+      colY += box.h + 60; colW = Math.max(colW, box.w);
+    }
+  }
   const byId = new Map(cards.map((c) => [c.node.id, c]));
   if (!cards.length) cards.push({ node: {}, title: ['Empty canvas'], body: [], w: CARD_W, h: 60, x: 0, y: 0 });
   const minX = Math.min(...cards.map((c) => c.x)) - MARGIN;
@@ -97,9 +156,11 @@ export function toSVG(nodes, { theme = 'light', title = '' } = {}) {
   }
   for (const c of cards) {
     out.push(`<g><rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="12" fill="${p.card}" stroke="${p.border}" stroke-width="1.2"/>`);
-    c.title.forEach((line, i) => out.push(`<text x="${c.x + PAD}" y="${c.y + PAD + 14 + i * TITLE_LINE}" font-size="14" font-weight="650" fill="${p.title}">${escapeXml(line)}</text>`));
+    c.title.forEach((line, i) => out.push(`<text x="${c.x + PAD}" y="${c.y + PAD + 15 + i * TITLE_LINE}" font-size="15" font-weight="650" fill="${p.title}">${escapeXml(line)}</text>`));
     const bodyTop = c.y + PAD + c.title.length * TITLE_LINE + 6;
-    c.body.forEach((line, i) => out.push(`<text x="${c.x + PAD}" y="${bodyTop + 12 + i * BODY_LINE}" font-size="12" fill="${p.body}">${escapeXml(line)}</text>`));
+    c.body.forEach((line, i) => out.push(`<text x="${c.x + PAD}" y="${bodyTop + 13 + i * BODY_LINE}" font-size="13" fill="${p.body}">${escapeXml(line)}</text>`));
+    let imageY = c.y + c.imagesTop;
+    for (const image of c.images || []) { out.push(`<image href="${escapeXml(image.dataUrl)}" x="${c.x + PAD}" y="${imageY}" width="${c.w - PAD * 2}" height="${image.h}" preserveAspectRatio="xMidYMid meet"/>`); imageY += image.h + 8; }
     out.push('</g>');
   }
   out.push('</svg>');

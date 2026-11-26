@@ -22,6 +22,15 @@ import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} f
 import {SuggestTextarea} from './components/SuggestTextarea.jsx';
 import {TaskOverview} from './components/TaskOverview.jsx';
 import {EffortSlider, ModelList, piEffortLevels, piModelGroups} from './components/ModelPanel.jsx';
+import {PiHistory} from './components/PiHistory.jsx';
+import {openJobStream} from './agents/job-stream.js';
+import {ModelMenu} from './components/ModelMenu.jsx';
+import { DEFAULT_CUSTOM_THEME, customThemeVars, normalizeCustomTheme } from './themes/custom-theme.mjs';
+// Themes that were removed, and the closest one that replaces a saved choice of them.
+const RETIRED_THEMES = { sage: 'fog', paper: 'notebook', midnight: 'obsidian', graphite: 'obsidian', starlight: 'obsidian' };
+import {ExitAnimated} from './components/useExitAnimation.js';
+const POP_EXIT = { inPlace: true, duration: 150, to: 'translateY(6px) scale(.97)' };
+import {ModelConnectionsPanel} from './components/ModelConnectionsPanel.jsx';
 import {AGENT_LABELS} from './agents/catalog.mjs';
 import {pinchViewport} from './canvas/pinch.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
@@ -29,13 +38,13 @@ import './styles.css';
 import './themes/presets.css';
 import './components/controls.css';
 import './themes/contrast-black.css';
-import './themes/starlight.css';
 import './themes/dark-controls.css';
 import './cards/thought-text.css';
 import './quick-thought/motion.css';
 import { normalizeWdf, remapNodes } from './canvas/document.mjs';
 import {createGraphIndex, updateGraphIndex} from './canvas/graph-index.mjs';
-import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,LatestFrame,advanceViewport} from './canvas/camera.mjs';
+import {tidyLayout} from './canvas/tidy-layout.mjs';
+import {viewportTransform,needsViewportSnapshot,ConnectionGeometry,connectionPath,LatestFrame,advanceViewport} from './canvas/camera.mjs';
 import {useCanvasNodes} from './canvas/useCanvasNodes.js';
 import {detachParent} from './canvas/parents.mjs';
 import {diagramPrompt,parseDiagram,applyDiagram} from './canvas/ai-diagram.mjs';
@@ -166,23 +175,22 @@ const DEFAULT_AGENT_SETTINGS = {
   deepseek: { profile: 'headless', reasoning: 'high', thinking: true },
   pi: { command: '', provider: '', model: '', thinking: '', permission: 'ask', readOnly: false, extraArgs: '', saveSession: true },
 };
-const DEFAULT_CUSTOM_THEME = { background: '#f4f6f2', surface: '#ffffff', text: '#18231d', accent: '#267c5b', grid: '#c8d4cd' };
 const UI_LANGUAGES = [
   ['zh-CN', '简体中文'], ['zh-TW', '繁體中文'], ['en', 'English'], ['ja', '日本語'], ['ko', '한국어'],
   ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['pt-BR', 'Português'], ['ru', 'Русский'], ['ar', 'العربية'],
 ];
 const UI_COPY = {
-  'zh-CN': { canvasHint: '拖动画布 · 右键框选 · Shift 多选 · Alt 拖动子树 · Delete 删除', empty: '空画布', emptyHint: '在下方输入第一句话开始', attach: '＋ 图片 / 文件', shortcut: 'Enter 发送 · Shift Enter 换行', chat: '对话', idea: '想法', action: '行动', newCanvas: '新画布 · 从零开始', rootHint: '输入一个问题，AI 将从零开始回答……', ideaHint: '记录一个不需要 AI 回答的想法……', dropChat: '松开以添加到这次对话', language: '界面语言', languageHint: '仅改变软件界面文字；卡片内容与 AI 回复不会被自动翻译。', save: '保存', saving: '保存中…', saved: '已保存', saveFailed: '保存失败', fitCanvas: '适应画布', autoLayout: '自动整理', minimap: '小地图', focusPath: '专注路径', allCanvases: '所有画布', search: '搜索', library: '资料库', settings: '设置', localArchives: '本地 WDF 存档', savedCanvases: '已保存的画布', importWdf: '导入 WDF', createCanvas: '创建新画布', createCanvasHint: '从一个空白输入框开始', appearance: '外观', appearanceHint: '选择适合环境的界面，画布内容不会改变。', modelConnections: '模型连接', modelConnectionsHint: '本地与云端 API', projectData: '项目数据', projectDataHint: '导入与导出', themeDisplay: '主题与显示', interfaceTheme: '界面主题', interfaceThemeHint: '基础主题与高对比度主题，后者优先保证读写清晰。', preview: '缩放预览', previewHint: '缩小画布时仅显示标题；关闭后卡片始终保持完整内容。', enabled: '已开启', disabled: '已关闭', customTheme: '自定义', customThemeHint: '颜色会立即应用，并保存在当前设备。', restoreColors: '恢复默认颜色', currentNode: '当前节点', selectedNodes: '个节点已选择', overview: '概览', context: '上下文', operations: '操作', manualInput: '手动输入', nodeActions: '节点操作', editNode: '编辑节点', retryModel: '换模型重试', searchPlaceholder: '搜索标题、问题、回答或模型…', noResults: '没有匹配的节点', results: '项结果', currentCanvas: '当前画布', uploadCurrent: '＋ 上传到当前输入', libraryEmpty: '还没有文件。可以在此上传，或从任意输入框添加文件。', navigate: '导航', close: '关闭' },
-  'zh-TW': { canvasHint: '拖曳畫布 · 右鍵框選 · Shift 多選 · Alt 拖曳子樹 · Delete 刪除', empty: '空白畫布', emptyHint: '在下方輸入第一句話開始', attach: '＋ 圖片 / 檔案', shortcut: 'Enter 傳送 · Shift Enter 換行', chat: '對話', idea: '想法', action: '行動', newCanvas: '新畫布 · 從零開始', rootHint: '輸入問題，AI 將從零開始回答……', ideaHint: '記錄一個不需要 AI 回答的想法……', dropChat: '放開即可加入這次對話', language: '介面語言', languageHint: '僅變更軟體介面文字；卡片內容與 AI 回覆不會自動翻譯。' },
-  en: { canvasHint: 'Drag canvas · Right-drag to select · Shift multi-select · Alt drag subtree · Delete', empty: 'Empty canvas', emptyHint: 'Start with your first message below', attach: '＋ Image / File', shortcut: 'Enter to send · Shift Enter for newline', chat: 'Chat', idea: 'Idea', action: 'Action', newCanvas: 'New canvas · Start from scratch', rootHint: 'Ask a question and let AI answer from scratch…', ideaHint: 'Capture an idea without an AI reply…', dropChat: 'Release to add to this conversation', language: 'Interface language', languageHint: 'Changes app controls only. Cards and AI responses are not translated.', save: 'Save', saving: 'Saving…', saved: 'Saved', saveFailed: 'Save failed', fitCanvas: 'Fit canvas', autoLayout: 'Auto arrange', minimap: 'Minimap', focusPath: 'Focus path', allCanvases: 'All canvases', search: 'Search', library: 'Library', settings: 'Settings', localArchives: 'Local WDF archives', savedCanvases: 'Saved canvases', importWdf: 'Import WDF', createCanvas: 'Create canvas', createCanvasHint: 'Start with an empty composer', appearance: 'Appearance', appearanceHint: 'Choose an interface for your environment. Canvas content will not change.', modelConnections: 'Model connections', modelConnectionsHint: 'Local and cloud APIs', projectData: 'Project data', projectDataHint: 'Import and export', themeDisplay: 'Theme and display', interfaceTheme: 'Interface theme', interfaceThemeHint: 'Standard and high-contrast themes for clear reading and writing.', preview: 'Zoom preview', previewHint: 'Show only titles when zoomed out. Turn this off to keep full card content at every zoom level.', enabled: 'On', disabled: 'Off', customTheme: 'Custom theme', customThemeHint: 'Colors apply instantly and are saved in this browser.', restoreColors: 'Restore default colors', currentNode: 'Current node', selectedNodes: 'nodes selected', overview: 'Overview', context: 'Context', operations: 'Actions', manualInput: 'Manual input', nodeActions: 'Node actions', editNode: 'Edit node', retryModel: 'Retry with another model', searchPlaceholder: 'Search titles, questions, answers, or models…', noResults: 'No matching nodes', results: 'results', currentCanvas: 'Current canvas', uploadCurrent: '＋ Upload to current input', libraryEmpty: 'No files yet. Upload here or add files from any composer.', navigate: 'Navigate', close: 'Close' },
-  ja: { canvasHint: 'キャンバスをドラッグ · 右ドラッグで選択 · Shift 複数選択 · Alt で子ツリー移動 · Delete 削除', empty: '空のキャンバス', emptyHint: '下の入力欄から最初のメッセージを始めましょう', attach: '＋ 画像 / ファイル', shortcut: 'Enter 送信 · Shift Enter 改行', chat: '会話', idea: 'アイデア', action: '実行', newCanvas: '新しいキャンバス · ゼロから開始', rootHint: '質問を入力すると、AI がゼロから回答します…', ideaHint: 'AI の回答が不要なアイデアを記録…', dropChat: '離すとこの会話に追加されます', language: '表示言語', languageHint: 'アプリの操作表示のみ変更します。カードと AI の回答は翻訳されません。' },
-  ko: { canvasHint: '캔버스 드래그 · 오른쪽 드래그로 선택 · Shift 다중 선택 · Alt 하위 트리 이동 · Delete 삭제', empty: '빈 캔버스', emptyHint: '아래 입력창에서 첫 메시지를 시작하세요', attach: '＋ 이미지 / 파일', shortcut: 'Enter 전송 · Shift Enter 줄바꿈', chat: '대화', idea: '아이디어', action: '실행', newCanvas: '새 캔버스 · 처음부터 시작', rootHint: '질문을 입력하면 AI가 처음부터 답변합니다…', ideaHint: 'AI 답변이 필요 없는 아이디어를 기록하세요…', dropChat: '놓으면 이 대화에 추가됩니다', language: '인터페이스 언어', languageHint: '앱 조작 문구만 변경됩니다. 카드와 AI 응답은 번역되지 않습니다.' },
-  es: { canvasHint: 'Arrastra el lienzo · Botón derecho para seleccionar · Shift múltiple · Alt mueve subárbol · Supr eliminar', empty: 'Lienzo vacío', emptyHint: 'Empieza con tu primer mensaje abajo', attach: '＋ Imagen / Archivo', shortcut: 'Enter para enviar · Shift Enter para nueva línea', chat: 'Chat', idea: 'Idea', action: 'Acción', newCanvas: 'Nuevo lienzo · Empezar desde cero', rootHint: 'Escribe una pregunta y la IA responderá desde cero…', ideaHint: 'Guarda una idea sin respuesta de IA…', dropChat: 'Suelta para añadir a esta conversación', language: 'Idioma de la interfaz', languageHint: 'Solo cambia la interfaz. Las tarjetas y respuestas de IA no se traducen.' },
-  fr: { canvasHint: 'Glisser le canevas · Clic droit pour sélectionner · Shift multiple · Alt déplace la branche · Suppr supprimer', empty: 'Canevas vide', emptyHint: 'Commencez avec votre premier message ci-dessous', attach: '＋ Image / Fichier', shortcut: 'Entrée pour envoyer · Maj Entrée pour nouvelle ligne', chat: 'Discussion', idea: 'Idée', action: 'Action', newCanvas: 'Nouveau canevas · Commencer de zéro', rootHint: 'Posez une question et l’IA répondra depuis zéro…', ideaHint: 'Notez une idée sans réponse de l’IA…', dropChat: 'Déposez pour ajouter à cette discussion', language: 'Langue de l’interface', languageHint: 'Change seulement l’interface. Les cartes et réponses IA ne sont pas traduites.' },
-  de: { canvasHint: 'Leinwand ziehen · Rechts ziehen zum Auswählen · Shift Mehrfachauswahl · Alt Unterbaum bewegen · Entf löschen', empty: 'Leere Leinwand', emptyHint: 'Beginne unten mit deiner ersten Nachricht', attach: '＋ Bild / Datei', shortcut: 'Enter zum Senden · Shift Enter für Zeilenumbruch', chat: 'Chat', idea: 'Idee', action: 'Aktion', newCanvas: 'Neue Leinwand · Von vorn beginnen', rootHint: 'Stelle eine Frage, die KI antwortet von Grund auf…', ideaHint: 'Eine Idee ohne KI-Antwort festhalten…', dropChat: 'Loslassen, um zur Unterhaltung hinzuzufügen', language: 'Oberflächensprache', languageHint: 'Ändert nur die Bedienoberfläche. Karten und KI-Antworten werden nicht übersetzt.' },
-  'pt-BR': { canvasHint: 'Arraste a tela · Botão direito para selecionar · Shift múltiplo · Alt move a subárvore · Delete excluir', empty: 'Tela vazia', emptyHint: 'Comece com sua primeira mensagem abaixo', attach: '＋ Imagem / Arquivo', shortcut: 'Enter para enviar · Shift Enter para nova linha', chat: 'Conversa', idea: 'Ideia', action: 'Ação', newCanvas: 'Nova tela · Começar do zero', rootHint: 'Digite uma pergunta e a IA responderá do zero…', ideaHint: 'Registre uma ideia sem resposta da IA…', dropChat: 'Solte para adicionar a esta conversa', language: 'Idioma da interface', languageHint: 'Altera apenas a interface. Cartões e respostas da IA não são traduzidos.' },
-  ru: { canvasHint: 'Перетаскивание холста · Правая кнопка для выбора · Shift множественный выбор · Alt переместить ветвь · Delete удалить', empty: 'Пустой холст', emptyHint: 'Начните с первого сообщения ниже', attach: '＋ Изображение / файл', shortcut: 'Enter — отправить · Shift Enter — новая строка', chat: 'Диалог', idea: 'Идея', action: 'Действие', newCanvas: 'Новый холст · Начать с нуля', rootHint: 'Задайте вопрос, и ИИ ответит с нуля…', ideaHint: 'Запишите идею без ответа ИИ…', dropChat: 'Отпустите, чтобы добавить к этому диалогу', language: 'Язык интерфейса', languageHint: 'Меняет только интерфейс. Карточки и ответы ИИ не переводятся.' },
-  ar: { canvasHint: 'اسحب اللوحة · زر الفأرة الأيمن للتحديد · Shift لتحديد متعدد · Alt لتحريك الفرع · Delete للحذف', empty: 'لوحة فارغة', emptyHint: 'ابدأ برسالتك الأولى في الأسفل', attach: '＋ صورة / ملف', shortcut: 'Enter للإرسال · Shift Enter لسطر جديد', chat: 'محادثة', idea: 'فكرة', action: 'إجراء', newCanvas: 'لوحة جديدة · ابدأ من الصفر', rootHint: 'اكتب سؤالاً وسيجيب الذكاء الاصطناعي من الصفر…', ideaHint: 'سجّل فكرة لا تحتاج إلى رد من الذكاء الاصطناعي…', dropChat: 'أفلت للإضافة إلى هذه المحادثة', language: 'لغة الواجهة', languageHint: 'يغيّر واجهة التطبيق فقط. لا تُترجم البطاقات وردود الذكاء الاصطناعي.' },
+  'zh-CN': { canvasHint: '拖动画布 · 右键框选 · Shift / Ctrl 多选 · Alt 拖动子树 · Delete 删除', empty: '空画布', emptyHint: '在下方输入第一句话开始', attach: '＋ 图片 / 文件', shortcut: 'Enter 发送 · Shift Enter 换行', chat: '对话', idea: '想法', action: '行动', newCanvas: '新画布 · 从零开始', rootHint: '输入一个问题，AI 将从零开始回答……', ideaHint: '记录一个不需要 AI 回答的想法……', dropChat: '松开以添加到这次对话', language: '界面语言', languageHint: '仅改变软件界面文字；卡片内容与 AI 回复不会被自动翻译。', save: '保存', saving: '保存中…', saved: '已保存', saveFailed: '保存失败', fitCanvas: '适应画布', autoLayout: '自动整理', minimap: '小地图', focusPath: '专注路径', allCanvases: '所有画布', search: '搜索', library: '资料库', settings: '设置', localArchives: '本地 WDF 存档', savedCanvases: '已保存的画布', importWdf: '导入 WDF', createCanvas: '创建新画布', createCanvasHint: '从一个空白输入框开始', appearance: '外观', appearanceHint: '选择适合环境的界面，画布内容不会改变。', modelConnections: '模型连接', modelConnectionsHint: '本地与云端 API', projectData: '项目数据', projectDataHint: '导入与导出', themeDisplay: '主题与显示', interfaceTheme: '界面主题', interfaceThemeHint: '基础主题与高对比度主题，后者优先保证读写清晰。', preview: '缩放预览', previewHint: '缩小画布时仅显示标题；关闭后卡片始终保持完整内容。', enabled: '已开启', disabled: '已关闭', customTheme: '自定义', customThemeHint: '颜色会立即应用，并保存在当前设备。', restoreColors: '恢复默认颜色', currentNode: '当前节点', selectedNodes: '个节点已选择', overview: '概览', context: '上下文', operations: '操作', manualInput: '手动输入', nodeActions: '节点操作', editNode: '编辑节点', retryModel: '换模型重试', searchPlaceholder: '搜索标题、问题、回答或模型…', noResults: '没有匹配的节点', results: '项结果', currentCanvas: '当前画布', uploadCurrent: '＋ 上传到当前输入', libraryEmpty: '还没有文件。可以在此上传，或从任意输入框添加文件。', navigate: '导航', close: '关闭' },
+  'zh-TW': { canvasHint: '拖曳畫布 · 右鍵框選 · Shift / Ctrl 多選 · Alt 拖曳子樹 · Delete 刪除', empty: '空白畫布', emptyHint: '在下方輸入第一句話開始', attach: '＋ 圖片 / 檔案', shortcut: 'Enter 傳送 · Shift Enter 換行', chat: '對話', idea: '想法', action: '行動', newCanvas: '新畫布 · 從零開始', rootHint: '輸入問題，AI 將從零開始回答……', ideaHint: '記錄一個不需要 AI 回答的想法……', dropChat: '放開即可加入這次對話', language: '介面語言', languageHint: '僅變更軟體介面文字；卡片內容與 AI 回覆不會自動翻譯。' },
+  en: { canvasHint: 'Drag canvas · Right-drag to select · Shift / Ctrl multi-select · Alt drag subtree · Delete', empty: 'Empty canvas', emptyHint: 'Start with your first message below', attach: '＋ Image / File', shortcut: 'Enter to send · Shift Enter for newline', chat: 'Chat', idea: 'Idea', action: 'Action', newCanvas: 'New canvas · Start from scratch', rootHint: 'Ask a question and let AI answer from scratch…', ideaHint: 'Capture an idea without an AI reply…', dropChat: 'Release to add to this conversation', language: 'Interface language', languageHint: 'Changes app controls only. Cards and AI responses are not translated.', save: 'Save', saving: 'Saving…', saved: 'Saved', saveFailed: 'Save failed', fitCanvas: 'Fit canvas', autoLayout: 'Auto arrange', minimap: 'Minimap', focusPath: 'Focus path', allCanvases: 'All canvases', search: 'Search', library: 'Library', settings: 'Settings', localArchives: 'Local WDF archives', savedCanvases: 'Saved canvases', importWdf: 'Import WDF', createCanvas: 'Create canvas', createCanvasHint: 'Start with an empty composer', appearance: 'Appearance', appearanceHint: 'Choose an interface for your environment. Canvas content will not change.', modelConnections: 'Model connections', modelConnectionsHint: 'Local and cloud APIs', projectData: 'Project data', projectDataHint: 'Import and export', themeDisplay: 'Theme and display', interfaceTheme: 'Interface theme', interfaceThemeHint: 'Standard and high-contrast themes for clear reading and writing.', preview: 'Zoom preview', previewHint: 'Show only titles when zoomed out. Turn this off to keep full card content at every zoom level.', enabled: 'On', disabled: 'Off', customTheme: 'Custom theme', customThemeHint: 'Colors apply instantly and are saved in this browser.', restoreColors: 'Restore default colors', currentNode: 'Current node', selectedNodes: 'nodes selected', overview: 'Overview', context: 'Context', operations: 'Actions', manualInput: 'Manual input', nodeActions: 'Node actions', editNode: 'Edit node', retryModel: 'Retry with another model', searchPlaceholder: 'Search titles, questions, answers, or models…', noResults: 'No matching nodes', results: 'results', currentCanvas: 'Current canvas', uploadCurrent: '＋ Upload to current input', libraryEmpty: 'No files yet. Upload here or add files from any composer.', navigate: 'Navigate', close: 'Close' },
+  ja: { canvasHint: 'キャンバスをドラッグ · 右ドラッグで選択 · Shift / Ctrl 複数選択 · Alt で子ツリー移動 · Delete 削除', empty: '空のキャンバス', emptyHint: '下の入力欄から最初のメッセージを始めましょう', attach: '＋ 画像 / ファイル', shortcut: 'Enter 送信 · Shift Enter 改行', chat: '会話', idea: 'アイデア', action: '実行', newCanvas: '新しいキャンバス · ゼロから開始', rootHint: '質問を入力すると、AI がゼロから回答します…', ideaHint: 'AI の回答が不要なアイデアを記録…', dropChat: '離すとこの会話に追加されます', language: '表示言語', languageHint: 'アプリの操作表示のみ変更します。カードと AI の回答は翻訳されません。' },
+  ko: { canvasHint: '캔버스 드래그 · 오른쪽 드래그로 선택 · Shift / Ctrl 다중 선택 · Alt 하위 트리 이동 · Delete 삭제', empty: '빈 캔버스', emptyHint: '아래 입력창에서 첫 메시지를 시작하세요', attach: '＋ 이미지 / 파일', shortcut: 'Enter 전송 · Shift Enter 줄바꿈', chat: '대화', idea: '아이디어', action: '실행', newCanvas: '새 캔버스 · 처음부터 시작', rootHint: '질문을 입력하면 AI가 처음부터 답변합니다…', ideaHint: 'AI 답변이 필요 없는 아이디어를 기록하세요…', dropChat: '놓으면 이 대화에 추가됩니다', language: '인터페이스 언어', languageHint: '앱 조작 문구만 변경됩니다. 카드와 AI 응답은 번역되지 않습니다.' },
+  es: { canvasHint: 'Arrastra el lienzo · Botón derecho para seleccionar · Shift / Ctrl múltiple · Alt mueve subárbol · Supr eliminar', empty: 'Lienzo vacío', emptyHint: 'Empieza con tu primer mensaje abajo', attach: '＋ Imagen / Archivo', shortcut: 'Enter para enviar · Shift Enter para nueva línea', chat: 'Chat', idea: 'Idea', action: 'Acción', newCanvas: 'Nuevo lienzo · Empezar desde cero', rootHint: 'Escribe una pregunta y la IA responderá desde cero…', ideaHint: 'Guarda una idea sin respuesta de IA…', dropChat: 'Suelta para añadir a esta conversación', language: 'Idioma de la interfaz', languageHint: 'Solo cambia la interfaz. Las tarjetas y respuestas de IA no se traducen.' },
+  fr: { canvasHint: 'Glisser le canevas · Clic droit pour sélectionner · Shift / Ctrl multiple · Alt déplace la branche · Suppr supprimer', empty: 'Canevas vide', emptyHint: 'Commencez avec votre premier message ci-dessous', attach: '＋ Image / Fichier', shortcut: 'Entrée pour envoyer · Maj Entrée pour nouvelle ligne', chat: 'Discussion', idea: 'Idée', action: 'Action', newCanvas: 'Nouveau canevas · Commencer de zéro', rootHint: 'Posez une question et l’IA répondra depuis zéro…', ideaHint: 'Notez une idée sans réponse de l’IA…', dropChat: 'Déposez pour ajouter à cette discussion', language: 'Langue de l’interface', languageHint: 'Change seulement l’interface. Les cartes et réponses IA ne sont pas traduites.' },
+  de: { canvasHint: 'Leinwand ziehen · Rechts ziehen zum Auswählen · Shift / Ctrl Mehrfachauswahl · Alt Unterbaum bewegen · Entf löschen', empty: 'Leere Leinwand', emptyHint: 'Beginne unten mit deiner ersten Nachricht', attach: '＋ Bild / Datei', shortcut: 'Enter zum Senden · Shift Enter für Zeilenumbruch', chat: 'Chat', idea: 'Idee', action: 'Aktion', newCanvas: 'Neue Leinwand · Von vorn beginnen', rootHint: 'Stelle eine Frage, die KI antwortet von Grund auf…', ideaHint: 'Eine Idee ohne KI-Antwort festhalten…', dropChat: 'Loslassen, um zur Unterhaltung hinzuzufügen', language: 'Oberflächensprache', languageHint: 'Ändert nur die Bedienoberfläche. Karten und KI-Antworten werden nicht übersetzt.' },
+  'pt-BR': { canvasHint: 'Arraste a tela · Botão direito para selecionar · Shift / Ctrl múltiplo · Alt move a subárvore · Delete excluir', empty: 'Tela vazia', emptyHint: 'Comece com sua primeira mensagem abaixo', attach: '＋ Imagem / Arquivo', shortcut: 'Enter para enviar · Shift Enter para nova linha', chat: 'Conversa', idea: 'Ideia', action: 'Ação', newCanvas: 'Nova tela · Começar do zero', rootHint: 'Digite uma pergunta e a IA responderá do zero…', ideaHint: 'Registre uma ideia sem resposta da IA…', dropChat: 'Solte para adicionar a esta conversa', language: 'Idioma da interface', languageHint: 'Altera apenas a interface. Cartões e respostas da IA não são traduzidos.' },
+  ru: { canvasHint: 'Перетаскивание холста · Правая кнопка для выбора · Shift / Ctrl множественный выбор · Alt переместить ветвь · Delete удалить', empty: 'Пустой холст', emptyHint: 'Начните с первого сообщения ниже', attach: '＋ Изображение / файл', shortcut: 'Enter — отправить · Shift Enter — новая строка', chat: 'Диалог', idea: 'Идея', action: 'Действие', newCanvas: 'Новый холст · Начать с нуля', rootHint: 'Задайте вопрос, и ИИ ответит с нуля…', ideaHint: 'Запишите идею без ответа ИИ…', dropChat: 'Отпустите, чтобы добавить к этому диалогу', language: 'Язык интерфейса', languageHint: 'Меняет только интерфейс. Карточки и ответы ИИ не переводятся.' },
+  ar: { canvasHint: 'اسحب اللوحة · زر الفأرة الأيمن للتحديد · Shift / Ctrl لتحديد متعدد · Alt لتحريك الفرع · Delete للحذف', empty: 'لوحة فارغة', emptyHint: 'ابدأ برسالتك الأولى في الأسفل', attach: '＋ صورة / ملف', shortcut: 'Enter للإرسال · Shift Enter لسطر جديد', chat: 'محادثة', idea: 'فكرة', action: 'إجراء', newCanvas: 'لوحة جديدة · ابدأ من الصفر', rootHint: 'اكتب سؤالاً وسيجيب الذكاء الاصطناعي من الصفر…', ideaHint: 'سجّل فكرة لا تحتاج إلى رد من الذكاء الاصطناعي…', dropChat: 'أفلت للإضافة إلى هذه المحادثة', language: 'لغة الواجهة', languageHint: 'يغيّر واجهة التطبيق فقط. لا تُترجم البطاقات وردود الذكاء الاصطناعي.' },
 };
 const NODE_COLORS = [
   ['default', '默认', ''], ['sage', '雾青', '#edf7f1'], ['amber', '琥珀', '#fff4dc'],
@@ -250,7 +258,7 @@ function loadCanvasBoot() {
   const now = new Date().toISOString();
   try {
     const saved=JSON.parse(localStorage.getItem(CANVAS_INDEX_KEY));
-    if(Array.isArray(saved?.canvases)) {
+    if(Array.isArray(saved?.canvases) && saved.canvases.length) {
       let policy={};try{policy=JSON.parse(localStorage.getItem('wendaflow-autosave-v1')||'{}');}catch{}
       const index=durableCanvasIndex(saved.canvases,saved.activeId,policy);
       return {canvases:index.canvases.map(canvas=>({...canvas,createdAt:canvas.createdAt||now,updatedAt:canvas.updatedAt||canvas.createdAt||now})),activeId:index.activeId};
@@ -392,7 +400,7 @@ function App() {
   const workspaceBusyRef=useRef(false);
   const [canvasSummaries,setCanvasSummaries]=useState({});
   const [activeCanvasId, setActiveCanvasId] = useState(canvasBoot.activeId);
-  const [canvasMenuOpen, setCanvasMenuOpen] = useState(()=>!localStorage.getItem(CANVAS_INDEX_KEY)||workspaceMeta.openTabs.length===0||Boolean(workspaceMeta.cards[canvasBoot.activeId]?.trashedAt));
+  const [canvasMenuOpen, setCanvasMenuOpen] = useState(()=>canvasBoot.canvases.some(canvas=>!canvas.temporary)&&(workspaceMeta.openTabs.length===0||Boolean(workspaceMeta.cards[canvasBoot.activeId]?.trashedAt)));
   const [closingPanels, setClosingPanels] = useState(new Set());
   const [editingCanvasId, setEditingCanvasId] = useState(null);
   const [saveStatus, setSaveStatus] = useState('');
@@ -422,7 +430,7 @@ function App() {
   const say=(zh,en)=>uiLanguage.startsWith('zh')?zh:en;
   const [canvasLibraryStatus, setCanvasLibraryStatus] = useState('');
   const [canvasTransition, setCanvasTransition] = useState('');
-  const [theme, setTheme] = useState(() => { const saved = localStorage.getItem('wonderful-theme'); return !saved || /^(contrast-(blue|amber|plum)|slate)$/.test(saved) ? (saved ? 'obsidian' : 'contrast-light') : saved; });
+  const [theme, setTheme] = useState(() => { const saved = localStorage.getItem('wonderful-theme'); return !saved ? 'contrast-light' : RETIRED_THEMES[saved] || (/^(contrast-(blue|amber|plum)|slate)$/.test(saved) ? 'obsidian' : saved); });
   const [uiLanguage, setUiLanguage] = useState(readUiLanguage);
   const [quickThought, setQuickThought] = useState(()=>localStorage.getItem('wendaflow-quick-thought')==='1');
   const [quickEditor,setQuickEditor]=useState(null);
@@ -457,11 +465,12 @@ function App() {
   // staged rich-content experiment, and can be disabled completely.
   const [previewEnabled, setPreviewEnabled] = useState(() => localStorage.getItem('wonderful-preview-enabled') === 'true');
   const [customTheme, setCustomTheme] = useState(() => {
-    try { return { ...DEFAULT_CUSTOM_THEME, ...JSON.parse(localStorage.getItem('wonderful-custom-theme') || '{}') }; }
+    try { return normalizeCustomTheme(JSON.parse(localStorage.getItem('wonderful-custom-theme') || '{}')); }
     catch { return DEFAULT_CUSTOM_THEME; }
   });
   const [enabledAgents, setEnabledAgents] = useState(() => {
-    try { const saved = JSON.parse(localStorage.getItem('wendaflow-enabled-agents')); return Array.isArray(saved) ? saved.filter((id) => AGENT_LABELS[id]) : []; } catch { return []; }
+    // Pi ships with Wendaflow and is always on; the other agents are opt-in from Settings → Agents.
+    try { const saved = JSON.parse(localStorage.getItem('wendaflow-enabled-agents')); return ['pi', ...(Array.isArray(saved) ? saved.filter((id) => AGENT_LABELS[id] && id !== 'pi') : [])]; } catch { return ['pi']; }
   });
   const [agentDetection, setAgentDetection] = useState(null);
   const [piInfo, setPiInfo] = useState(null);
@@ -500,6 +509,17 @@ function App() {
   const [projectInstructions, setProjectInstructions] = useState([]);
   const [piImportOpen, setPiImportOpen] = useState(false);
   const [planFirst, setPlanFirst] = useState(false);
+  // Per-run Pi choices from the composer's "More" panel. Resources stick between runs; compacting is one-shot.
+  const [piResources_run, setPiResourcesRun] = useState(() => { try { return { skills: true, extensions: true, mcp: true, contextFiles: true, ...JSON.parse(localStorage.getItem('wendaflow-pi-run-resources') || '{}') }; } catch { return { skills: true, extensions: true, mcp: true, contextFiles: true }; } });
+  const [piCompactFirst, setPiCompactFirst] = useState(false);
+  // Session history of a Pi card, and a branch that rewinds that session to just before one of its messages.
+  const [piHistoryNode, setPiHistoryNode] = useState(null);
+  const [pendingPiFork, setPendingPiFork] = useState(null);
+  const [closingPop, setClosingPop] = useState(null);
+  const lastPopRef = useRef(null);
+  const [favoriteModels, setFavoriteModels] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('wendaflow-favorite-models') || '[]'); return new Set(Array.isArray(saved) ? saved : []); } catch { return new Set(); } });
+  const toggleFavoriteModel = (value) => setFavoriteModels((current) => { const next = new Set(current); if (next.has(value)) next.delete(value); else next.add(value); try { localStorage.setItem('wendaflow-favorite-models', JSON.stringify([...next])); } catch {} return next; });
+  const [isolateRun, setIsolateRun] = useState(false);
   function resetCompare() { setCompareMode(false); setVariantB(null); setActiveVariant('A'); setPlanFirst(false); }
   function toggleCompare() {
     if (compareMode) { resetCompare(); return; }
@@ -588,7 +608,13 @@ function App() {
   const canvasFileDragDepthRef = useRef(0);
   const [composerFileDragActive, setComposerFileDragActive] = useState(false);
   const composerFileDragDepthRef = useRef(0);
-  const [model, setModel] = useState(() => `cloud:${cloudProfiles[0].id}`);
+  // The model conversations start with; any model can be made the default from the model menu.
+  const [defaultChatModel, setDefaultChatModel] = useState(() => { try { return localStorage.getItem('wendaflow-default-chat-model') || ''; } catch { return ''; } });
+  const [model, setModel] = useState(() => { const saved = (() => { try { return localStorage.getItem('wendaflow-default-chat-model') || ''; } catch { return ''; } })(); const known = saved.startsWith('cloud:') ? cloudProfiles.some((p) => `cloud:${p.id}` === saved) : saved.startsWith('local:') ? localProfiles.some((p) => `local:${p.id}` === saved) : false; return known ? saved : `cloud:${cloudProfiles[0].id}`; });
+  const makeDefaultChatModel = (value) => { setDefaultChatModel(value); try { localStorage.setItem('wendaflow-default-chat-model', value); } catch {} };
+  // Each Pi model keeps the thinking level last chosen with it.
+  const [piThinkingByModel, setPiThinkingByModel] = useState(() => { try { return JSON.parse(localStorage.getItem('wendaflow-pi-thinking-by-model') || '{}') || {}; } catch { return {}; } });
+  const rememberPiThinking = (modelValue, level) => { if (!modelValue) return; setPiThinkingByModel((current) => { const next = { ...current, [modelValue]: level }; try { localStorage.setItem('wendaflow-pi-thinking-by-model', JSON.stringify(next)); } catch {} return next; }); };
   const [nodeType, setNodeType] = useState(quickThought ? 'thought' : 'conversation');
   const [drawBusy, setDrawBusy] = useState(false);
   const drawAbortRef = useRef(null);
@@ -663,6 +689,22 @@ function App() {
   useEffect(()=>{if(!feedback)return;const timer=setTimeout(()=>setFeedback(null),2400);return()=>clearTimeout(timer);},[feedback]);
   function notify(message){setFeedback({message,key:Date.now()});}
   const [parallelMode, setParallelMode] = useState(false);
+  const [parallelMenuOpen, setParallelMenuOpen] = useState(false);
+  useEffect(() => {
+    let frame = 0, last = null;
+    const paint = () => { frame = 0; if (!last) return; const { el, x, y } = last; el.style.setProperty('--glow-x', `${x}px`); el.style.setProperty('--glow-y', `${y}px`); };
+    const move = (event) => {
+      const el = event.target instanceof Element ? event.target.closest('.composer') : null;
+      document.querySelectorAll('.composer.glowing').forEach((item) => { if (item !== el) item.classList.remove('glowing'); });
+      if (!el) { last = null; return; }
+      const rect = el.getBoundingClientRect();
+      el.classList.add('glowing');
+      last = { el, x: event.clientX - rect.left, y: event.clientY - rect.top };
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+    window.addEventListener('pointermove', move, { passive: true });
+    return () => { window.removeEventListener('pointermove', move); if (frame) cancelAnimationFrame(frame); };
+  }, []);
   const [parallelModels, setParallelModels] = useState(new Set());
   const [minimapOpen, setMinimapOpen] = useState(() => localStorage.getItem('branchspace-minimap') === 'true');
   const canvasRef = useRef(null);
@@ -785,6 +827,12 @@ function App() {
   const activeCloud = cloudProfiles.find((profile) => profile.id === activeCloudId) || cloudProfiles[0] || DEFAULT_CLOUD;
   const activeCanvas = canvases.find((canvas) => canvas.id === activeCanvasId) || canvases[0];
   const workspaceItems=useMemo(()=>listLibraryCanvases(canvases,workspaceMeta),[canvases,workspaceMeta]);
+  useEffect(()=>{if(canvasMenuOpen&&!PUBLIC_WEB)void refreshSavedCanvases();},[canvasMenuOpen]);
+  const pickerItems=useMemo(()=>{
+    const known=new Set(canvases.map(canvas=>canvas.id));
+    const fromBackend=savedCanvases.filter(canvas=>canvas.id&&!known.has(canvas.id)).map(canvas=>({id:canvas.id,name:canvas.name||'Untitled',createdAt:canvas.createdAt,updatedAt:canvas.updatedAt,lastOpenedAt:canvas.updatedAt,fromBackend:true}));
+    return fromBackend.length?[...workspaceItems,...fromBackend]:workspaceItems;
+  },[workspaceItems,savedCanvases,canvases]);
   const workspaceTabs=workspaceMeta.openTabs.map(id=>canvases.find(c=>c.id===id)).filter(c=>c&&!workspaceMeta.cards[c.id]?.trashedAt);
   const headerCanvases=workspaceTabs;
   useEffect(()=>{
@@ -800,7 +848,7 @@ function App() {
     void (async()=>{
       for(const canvas of canvases){
         let unreadable=false;
-        const state=canvas.id===activeCanvasId&&canvasHydratedRef.current?{nodes:currentNodes()}:(canvasDraftsRef.current.get(canvas.id)||await readCanvasState(canvas.id).catch(()=>{unreadable=true;return null;}))||(canvas.id===activeCanvasId?{nodes:currentNodes()}:null);
+        const state=canvas.id===activeCanvasId&&canvasHydratedRef.current?{nodes:currentNodes()}:(canvasDraftsRef.current.get(canvas.id)||await Promise.race([readCanvasState(canvas.id),new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),1500))]).catch(()=>{unreadable=true;return null;}))||(canvas.id===activeCanvasId?{nodes:currentNodes()}:null);
         const summary=!state&&!unreadable&&autosavePolicyRef.current[canvas.id]!==true?{...summarizeCanvas({nodes:[]}),unsaved:true}:summarizeCanvas(state);
         if(cancelled)return;setCanvasSummaries(prev=>({...prev,[canvas.id]:summary}));
       }
@@ -834,6 +882,24 @@ function App() {
   const ollama = localProfiles.find((profile) => profile.id === activeLocalId) || localProfiles[0] || DEFAULT_OLLAMA;
   const selectedCloud = model.startsWith('cloud:') ? cloudProfiles.find((profile) => profile.id === model.slice(6)) : null;
   const selectedLocal = model.startsWith('local:') ? localProfiles.find((profile) => profile.id === model.slice(6)) : ollama;
+  // Pi runs with the model connections set up here, so a new user's action cards work without
+  // configuring Pi separately. The backend keeps them in memory only, so send them on every change.
+  // Also sent with every Pi run, so a restarted backend has them again without a page reload.
+  const piProviderPayload = useMemo(() => ({
+    profiles: [...cloudProfiles, ...localProfiles.map((profile) => ({ ...profile, local: true }))].map(({ id, name, format, endpoint, model: modelId, apiKey, local }) => ({ id, name, format, endpoint, model: modelId, apiKey, local })),
+    preferred: model.startsWith('cloud:') || model.startsWith('local:') ? model.slice(6) : '',
+  }), [cloudProfiles, localProfiles, model]);
+  const piProviderPayloadRef = useRef(piProviderPayload);
+  piProviderPayloadRef.current = piProviderPayload;
+  const syncPiProviders = () => PUBLIC_WEB ? Promise.resolve() : fetch(`${LOCAL_PROXY_URL}/agents/pi/providers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(piProviderPayloadRef.current) }).catch(() => {});
+  useEffect(() => { void syncPiProviders(); }, [piProviderPayload]);
+  // The backend keeps them in memory only: send them again whenever the window comes back to the front,
+  // so a restarted backend has them before the next model list or run.
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === 'visible') void syncPiProviders(); };
+    window.addEventListener('focus', again); document.addEventListener('visibilitychange', again);
+    return () => { window.removeEventListener('focus', again); document.removeEventListener('visibilitychange', again); };
+  }, []);
   const modelOptions = useMemo(() => [...cloudProfiles.map((profile) => ({ value: `cloud:${profile.id}`, label: `${profile.name} · ${profile.model}` })), ...localProfiles.map((profile) => ({ value: `local:${profile.id}`, label: `${profile.name} · ${profile.model}` }))], [cloudProfiles, localProfiles]);
   const unreadNotificationCount = useMemo(() => notifications.reduce((count, item) => count + (item.read ? 0 : 1), 0), [notifications]);
   const searchResults = useMemo(() => {
@@ -917,6 +983,13 @@ function App() {
     return () => { window.clearTimeout(timer); if (fileTimer) window.clearTimeout(fileTimer); };
   }, [nodes, selectedId, collapsedIds, activeCanvasId,autosavePolicy]);
   useEffect(() => {
+    if (!activeCanvasId || !nodes.length || discardedCanvasIdsRef.current.has(activeCanvasId)) return;
+    const current = canvases.find((canvas) => canvas.id === activeCanvasId);
+    if (!current || !isTemporaryCanvas(current, autosavePolicyRef.current)) return;
+    enableCanvasAutosave(activeCanvasId);
+    setCanvases((items) => items.map((canvas) => canvas.id === activeCanvasId ? { ...canvas, temporary: false } : canvas));
+  }, [nodes.length, activeCanvasId, canvases]);
+  useEffect(() => {
     const timer = window.setInterval(() => {
       if (canvasHydratedRef.current) void saveCanvasRef.current?.(true);
     }, 120_000);
@@ -962,15 +1035,20 @@ function App() {
   useEffect(() => {
     localStorage.setItem('wonderful-custom-theme', JSON.stringify(customTheme));
     const root = document.documentElement;
-    Object.entries(customTheme).forEach(([key, value]) => root.style.setProperty(`--custom-${key}`, value));
+    const { vars, tone, grid } = customThemeVars(customTheme);
+    Object.entries(vars).forEach(([key, value]) => root.style.setProperty(key, value));
+    root.dataset.tone = tone; root.dataset.customGrid = grid;
   }, [customTheme]);
   useEffect(() => localStorage.setItem('wonderful-action-runner', actionRunner), [actionRunner]);
   useEffect(() => localStorage.setItem('wendaflow-enabled-agents', JSON.stringify(enabledAgents)), [enabledAgents]);
+  useEffect(() => { try { localStorage.setItem('wendaflow-pi-run-resources', JSON.stringify(piResources_run)); } catch {} }, [piResources_run]);
   useEffect(() => { void loadWorkspaceConfig(); }, []);
   useEffect(() => { if (settingsOpen && settingsSection === 'agents') { void detectAgents(); void loadWorkspaceConfig(); } }, [settingsOpen, settingsSection]);
   const piPanelOpen = enabledAgents.includes('pi') && ((settingsOpen && settingsSection === 'agents') || (actionOptionsOpen && actionRunner === 'pi'));
   const piSelection = actionOptionsOpen ? taskAgentSettings.pi : agentSettings.pi;
   useEffect(() => { if (piPanelOpen) void loadPiInfo(); }, [piPanelOpen]);
+  // The Pi bar names the model Pi will actually use, so load it once when the action composer first shows.
+  useEffect(() => { if (nodeType === 'action' && actionRunner === 'pi' && !piInfo && !PUBLIC_WEB) void loadPiInfo(); }, [nodeType, actionRunner, piInfo]);
   // Which thinking levels exist depends on the model, so ask Pi about the chosen one.
   useEffect(() => {
     if (!piPanelOpen || PUBLIC_WEB) return;
@@ -1282,12 +1360,28 @@ function App() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [activeCanvasId]);
 
+  // With a composer open the main shortcut handler is off; Tab still switches to quick thinking (the draft is kept).
+  const toggleQuickRef = useRef(null);
+  useEffect(() => {
+    if (!branchingFrom && !rootComposerOpen) return undefined;
+    const onTab = (event) => {
+      if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && target !== document.body && !target.closest('.composer')) return;
+      if (target?.closest('[role="dialog"]')) return;
+      event.preventDefault();
+      toggleQuickRef.current?.();
+    };
+    window.addEventListener('keydown', onTab);
+    return () => window.removeEventListener('keydown', onTab);
+  }, [branchingFrom, rootComposerOpen]);
+
   useEffect(() => {
     if (branchingFrom) return undefined;
     const clearOnEscape = (event) => {
       if (event.key === 'Escape') {
         if(contextMenu){setContextMenu(null);return;}
-        if(canvasMenuOpen){if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)setCanvasMenuOpen(false);return;}
+        if(canvasMenuOpen){if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)setCanvasMenuOpen(false);else closeCanvasHome();return;}
         if(shortcutHelp){setShortcutHelp(false);return;}
         relationDragRef.current=null;quickBlankClick.current=null;clearQuickSlicePreview();
         setRelationDrag(null);setMarquee(null);clearSelection();
@@ -1296,6 +1390,8 @@ function App() {
       const isEditing = event.target instanceof Element && event.target.closest('textarea, input, select, [contenteditable="true"]');
       const onCanvas=!event.target.closest?.('button,a,.inspector,.ix,.settings-panel,.canvas-overview,.canvas-context-menu,[role="dialog"]');
       if(!isEditing && event.key==='?'){event.preventDefault();setShortcutHelp(value=>!value);return;}
+      if(!isEditing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase()==='f' && onCanvas){event.preventDefault();fitView();return;}
+      if(!isEditing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key==='Tab' && !event.shiftKey && onCanvas && !(quickThought && selected?.type==='thought')){event.preventDefault();toggleQuickThought();return;}
       if(!isEditing && !quickThought && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase()==='i' && selected && selectedIds.size===1){event.preventDefault();if(inspectorOpenRef.current)closeInspector();else openInspector();return;}
       if(!isEditing && quickThought && onCanvas && selected?.type==='thought') {
         if(event.key==='F2'){event.preventDefault();editQuickIdea(selected);return;}
@@ -1306,6 +1402,10 @@ function App() {
         }
       }
 
+      if(!isEditing && !quickThought && onCanvas && selected && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){
+        event.preventDefault();const next=directionalNeighbor(selected,event.key,visibleNodes,nodeSizes);
+        if(next){selectNode(next.id);requestAnimationFrame(()=>worldRef.current?.querySelector(`[data-node-id="${CSS.escape(next.id)}"]`)?.focus({preventScroll:true}));}return;
+      }
       if (!isEditing && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         // A selectable Markdown answer is real document text. Do not hijack
         // its native copy shortcut merely because its enclosing card is also
@@ -1551,6 +1651,7 @@ function App() {
     const rect=canvasRef.current.getBoundingClientRect(),v=viewportRef.current;
     return {x:(event.clientX-rect.left-v.x)/v.zoom,y:(event.clientY-rect.top-v.y)/v.zoom};
   }
+  toggleQuickRef.current = () => toggleQuickThought();
   function toggleQuickThought() {
     panFramesRef.current.flush();panInputRef.current=null;
     cameraGestureRef.current=false;
@@ -1627,7 +1728,7 @@ function App() {
       const roots = selectedIds.has(node.id) ? [...selectedIds] : [node.id];
       dragIds = nodes.filter((item) => roots.includes(item.id) || roots.some((rootId) => isDescendant(nodes, item.id, rootId))).map((item) => item.id);
       if (!selectedIds.has(node.id)) selectNode(node.id);
-    } else if (event.shiftKey) {
+    } else if (event.shiftKey || event.ctrlKey || event.metaKey) {
       const nextSelection = new Set(selectedIds);
       if (nextSelection.has(node.id)) nextSelection.delete(node.id);
       else nextSelection.add(node.id);
@@ -1673,6 +1774,14 @@ function App() {
     // old implementation leaked it to the canvas and unexpectedly zoomed.
     event.stopPropagation();
     event.nativeEvent?.stopImmediatePropagation?.();
+  }
+
+  // Wheel over a card's text: only a card whose content actually scrolls keeps the wheel (so reading a long
+  // answer never zooms by surprise); anywhere else, and with Ctrl / a pinch, the canvas zooms as usual.
+  function handleCardWheel(event) {
+    if (event.ctrlKey || event.metaKey) return;
+    const el = event.currentTarget;
+    if (el && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) handleContentWheel(event);
   }
 
   function beginResize(event, node, axis = 'both') {
@@ -1739,7 +1848,7 @@ function App() {
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
       marqueeRectRef.current=rect;
-      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
+      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
     if (editingRelation) closeRelationEditor();
@@ -1756,7 +1865,7 @@ function App() {
       setSelectedConnections([]);
       setLineSelectionMenu(null);
       marqueeLiveRef.current={x,y};marqueeHitsRef.current='';
-      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':event.shiftKey?'add':'replace'});
+      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'});
       return;
     }
     if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought || event.pointerType==='touch'))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
@@ -1984,35 +2093,13 @@ function App() {
   }
 
   function autoLayout() {
-    const depthMap = new Map();
-    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
-    const getDepth = node => {let depth=0,cursor=node;const seen=new Set();while(cursor?.parentId && nodeMap.has(cursor.parentId) && !seen.has(cursor.id)){seen.add(cursor.id);depth++;cursor=nodeMap.get(cursor.parentId);}return depth;};
-    visibleNodes.forEach((node) => {
-      const depth = getDepth(node);
-      if (!depthMap.has(depth)) depthMap.set(depth, []);
-      depthMap.get(depth).push(node);
-    });
+    // A tidy tree: each card next to its own children, parents centred on them, trees stacked.
     const sizeFor = (node) => {
       const measured = nodeSizes.get(node.id);
       return { width: measured?.width || node.manualWidth || 224, height: measured?.height || node.manualHeight || 110 };
     };
-    const orderedDepths = [...depthMap.keys()].sort((a, b) => a - b);
-    const columnX = new Map();
-    let nextX = 100;
-    orderedDepths.forEach((depth) => {
-      columnX.set(depth, nextX);
-      const maxWidth = Math.max(224, ...depthMap.get(depth).map((node) => sizeFor(node).width));
-      nextX += maxWidth + 92;
-    });
-    const positions = new Map();
-    [...depthMap.entries()].sort(([a], [b]) => a - b).forEach(([depth, items]) => {
-      let y = 110;
-      items.sort((a, b) => a.y - b.y).forEach((node) => {
-        const size = sizeFor(node);
-        positions.set(node.id, { x: columnX.get(depth), y });
-        y += size.height + 74;
-      });
-    });
+    const visibleIds = new Set(visibleNodes.map((node) => node.id));
+    const positions = tidyLayout(visibleNodes.map((node) => ({ ...node, parentId: visibleIds.has(node.parentId) ? node.parentId : null })), sizeFor);
     setNodes((items) => items.map((node) => positions.has(node.id) ? { ...node, ...positions.get(node.id) } : node));
     if (canvasRef.current && positions.size) {
       const laidOut = visibleNodes.map((node) => ({ ...node, ...positions.get(node.id) }));
@@ -2177,6 +2264,13 @@ function App() {
   }
   function removeCanvasGroup(id) {
     return changeWorkspace(meta=>({...meta,groups:meta.groups.filter(g=>g.id!==id),cards:Object.fromEntries(Object.entries(meta.cards).map(([key,c])=>[key,c.groupId===id?{...c,groupId:''}:c]))}));
+  }
+  // Leaving the canvas list goes back to the canvas on screen; if that one was trashed, to another open
+  // canvas, or a fresh one, never to an empty view.
+  function closeCanvasHome() {
+    if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt){void switchCanvas(activeCanvasId);return;}
+    const next=workspaceMetaRef.current.openTabs.filter(id=>canvases.some(c=>c.id===id)&&!workspaceMetaRef.current.cards[id]?.trashedAt).at(-1);
+    if(next)void switchCanvas(next);else void createCanvas();
   }
   async function moveCanvasesToTrash(ids) {
     try{await persistCurrentCanvas();}catch(error){setStorageWarning(error.message);return false;}
@@ -2572,7 +2666,7 @@ function App() {
     if (typeof comicPlugin !== 'undefined' && comicPlugin.active) { comicPlugin.submit(); return; }
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
-    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
+    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 行动模式 里启用一个执行器。','Enable an agent in Settings → Action mode first.'));openAgentSettings();return;}
     const text = draft.trim();
     if (!text && !attachments.length) return;
     const requestText = text || tr('请理解并描述我上传的图片或文件。',"Please interpret the uploaded images or files.");
@@ -2582,10 +2676,10 @@ function App() {
       id: `root-${Date.now()}`, parentId: null, type: creationType,
       author: creationType === 'thought' ? tr('你',"You") : creationType === 'action' ? tr('执行代理',"Agent") : 'AI',
       model: creationType === 'thought' ? null : creationType === 'action' ? (AGENT_LABELS[actionRunner]) : profile?.model || localProfile?.model,
-      title: questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
-      content: requestText, prompt: creationType === 'conversation' ? requestText : null,
+      title: creationType === 'thought' && !text && attachments.length ? '' : questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
+      content: creationType === 'thought' ? text : requestText, prompt: creationType === 'conversation' ? requestText : null,
       x: rootPosition.x, y: rootPosition.y, attachments,
-      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, modelValue: model, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
+      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, modelValue: model, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: actionRunner === 'pi' ? { ...taskAgentSettings.pi, resources: { ...piResources_run }, compactFirst: piCompactFirst, ...(pendingPiFork && typeof selected !== 'undefined' && pendingPiFork.sourceId === selected?.id ? { forkEntryId: pendingPiFork.entryId } : {}) } : taskAgentSettings[actionRunner], actionIsolated: creationType === 'action' && isolateRun ? true : undefined, actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
     };
     const compareRoots = (() => {
       if (!(compareMode && variantB && creationType === 'action')) return [root];
@@ -2601,7 +2695,7 @@ function App() {
     setSelectedId(root.id);
     setSelectedIds(new Set([root.id]));
     setNewNodeId(root.id);
-    setDraft(''); setAttachments([]); setRootComposerOpen(false); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(settingsForFolder(activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '')); resetCompare();
+    setDraft(''); setPiCompactFirst(false); setPendingPiFork(null); setAttachments([]); setRootComposerOpen(false); setActionOptionsOpen(false); setActionWorkspace(''); setTaskAgentSettings(settingsForFolder(activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '')); resetCompare();
     if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
     nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
     if (root.type === 'conversation') await generateResponse(root.id, model, sourceNodes, null, requestText, root.attachments);
@@ -2714,7 +2808,7 @@ function App() {
     if (typeof comicPlugin !== 'undefined' && comicPlugin.active) { comicPlugin.submit(); return; }
     const creationType=quickThought?'thought':nodeType;
     if(PUBLIC_WEB && creationType==='action'){notify(say('公开版不执行本地行动。','Local actions are unavailable on the public web.'));return;}
-    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 执行器 里启用一个执行器。','Enable an agent in Settings → Agents first.'));openAgentSettings();return;}
+    if(creationType==='action' && !enabledAgents.includes(actionRunner)){notify(tr('请先在 设置 → 行动模式 里启用一个执行器。','Enable an agent in Settings → Action mode first.'));openAgentSettings();return;}
     const text = draft.trim();
     if ((!text && !attachments.length) || !selected) return;
     if (parallelMode && creationType === 'conversation') {
@@ -2743,13 +2837,13 @@ function App() {
       type: creationType,
       author: creationType === 'thought' ? tr('你',"You") : creationType === 'action' ? tr('执行代理',"Agent") : 'AI',
       model: creationType === 'thought' ? null : creationType === 'action' ? (AGENT_LABELS[actionRunner]) : selectedCloud?.model || selectedLocal?.model,
-      title: questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
+      title: creationType === 'thought' && !text && attachments.length ? '' : questionTitle(text, creationType === 'action' ? tr('新行动',"New action") : creationType === 'thought' ? tr('新想法',"New idea") : tr('图片问题',"Image question")),
       content: text,
       prompt: creationType === 'conversation' ? text : null,
       attachments,
       x: position.x,
       y: position.y,
-      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: taskAgentSettings[actionRunner], actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', contextRelations: [...pendingContextRelations], execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
+      status: creationType === 'action' ? 'running' : creationType === 'conversation' ? 'queued' : 'done', generationPhase: creationType === 'conversation' ? tr('请求已排队，正在准备上下文…',"Request queued…") : null, actionRunner, actionPlanFirst: creationType === 'action' && planFirst && actionRunner !== 'deepseek', actionOptions: actionRunner === 'pi' ? { ...taskAgentSettings.pi, resources: { ...piResources_run }, compactFirst: piCompactFirst, ...(pendingPiFork && typeof selected !== 'undefined' && pendingPiFork.sourceId === selected?.id ? { forkEntryId: pendingPiFork.entryId } : {}) } : taskAgentSettings[actionRunner], actionIsolated: creationType === 'action' && isolateRun ? true : undefined, actionWorkspace: actionWorkspace || activeCanvas?.workspace || '', contextRelations: [...pendingContextRelations], execution: creationType === 'action' ? { activityCollapsed: true, events: [] } : undefined,
       modelValue: creationType === 'conversation' ? model : null,
       contextExclusions: [...excludedContextIds],
     };
@@ -2775,7 +2869,7 @@ function App() {
     resetCompare();
     const extraRelations = [...pendingContextRelations];
     closeBranch();
-    setDraft('');
+    setDraft(''); setPiCompactFirst(false); setPendingPiFork(null);
     setAttachments([]);
     // Conversation branches deliberately start in "thinking" so the card can
     // communicate the connection phase.  Do not use that display status as a
@@ -3210,6 +3304,7 @@ function App() {
   }
 
   function toggleAgent(id, on) {
+    if (id === 'pi') return;
     setEnabledAgents((current) => on ? (current.includes(id) ? current : [...current, id]) : current.filter((item) => item !== id));
     if (on && !actionRunner) setActionRunner(id);
   }
@@ -3256,6 +3351,7 @@ function App() {
 
   async function loadPiInfo() {
     if (PUBLIC_WEB) return;
+    await syncPiProviders();
     try {
       const response = await fetch(`${LOCAL_PROXY_URL}/agents/pi/models`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: agentSettings.pi?.command || '' }) });
       const result = await response.json();
@@ -3374,6 +3470,7 @@ function App() {
 
   function closeBranch() {
     if (!branchingFrom || composerClosing) return;
+    setPendingPiFork(null);
     setComposerClosing(true);
     closeTimerRef.current = window.setTimeout(() => {
       setBranchingFrom(null);
@@ -3396,6 +3493,8 @@ function App() {
         if (!first.ok) throw new Error(result.error);
       }
       let announcedApproval = '', lastFingerprint = '';
+      const stream = result.status === 'running' ? openJobStream(LOCAL_PROXY_URL, jobId) : null;
+      try {
       while (result.status === 'running') {
         if (result.pending?.[0]?.id && result.pending[0].id !== announcedApproval) { announcedApproval = result.pending[0].id; notify(tr(`${runnerName} 正在等待你的批准。`, `${runnerName} is waiting for your approval.`)); desktopNotify(tr('需要你的批准', 'Approval needed'), `${runnerName} · ${result.pending[0].tool}`, actionId); }
         const lastEv = result.events?.[result.events.length - 1];
@@ -3407,15 +3506,15 @@ function App() {
           result.before?.status || '', result.after?.status || '',
           result.changes?.files?.length || 0, result.changes?.applied || false, result.changes?.rolledBack || false,
           result.usage?.input || 0, result.usage?.output || 0, result.usage?.cost || 0,
+          JSON.stringify(result.extensionStatus || null), JSON.stringify(result.extensionWidgets || null),
         ]);
         if (fingerprint !== lastFingerprint) {
           lastFingerprint = fingerprint;
-          updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
+          updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], extensionStatus: result.extensionStatus || null, extensionWidgets: result.extensionWidgets || null, canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 280));
-        const statusResponse = await fetch(`${LOCAL_PROXY_URL}/agent/status?id=${encodeURIComponent(jobId)}`); result = await statusResponse.json();
-        if (!statusResponse.ok) throw new Error(result.error);
+        result = await stream.next();
       }
+      } finally { stream?.close(); }
       const finalStatus = result.status === 'done' ? 'done' : result.status === 'stopped' ? 'stopped' : 'failed';
       if (finalStatus !== 'stopped') desktopNotify(finalStatus === 'done' ? tr('任务已完成', 'Task finished') : tr('任务失败', 'Task failed'), `${runnerName} · ${task.slice(0, 80)}`, actionId);
       updateTaskNode(canvasId, actionId, (node) => ({ ...node, status: finalStatus, content: result.output ? `${task}\n\n---\n\n**${tr(`${runnerName} 执行结果`,`${runnerName} execution results`)}**\n\n${result.output}` : node.content, error: result.error || null, execution: { ...(node.execution || {}), jobId, runner, pending: [], canSteer: false, sessionId: result.sessionId || '', forkedFrom, completedAt: result.completedAt, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, workspace, output: result.output } }));
@@ -3447,7 +3546,8 @@ function App() {
     // A Pi card branched from another Pi card continues a fork of that card's Pi session, so the
     // cards already inside that session are not sent again as pasted context.
     const piFork = (() => {
-      if ((actionNode.actionRunner || 'codex') !== 'pi' || actionNode.actionIsolated) return null;
+      // Sessions are opened by file, so isolated runs continue a session like any other.
+      if ((actionNode.actionRunner || 'codex') !== 'pi') return null;
       const isPiRun = (node) => node?.type === 'action' && node.actionRunner === 'pi' && node.execution?.sessionId;
       let parent = sourceNodes.find((node) => node.id === actionNode.parentId);
       if (!isPiRun(parent) || excluded.has(parent.id)) return null;
@@ -3480,7 +3580,7 @@ function App() {
       const taskAttachments = [...inheritedAttachments, ...(actionNode.attachments || [])].filter((item) => item.dataUrl || item.sourcePath).map((item) => ({ name: item.name, type: item.type, dataUrl: item.dataUrl, sourcePath: item.sourcePath || '' }));
       const images = taskAttachments.filter((item) => item.dataUrl?.startsWith('data:image/'));
       const files = taskAttachments.filter((item) => !item.dataUrl?.startsWith('data:image/'));
-      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', isolate: actionNode.actionIsolated === true, options: { ...(actionNode.actionOptions || agentSettings[runner]), ...(planning ? ({ pi: { permission: 'read', readOnly: true }, codex: { accessMode: 'read-only' }, claude: { permissionMode: 'plan' } }[runner] || {}) : {}), ...(piFork ? { parentSession: piFork.sessionId } : {}) } }) });
+      const response = await fetch(`${LOCAL_PROXY_URL}/agent/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runner, prompt, images, files, workspace: actionNode.actionWorkspace || canvasSnapshot?.workspace || '', isolate: actionNode.actionIsolated === true, ...(runner === 'pi' ? { piProviders: piProviderPayload } : {}), options: { ...(actionNode.actionOptions || agentSettings[runner]), ...(planning ? ({ pi: { permission: 'read', readOnly: true }, codex: { accessMode: 'read-only' }, claude: { permissionMode: 'plan' } }[runner] || {}) : {}), ...(piFork ? { parentSession: piFork.sessionId } : {}), ...(runner === 'pi' && /^!\S/.test(task.trim()) ? { bashCommand: task.trim().slice(1) } : {}) } }) });
       let result = await response.json();
       if (!response.ok) throw new Error(result.error || tr(`Codex 返回 ${response.status}`,`Codex returned ${response.status}`));
       const jobId = result.id;
@@ -3515,10 +3615,11 @@ function App() {
   }
 
   // "Plan first" cards only analyse; this starts the real run as a branch that continues the same session.
-  function executePlan(node) {
+  // steps: the plan steps the user kept on the card's checklist, or null to carry out the whole plan.
+  function executePlan(node, steps = null) {
     const position = findBranchPosition(nodes, node, nodeSizes);
     const id = `node-${Date.now()}`;
-    const text = tr('按上面的计划执行。', 'Carry out the plan above.');
+    const text = steps?.length ? `${tr('只执行上面计划中的这些步骤，其余的不要做：', 'Carry out only these steps of the plan above, and skip the rest:')}\n${steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}` : tr('按上面的计划执行。', 'Carry out the plan above.');
     const child = { id, parentId: node.id, type: 'action', author: tr('执行代理', "Agent"), model: AGENT_LABELS[node.actionRunner], title: questionTitle(text, tr('新行动', "New action")), content: text, prompt: null, attachments: [], x: position.x, y: position.y, status: 'running', generationPhase: null, modelValue: null, actionRunner: node.actionRunner, actionOptions: node.actionOptions, actionWorkspace: node.actionWorkspace || '', actionIsolated: node.actionIsolated === true, contextRelations: [], contextExclusions: [], execution: { activityCollapsed: true, events: [] } };
     setNodes((items) => [...items.map((item) => item.id === node.id ? { ...item, planApproved: true } : item), child]);
     setNewNodeId(id); selectNode(id);
@@ -3531,10 +3632,11 @@ function App() {
     setNodes((items) => items.map((item) => item.id === node.id ? { ...item, execution: { ...(item.execution || {}), changes } } : item));
   }
 
-  async function respondAgentApproval(node, requestId, approved, always = false) {
+  // answer: optional { value } or { cancelled: true } for a select, input or editor dialog from a Pi extension.
+  async function respondAgentApproval(node, requestId, approved, always = false, answer = null) {
     const id = node.execution?.jobId;
     if (!id) return;
-    await fetch(`${LOCAL_PROXY_URL}/agent/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, requestId, approved, always }) });
+    await fetch(`${LOCAL_PROXY_URL}/agent/respond`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, requestId, approved, always, ...(answer || {}) }) });
   }
 
   async function steerAgent(node, message, behavior) {
@@ -3624,12 +3726,13 @@ function App() {
     if (savedRunner && enabledAgents.includes(savedRunner)) setActionRunner(savedRunner);
   }, [effectiveFolder, folderSettings, agentSettings]);
   useEffect(() => {
-    if (actionOptionsOpen !== 'dir' || !effectiveFolder || PUBLIC_WEB) return undefined;
+    // Also loaded while the action composer is showing, so the folder chip can name the AGENTS.md Pi will read.
+    if (nodeType !== 'action' || !effectiveFolder || PUBLIC_WEB) return undefined;
     let cancelled = false;
     fetch(`${LOCAL_PROXY_URL}/agents/project-instructions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cwd: effectiveFolder }) })
       .then((response) => response.json()).then((result) => { if (!cancelled) setProjectInstructions(result.files || []); }).catch(() => { if (!cancelled) setProjectInstructions([]); });
     return () => { cancelled = true; };
-  }, [actionOptionsOpen, effectiveFolder]);
+  }, [nodeType, effectiveFolder]);
 
   const suggestProps = { enabled: nodeType === 'action' && !PUBLIC_WEB, commandsEnabled: actionRunner === 'pi', workspace: actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '', piCommand: agentSettings.pi?.command || '', tr };
 
@@ -3652,6 +3755,56 @@ function App() {
     </>;
   }
 
+  // Pi-only header for the action composer: which Pi session this run continues and how full its context is.
+  // branchSource is a snapshot from when the branch opened; read the card's current state instead.
+  const liveCard = (source) => (source && nodes.find((node) => node.id === source.id)) || source;
+  function renderPiSessionPills(snapshot) {
+    if (nodeType !== 'action' || actionRunner !== 'pi' || PUBLIC_WEB) return null;
+    const source = liveCard(snapshot);
+    const continuing = source?.type === 'action' && source.actionRunner === 'pi' && source.execution?.sessionId && !compareMode;
+    const folderName = effectiveFolder ? effectiveFolder.split(/[\\/]/).filter(Boolean).pop() || effectiveFolder : tr('默认目录','Default folder');
+    const instruction = piResources_run.contextFiles !== false ? projectInstructions.find((file) => file.scope !== 'global')?.name || '' : '';
+    return <div className="pi-session-pills">
+      <button type="button" className="pi-pill folder" title={`${tr('工作目录','Working directory')}: ${effectiveFolder || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}`} onClick={(event) => { event.stopPropagation(); setPopLeft(0); setActionOptionsOpen((value) => value === 'dir' ? false : 'dir'); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" /></svg>{folderName}{instruction && <em>· {instruction}</em>}</button>
+      {pendingPiFork && source?.id === pendingPiFork.sourceId && <span className="pi-pill fork" title={pendingPiFork.text}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v10M5 8c0-3 6-2 6-5M11 3v.01" /></svg>{tr('从会话中这句话之前分岔','Branching from before this message')}<button type="button" aria-label={tr('取消分岔点','Clear branch point')} onClick={() => setPendingPiFork(null)}>×</button></span>}
+      <span className="pi-pill" title={continuing ? tr('Pi 会从这张卡片的会话分岔继续，记得之前做过的事','Pi forks the session of this card and remembers what it did') : tr('Pi 会开一个新会话','Pi starts a new session')}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3v6a3 3 0 0 0 3 3h3M5 3a1.5 1.5 0 1 0 0 .01M11 12a1.5 1.5 0 1 0 0 .01" /></svg>{continuing ? tr(`接着「${source.title}」的会话`, `Continues “${source.title}”`) : tr('新的 Pi 会话','New Pi session')}</span>
+    </div>;
+  }
+
+  // When the card being branched from is a Pi run still in progress, the composer steers it instead.
+  function runningPiSource(snapshot) {
+    const source = liveCard(snapshot);
+    return nodeType === 'action' && source?.type === 'action' && source.actionRunner === 'pi' && source.status === 'running' && source.execution?.canSteer ? source : null;
+  }
+  async function sendToRunningPi(source, behavior) {
+    const message = draft.trim();
+    if (!message) return;
+    try { await steerAgent(source, message, behavior); setDraft(''); notify(behavior === 'steer' ? tr('已送达，Pi 会在这一步之后看到','Sent; Pi sees it after the current step') : tr('已排队，Pi 做完当前任务后处理','Queued; Pi handles it after the current task')); }
+    catch (error) { notify(error.message); }
+  }
+  function renderPiRunningStrip(source) {
+    const running = runningPiSource(source);
+    if (!running) return null;
+    const steps = (running.execution?.events || []).filter((event) => event.type === 'command').length;
+    const cost = running.execution?.usage?.cost;
+    return <div className="pi-running-strip" role="status">
+      <i aria-hidden="true" />
+      <span>{tr(`Pi 正在运行「${running.title}」`, `Pi is running “${running.title}”`)}{steps ? ` · ${tr(`${steps} 次工具调用`, `${steps} tool calls`)}` : ''}{cost > 0 ? ` · $${cost.toFixed(cost >= 0.01 ? 3 : 4)}` : ''}</span>
+      <button disabled={!draft.trim()} title={tr('在当前这一步的工具调用结束后、下一次思考前送达', "Delivered after the current step's tool calls, before the next thought")} onClick={() => void sendToRunningPi(running, 'steer')}>{tr('引导','Steer')} <kbd>⌘↵</kbd></button>
+      <button disabled={!draft.trim()} title={tr('等任务做完之后再处理','Handled once the task is finished')} onClick={() => void sendToRunningPi(running, 'followUp')}>{tr('排队','Queue')} <kbd>↵</kbd></button>
+      <button className="danger" onClick={() => void stopAgentJob(running)}>{tr('停止','Stop')}</button>
+    </div>;
+  }
+
+  // The action composer's popover fades out instead of vanishing: remember which one was open for a moment.
+  useEffect(() => {
+    if (actionOptionsOpen) { lastPopRef.current = actionOptionsOpen; setClosingPop(null); return undefined; }
+    if (!lastPopRef.current) return undefined;
+    setClosingPop(lastPopRef.current); lastPopRef.current = null;
+    const timer = window.setTimeout(() => setClosingPop(null), 150);
+    return () => window.clearTimeout(timer);
+  }, [actionOptionsOpen]);
+
   function renderActionControls() {
     // While comparing, the chips edit whichever variant (A = the normal composer state, B = its own copy) is selected.
     const onB = compareMode && activeVariant === 'B' && !!variantB;
@@ -3672,34 +3825,55 @@ function App() {
       : { label: options.thinking ? tr('思考开启','Thinking on') : tr('直接执行','Direct execution'), danger: false };
     const chipModel = runnerNow === 'codex' ? `${options.model || defaultModel} · ${reasoningLabels[options.reasoning] || options.reasoning}`
       : runnerNow === 'deepseek' ? (reasoningLabels[options.reasoning] || options.reasoning.toUpperCase())
+      : runnerNow === 'pi' ? (() => { const level = options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || ''); const label = level ? piEffortLevels(null, tr).find((item) => item.value === level)?.label : ''; return `${options.model || defaultModel}${label ? ` · ${tr('思考','Thinking')} ${label}` : ''}`; })()
       : (options.model || defaultModel);
     const workspace = actionWorkspace || activeCanvas?.workspace || '';
     const effectiveDirectory = workspace || workspaceConfig?.defaultWorkspace || '';
     const chipDirectory = effectiveDirectory ? effectiveDirectory.split(/[\\/]/).filter(Boolean).pop() || effectiveDirectory : tr('默认目录','Default folder');
-    const popWidths = { runner: 230, dir: 340, perm: 280, model: 320 };
+    const popWidths = { runner: 230, dir: 340, perm: 280, model: 320, more: 320, add: 260 };
+    const piLevel = runnerNow === 'pi' ? options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || '') : '';
+    const piEffort = piLevel ? piEffortLevels(null, tr).find((item) => item.value === piLevel)?.label || piLevel : '';
+    const piModelName = runnerNow === 'pi' ? (options.model || (piInfo?.current?.id ? piInfo.current.id : defaultModel)) : '';
     const toggleOptions = (section, event) => {
       const button = event.currentTarget; const host = button.closest('.inline-agent-config');
       setPopLeft(Math.max(0, Math.min(button.offsetLeft, (host?.offsetWidth || 0) - popWidths[section])));
       setActionOptionsOpen((value) => value === section ? false : section);
     };
-    const panel = actionOptionsOpen;
-    const panelTitle = panel === 'runner' ? runnerLabel : panel === 'dir' ? tr('工作目录','Working directory') : panel === 'perm' ? tr('权限','Permissions') : tr('模型','Model');
+    const panel = actionOptionsOpen || closingPop;
+    const panelTitle = panel === 'runner' ? runnerLabel : panel === 'dir' ? tr('工作目录','Working directory') : panel === 'perm' ? tr('权限','Permissions') : panel === 'more' ? tr('更多','More') : panel === 'add' ? tr('添加上下文','Add context') : tr('模型','Model');
+    const instructionLabel = runnerNow === 'pi' && piResources_run.contextFiles !== false ? projectInstructions.find((file) => file.scope !== 'global')?.name || '' : '';
+    const branchNow = liveCard(branchSource);
+    const continuingPi = runnerNow === 'pi' && branchNow?.type === 'action' && branchNow.actionRunner === 'pi' && !!branchNow.execution?.sessionId;
     const permissionChoices = runnerNow === 'codex' ? [['read-only', tr('只读分析','Read-only analysis')], ['workspace-write', tr('工作区可写','Workspace write')], ['auto-review', tr('自动审查并执行','Auto-review and execute')], ['full-access', tr('完全访问（跳过审批与沙箱）','Full access (skip approvals and sandbox)'), true]]
       : runnerNow === 'claude' ? [['default', claudeModes.default], ['plan', claudeModes.plan], ['acceptEdits', claudeModes.acceptEdits], ['bypassPermissions', claudeModes.bypassPermissions, true]]
       : runnerNow === 'pi' ? [['ask', tr('执行前询问','Ask before acting'), false, tr('修改文件或运行命令前先征得你的同意','Asks you before editing files or running commands')], ['read', tr('只读（读取与搜索）','Read-only (read and search)'), false, tr('只能读取和搜索，不做任何修改','Can only read and search, never changes anything')], ['full', tr('完全信任','Full trust'), true, tr('不再询问，直接执行所有操作','Never asks, runs everything directly')]] : [];
     const permissionValue = runnerNow === 'codex' ? options.accessMode : runnerNow === 'claude' ? options.permissionMode : piPermission;
     const choosePermission = (value) => { if (runnerNow === 'codex') updateVariantSetting('codex', { accessMode: value }); else if (runnerNow === 'claude') updateVariantSetting('claude', { permissionMode: value }); else updateVariantSetting('pi', { permission: value, readOnly: value === 'read' }); setActionOptionsOpen(false); };
-    return <div className="inline-agent-config">
-      <div className="agent-chips">
+    const insertTrigger = (mark) => { setDraft((current) => `${current}${current && !/\s$/.test(current) ? ' ' : ''}${mark}`); setActionOptionsOpen(false); window.setTimeout(() => document.querySelector('.composer textarea')?.focus(), 0); };
+    const contextPercent = continuingPi ? branchNow.execution?.usage?.context?.percent : null;
+    const piBar = runnerNow === 'pi' && !compareMode;
+    return <div className={`inline-agent-config ${piBar ? 'pi-bar' : ''}`}>
+      {piBar ? <div className="agent-chips">
+        <button className={`agent-chip add ${panel === 'add' ? 'active' : ''}`} title={tr('添加上下文','Add context')} aria-label={tr('添加上下文','Add context')} onClick={(event) => toggleOptions('add', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg></button>
+        {enabledAgents.length > 1 && <button className={`agent-chip quiet runner-switch ${panel === 'runner' ? 'active' : ''}`} title={tr('执行器','Agent')} onClick={(event) => toggleOptions('runner', event)}><span>{runnerLabel}</span><i>⌄</i></button>}
+        <button className={`agent-chip model-pill ${panel === 'model' ? 'active' : ''}`} title={tr('模型与思考强度','Model and thinking level')} onClick={(event) => toggleOptions('model', event)}><span className="model-name">{piModelName}</span>{piEffort && <b className="model-effort">{piEffort}</b>}<i>⌄</i></button>
+        <span className="chip-spacer" />
+        {Number.isFinite(contextPercent) && <span className={`context-ring ${contextPercent >= 80 ? 'warn' : ''}`} title={tr('这个会话已用的上下文窗口；快满时可在“更多”里先压缩','Context window used by this session; compact it from More when it gets full')} style={{ '--p': `${Math.min(100, Math.max(0, contextPercent))}%` }}><i aria-hidden="true" />{Math.round(contextPercent)}%</span>}
+        <button className={`agent-chip quiet perm ${chipPermission.danger ? 'danger' : ''} ${panel === 'perm' ? 'active' : ''}`} title={tr('权限','Permissions')} onClick={(event) => toggleOptions('perm', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v3.7c0 3-2 5.3-5 6.9-3-1.6-5-3.9-5-6.9V3.6z" /></svg><span>{chipPermission.label}</span><i>⌄</i></button>
+        <button className={`agent-chip quiet icon plan ${planFirst ? 'active' : ''}`} title={tr('先只读分析并给出计划，你确认后再执行','Analyze read-only and propose a plan first; run it only after you confirm')} aria-pressed={planFirst} aria-label={tr('先出计划','Plan first')} onClick={() => setPlanFirst((value) => !value)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg></button>
+        <button className={`agent-chip quiet icon more ${panel === 'more' || isolateRun || piCompactFirst || Object.values(piResources_run).includes(false) ? 'active' : ''}`} title={tr('更多','More')} aria-label={tr('更多','More')} onClick={(event) => toggleOptions('more', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h.01M8 8h.01M12.5 8h.01" /></svg></button>
+      </div> : <div className="agent-chips">
         {compareMode && <div className="variant-tabs" role="tablist" aria-label={tr('对比方案','Variants')}>{['A', 'B'].map((key) => <button key={key} role="tab" aria-selected={activeVariant === key} className={activeVariant === key ? 'selected' : ''} onClick={() => { setActiveVariant(key); setActionOptionsOpen(false); }}>{key}</button>)}</div>}
-        <button className={`agent-chip runner ${panel === 'runner' ? 'active' : ''}`} title={tr('执行器','Agent')} onClick={(event) => toggleOptions('runner', event)}><span>{runnerLabel}</span><i>⌄</i></button>
-        <button className={`agent-chip dir ${panel === 'dir' ? 'active' : ''}`} title={`${tr('工作目录','Working directory')}: ${effectiveDirectory || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}`} onClick={(event) => toggleOptions('dir', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" /></svg><span>{chipDirectory}</span></button>
+        {enabledAgents.length > 1 && <button className={`agent-chip runner ${panel === 'runner' ? 'active' : ''}`} title={tr('执行器','Agent')} onClick={(event) => toggleOptions('runner', event)}><span>{runnerLabel}</span><i>⌄</i></button>}
+        <button className={`agent-chip dir ${panel === 'dir' ? 'active' : ''}`} title={`${tr('工作目录','Working directory')}: ${effectiveDirectory || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}`} onClick={(event) => toggleOptions('dir', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" /></svg><span>{chipDirectory}</span>{instructionLabel && <em className="chip-note">· {instructionLabel}</em>}</button>
         <button className={`agent-chip ${chipPermission.danger ? 'danger' : ''} ${panel === 'perm' ? 'active' : ''}`} title={tr('权限','Permissions')} onClick={(event) => toggleOptions('perm', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 3.6v3.7c0 3-2 5.3-5 6.9-3-1.6-5-3.9-5-6.9V3.6z" /></svg><span>{chipPermission.label}</span></button>
         <button className={`agent-chip model-chip ${panel === 'model' ? 'active' : ''}`} title={tr('模型','Model')} onClick={(event) => toggleOptions('model', event)}><span>{chipModel}</span><i>⌄</i></button>
         {runnerNow !== 'deepseek' && <button className={`agent-chip plan ${planFirst ? 'active' : ''}`} title={tr('先只读分析并给出计划，你确认后再执行','Analyze read-only and propose a plan first; run it only after you confirm')} aria-pressed={planFirst} aria-label={tr('先出计划','Plan first')} onClick={() => setPlanFirst((value) => !value)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" /></svg><span>{tr('先出计划','Plan first')}</span></button>}
-        <button className={`agent-chip compare ${compareMode ? 'active' : ''}`} title={tr('同一个任务用两种设置各跑一次，在隔离副本里比较结果','Run the task twice with different settings in isolated copies and compare')} aria-pressed={compareMode} aria-label={tr('并排对比','Compare')} onClick={toggleCompare}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5h9M9.5 2.5 12 5l-2.5 2.5M13 11H4M6.5 8.5 4 11l2.5 2.5" /></svg><span>{tr('并排对比','Compare')}</span></button>
-      </div>
-      {panel && <div className={`chip-pop pop-${panel}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog" aria-label={panelTitle}>
+        {runnerNow === 'pi' && <button className={`agent-chip more ${panel === 'more' || compareMode || isolateRun || piCompactFirst || Object.values(piResources_run).includes(false) ? 'active' : ''}`} title={tr('更多','More')} aria-label={tr('更多','More')} onClick={(event) => toggleOptions('more', event)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h.01M8 8h.01M12.5 8h.01" /></svg>{(compareMode || isolateRun || piCompactFirst) && <span>{[compareMode && tr('并排对比','Compare'), isolateRun && tr('隔离副本','Isolated copy'), piCompactFirst && tr('先压缩','Compact first')].filter(Boolean).join(' · ')}</span>}</button>}
+        {runnerNow !== 'pi' && <button className={`agent-chip compare ${compareMode ? 'active' : ''}`} title={tr('同一个任务用两种设置各跑一次，在隔离副本里比较结果','Run the task twice with different settings in isolated copies and compare')} aria-pressed={compareMode} aria-label={tr('并排对比','Compare')} onClick={toggleCompare}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5h9M9.5 2.5 12 5l-2.5 2.5M13 11H4M6.5 8.5 4 11l2.5 2.5" /></svg><span>{tr('并排对比','Compare')}</span></button>}
+      </div>}
+
+      {panel && <div key={panel} className={`chip-pop pop-${panel} ${actionOptionsOpen ? '' : 'closing'}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog" aria-label={panelTitle}>
         {panel === 'runner' && <>
           <ModelList groups={[{ title: '', items: enabledAgents.map((id) => ({ value: id, label: AGENT_LABELS[id] })) }]} value={runnerNow} onChange={(value) => { setRunnerNow(value); setActionOptionsOpen(false); }} tr={tr} />
           {enabledAgents.includes('pi') && <button className="pop-link" onClick={() => { setActionOptionsOpen(false); setPiImportOpen(true); }}>{tr('导入 Pi 会话…','Import a Pi session…')}</button>}
@@ -3709,8 +3883,15 @@ function App() {
         {panel === 'perm' && runnerNow === 'codex' && options.accessMode === 'full-access' && <p className="permission-warning">{tr('完全访问会跳过沙箱和单次审批，仅在你信任任务与工作目录时使用。','Full access skips the sandbox and per-action approvals. Use it only for trusted tasks and directories.')}</p>}
         {panel === 'perm' && runnerNow === 'deepseek' && <div className="inline-option-grid"><label className="inline-checkbox full-row"><input type="checkbox" checked={options.thinking} onChange={(event) => updateVariantSetting('deepseek', { thinking: event.target.checked })} />{tr('要求充分思考后再执行','Require extended thinking before execution')}</label></div>}
         {panel === 'model' && runnerNow === 'pi' && <>
-          <ModelList groups={piModelGroups(piInfo, piSelectionValue(options), tr)} value={piSelectionValue(options)} searchable={(piInfo?.models?.length || 0) > 8} onChange={(value) => updateVariantSetting('pi', { ...parsePiSelection(value), thinking: '' })} tr={tr} />
-          <EffortSlider levels={piEffortLevels(piLevels, tr)} value={options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || '')} onChange={(value) => updateVariantSetting('pi', { thinking: value })} label={tr('思考强度','Thinking level')} defaultLabel={tr('默认','Default')} disabledNote={tr('此模型不能调节思考强度','This model has no adjustable thinking level')} tr={tr} />
+          {(() => {
+            const piDefault = piSelectionValue(agentSettings.pi) || (piInfo?.current ? `${piInfo.current.provider}::${piInfo.current.id}` : '');
+            const current = piSelectionValue(options) || piDefault;
+            return <ModelMenu favorites={favoriteModels} onToggleFavorite={toggleFavoriteModel} groups={piModelGroups(piInfo, piSelectionValue(options), tr)} value={piSelectionValue(options)} defaultValue={piDefault} selectedNote={piEffort} searchable={(piInfo?.models?.length || 0) > 8}
+              onChange={(value) => updateVariantSetting('pi', { ...parsePiSelection(value), thinking: piThinkingByModel[value] || '' })}
+              onSetDefault={(value) => { setAgentSettings((all) => ({ ...all, pi: { ...all.pi, ...parsePiSelection(value), thinking: piThinkingByModel[value] || all.pi?.thinking || '' } })); notify(tr('已设为新任务的默认模型','Set as the default model for new tasks')); }}
+              tr={tr}
+              effort={{ levels: piEffortLevels(piLevels, tr), value: options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || ''), onChange: (value) => { updateVariantSetting('pi', { thinking: value }); rememberPiThinking(current, value); }, label: tr('思考强度','Thinking level'), defaultLabel: tr('默认','Default'), disabledNote: tr('此模型不能调节思考强度','This model has no adjustable thinking level') }} />;
+          })()}
         </>}
         {panel === 'model' && runnerNow === 'codex' && <>
           <EffortSlider levels={['low', 'medium', 'high', 'xhigh'].map((value) => ({ value, label: reasoningLabels[value] }))} value={options.reasoning} onChange={(value) => updateVariantSetting('codex', { reasoning: value })} label={tr('推理强度','Reasoning effort')} defaultLabel={tr('默认','Default')} tr={tr} />
@@ -3732,6 +3913,23 @@ function App() {
           <EffortSlider levels={['low', 'medium', 'high', 'max'].map((value) => ({ value, label: reasoningLabels[value] }))} value={options.reasoning} onChange={(value) => updateVariantSetting('deepseek', { reasoning: value })} label={tr('推理策略','Reasoning strategy')} defaultLabel={tr('默认','Default')} tr={tr} />
           <div className="inline-option-grid"><label>{tr('配置档','Profile')}<input value={options.profile} disabled /></label></div>
         </>}
+        {panel === 'add' && <div className="pop-menu" role="menu">
+          <button role="menuitem" onClick={() => { setActionOptionsOpen(false); attachmentRef.current?.click(); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg><span>{tr('文件和图片','Files and images')}</span></button>
+          <button role="menuitem" onClick={(event) => { event.stopPropagation(); setPopLeft(0); setActionOptionsOpen('dir'); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.6l1.4 1.5h5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z" /></svg><span>{tr('工作目录','Working directory')}</span><em>{chipDirectory}</em></button>
+          <button role="menuitem" onClick={() => insertTrigger('@')}><b className="pop-glyph">@</b><span>{tr('引用文件','Mention a file')}</span></button>
+          <button role="menuitem" onClick={() => insertTrigger('/')}><b className="pop-glyph">/</b><span>{tr('命令和技能','Commands and skills')}</span></button>
+          <button role="menuitem" onClick={() => insertTrigger('!')}><b className="pop-glyph">!</b><span>{tr('直接运行命令','Run a command')}</span></button>
+          <button role="menuitem" onClick={() => { setActionOptionsOpen(false); setPiImportOpen(true); }}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3M3 12.5h10" /></svg><span>{tr('导入 Pi 会话…','Import a Pi session…')}</span></button>
+        </div>}
+        {panel === 'more' && <div className="pop-more">
+          <label className="pop-toggle"><input type="checkbox" checked={compareMode} onChange={toggleCompare} /><span><b>{tr('并排对比','Compare')}</b><em>{tr('同一个任务用两种设置各跑一次，在隔离副本里比较结果','Run the task twice with different settings in isolated copies and compare')}</em></span></label>
+          <label className="pop-toggle"><input type="checkbox" checked={isolateRun} disabled={compareMode} onChange={(event) => setIsolateRun(event.target.checked)} /><span><b>{tr('在隔离副本里运行','Run in an isolated copy')}</b><em>{tr('先在文件夹副本里改，确认后再应用到真实目录','Changes go to a copy of the folder first; apply them when you are happy')}</em></span></label>
+          <label className={`pop-toggle ${continuingPi ? '' : 'muted'}`}><input type="checkbox" checked={piCompactFirst && continuingPi} disabled={!continuingPi} onChange={(event) => setPiCompactFirst(event.target.checked)} /><span><b>{tr('先压缩上下文','Compact context first')}</b><em>{continuingPi ? tr('接着之前的会话时，先把历史压缩成摘要，省 token','When continuing a session, summarize its history first to save tokens') : tr('从一张 Pi 卡片继续时可用','Available when continuing from a Pi card')}</em></span></label>
+          <small className="pop-section">{tr('本次加载','Load for this run')}</small>
+          <div className="pop-resources">{[['skills', tr('技能','Skills')], ['extensions', tr('扩展','Extensions')], ['mcp', 'MCP'], ['contextFiles', tr('项目说明','Project instructions')]].map(([key, label]) => <label key={key}><input type="checkbox" checked={piResources_run[key] !== false} onChange={(event) => setPiResourcesRun((current) => ({ ...current, [key]: event.target.checked }))} />{label}</label>)}</div>
+          <button className="pop-link" onClick={() => { setActionOptionsOpen(false); setPiImportOpen(true); }}>{tr('导入 Pi 会话…','Import a Pi session…')}</button>
+          <button className="pop-link" onClick={() => { setActionOptionsOpen(false); openAgentSettings(); }}>{tr('Pi 设置…','Pi settings…')}</button>
+        </div>}
         {panel === 'dir' && <>
           <div className="pop-dir-current"><small>{tr('工作目录','Working directory')}</small><code title={effectiveDirectory}>{effectiveDirectory || tr('使用 Wendaflow 默认目录','Use Wendaflow default directory')}</code></div>
           <div className="pop-dir-actions"><button className="primary" onClick={() => pickWorkspaceDirectory(true)}>{tr('选择文件夹','Choose folder')}</button>{actionWorkspace && <button onClick={() => { setActionWorkspace(''); setWorkspaceError(''); }}>{tr('使用画布目录','Use canvas directory')}</button>}</div>
@@ -3773,11 +3971,16 @@ function App() {
     const creativity = [[0.2, tr('精确','Precise')], [0.7, tr('平衡','Balanced')], [1, tr('发散','Creative')]];
     return <div className="inline-agent-config conversation-config">
       <div className="agent-chips">
-        <button className={`agent-chip runner ${panel === 'model' ? 'active' : ''}`} title={modelOptions.find((item) => item.value === model)?.label || ''} onClick={(event) => toggle('model', event)}><span>{profile?.model || tr('选择模型','Select model')}</span><i>⌄</i></button>
-        {hasEffort && <button className={`agent-chip ${panel === 'effort' ? 'active' : ''}`} title={tr('本次对话配置','Conversation settings')} onClick={(event) => toggle('effort', event)}><span>{effortSummary}</span><i>⌄</i></button>}
+        <button className={`agent-chip model-pill chat ${panel === 'model' ? 'active' : ''}`} title={modelOptions.find((item) => item.value === model)?.label || ''} onClick={(event) => toggle('model', event)}><span className="model-name">{profile?.model || tr('选择模型','Select model')}</span>{support.toggle && <b className="model-effort">{reasoningDisabled || !options.thinking ? tr('不思考','No thinking') : support.levels ? levelLabels[options.reasoning] || options.reasoning : tr('思考','Thinking')}</b>}<i>⌄</i></button>
       </div>
-      {panel && <div className={`chip-pop pop-${panel === 'model' ? 'model' : 'chat-effort'}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog">
-        {panel === 'model' && <ModelList groups={groups} value={model} searchable={cloudItems.length + localItems.length > 8} onChange={(value) => { setModel(value); setChatOptionsOpen(false); }} tr={tr} />}
+      {panel && <ExitAnimated as="div" exit={POP_EXIT} className={`chip-pop pop-${panel === 'model' ? 'model' : 'chat-effort'}`} style={{ left: popLeft }} onWheel={handleContentWheel} role="dialog">
+        {panel === 'model' && <ModelMenu favorites={favoriteModels} onToggleFavorite={toggleFavoriteModel} groups={groups} value={model} defaultValue={defaultChatModel} onSetDefault={(value) => { makeDefaultChatModel(value); notify(tr('已设为对话的默认模型','Set as the default chat model')); }} searchable={cloudItems.length + localItems.length > 8} onChange={(value) => setModel(value)} tr={tr}
+          effort={support.levels ? { levels: ['none', 'low', 'medium', 'high'].map((value) => ({ value, label: levelLabels[value] })), value: options.reasoning, onChange: (reasoning) => updateConversationOptions({ reasoning, thinking: reasoning !== 'none' }), label: tr('思考强度','Thinking level'), defaultLabel: tr('默认','Default') }
+            : support.toggle ? { levels: [{ value: 'off', label: tr('不思考','No thinking') }, { value: 'on', label: tr('思考','Thinking') }], value: reasoningDisabled || !options.thinking ? 'off' : 'on', onChange: (value) => updateConversationOptions(value === 'on' ? { thinking: true, reasoning: options.reasoning === 'none' ? 'low' : options.reasoning } : { thinking: false, reasoning: 'none' }), label: tr('思考','Thinking'), defaultLabel: tr('默认','Default') } : null}
+          footer={<>
+            {nodeType === 'draw' && support.toggle && <p className="mm-note">{tr('绘图时开启思考会更慢：模型要先想完，节点才开始出现。想边写边画，请关闭思考。','Thinking makes drawing slower: cards only start appearing after the model finishes thinking. Turn it off to watch it draw live.')}</p>}
+            {support.temperature && <div className="mm-seg"><small>{tr('创造性','Creativity')}</small><div role="radiogroup" aria-label={tr('创造性','Creativity')}>{creativity.map(([value, label]) => <button key={value} role="radio" aria-checked={options.temperature === value} className={options.temperature === value ? 'selected' : ''} onClick={() => updateConversationOptions({ temperature: value })}>{label}</button>)}</div></div>}
+          </>} />}
         {panel === 'effort' && <>
           {nodeType === 'draw' && <p className="option-note draw-think-note">{tr('绘图时开启思考会更慢：模型要先想完，节点才开始出现。想边写边画，请关闭思考。','Thinking makes drawing slower: cards only start appearing after the model finishes thinking. Turn it off to watch it draw live.')}</p>}
           {support.levels && <EffortSlider levels={['none', 'low', 'medium', 'high'].map((value) => ({ value, label: levelLabels[value] }))} value={options.reasoning} onChange={(reasoning) => updateConversationOptions({ reasoning, thinking: reasoning !== 'none' })} label={tr('推理强度','Reasoning effort')} defaultLabel={tr('默认','Default')} tr={tr} />}
@@ -3785,7 +3988,7 @@ function App() {
           {support.toggle && !support.levels && <p className="option-note">{tr('此接口只能开关思考，不能调节强度。','This API can only turn thinking on or off, not set its level.')}</p>}
           {support.temperature && <div className="pop-seg"><small>{tr('创造性','Creativity')}</small><div role="radiogroup" aria-label={tr('创造性','Creativity')}>{creativity.map(([value, label]) => <button key={value} role="radio" aria-checked={options.temperature === value} className={options.temperature === value ? 'selected' : ''} onClick={() => updateConversationOptions({ temperature: value })}>{label}</button>)}</div></div>}
         </>}
-      </div>}
+      </ExitAnimated>}
     </div>;
   }
 
@@ -3811,7 +4014,33 @@ function App() {
 
   const cardRuntime=useRef(null);
   const liveCardActions=useRef(null);
-  const cardActions={...comicPlugin.cardActions,executePlan,openCompare:setCompareGroupOpen,applyAgentChanges,respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
+  function openPiHistory(node) { setPiHistoryNode(node); }
+  const piCardWorkspace = (node) => node.actionWorkspace || node.execution?.workspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || '';
+  // Compact a finished Pi card's session in place, so the next card continuing it starts from a summary.
+  async function compactPiSession(node) {
+    notify(tr('正在压缩会话…','Compacting the session…'));
+    try {
+      const response = await fetch(`${LOCAL_PROXY_URL}/agents/pi/compact`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: node.execution?.sessionId || '', cwd: piCardWorkspace(node), command: agentSettings.pi?.command || '' }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      notify(result.tokensBefore ? tr(`会话已压缩：约 ${result.tokensBefore} → ${result.tokensAfter} tokens`, `Session compacted: about ${result.tokensBefore} → ${result.tokensAfter} tokens`) : tr('会话已压缩','Session compacted'));
+    } catch (error) { notify(tr(`压缩失败：${error.message}`, `Compaction failed: ${error.message}`)); }
+  }
+  // Switch the model or thinking level of a running Pi card; Pi uses it from its next model call.
+  async function switchPiModel(node, { value = '', thinking = '' } = {}) {
+    const id = node.execution?.jobId;
+    if (!id) return;
+    const [provider, model] = value ? value.split('::') : ['', ''];
+    const response = await fetch(`${LOCAL_PROXY_URL}/agent/pi-model`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, provider, model, thinking }) });
+    if (!response.ok) notify((await response.json()).error || tr('切换失败','Could not switch'));
+  }
+  function forkPiAt(node, entryId, text) {
+    setPiHistoryNode(null);
+    startBranch(node); setNodeType('action'); setActionRunner('pi'); setDraft(text);
+    setPendingPiFork({ sourceId: node.id, entryId, text });
+    window.setTimeout(() => document.querySelector('.composer textarea')?.focus(), 60);
+  }
+  const cardActions={handleCardWheel,openPiHistory,compactPiSession,switchPiModel,piModelChoices:(piInfo?.models||[]).map((m)=>({value:`${m.provider}::${m.id}`,label:`${m.provider} / ${m.name||m.id}`})),...comicPlugin.cardActions,executePlan,openCompare:setCompareGroupOpen,applyAgentChanges,respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
     toggleActivity:node=>setNodes(items=>items.map(item=>item.id===node.id?{...item,execution:{...(item.execution||{}),activityCollapsed:!(item.execution?.activityCollapsed!==false)}}:item))};
   if(!liveCardActions.current)liveCardActions.current=Object.fromEntries(Object.keys(cardActions).map(key=>[key,(...args)=>cardRuntime.current.actions[key](...args)]));
   useLayoutEffect(()=>{cardRuntime.current={actions:cardActions,
@@ -3885,13 +4114,13 @@ function App() {
         <button className="rail-button" aria-label={text('settings')} title={text('settings')} onPointerDown={(event) => { event.stopPropagation(); openSettings(); }} onClick={openSettings}><AppIcon name="settings" /></button>
       </nav>
 
-      {canvasMenuOpen&&<CanvasHome managementOpen={canvasManagementOpen} onManagementChange={open=>{setCanvasManagementOpen(open);if(open&&!PUBLIC_WEB)void refreshSavedCanvases();}} items={workspaceItems} meta={workspaceMeta} summaries={canvasSummaries} filter={canvasFilter} setFilter={setCanvasFilter} onOpen={switchCanvas} onCreate={createCanvas} onImport={()=>canvasImportRef.current?.click()} onStar={id=>changeWorkspace(meta=>({...meta,cards:{...meta.cards,[id]:{...meta.cards[id],starred:!meta.cards[id]?.starred}}}))} onRename={renameCanvas} onMove={setCanvasGroup} onTrash={moveCanvasesToTrash} onRestore={restoreBrowserCanvases} onDuplicate={duplicateBrowserCanvas} onExport={exportCanvases} canReturn={Boolean(activeCanvasId)&&!workspaceMeta.cards[activeCanvasId]?.trashedAt} onClose={()=>{if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)void switchCanvas(activeCanvasId);}} onGroupRename={(id,name)=>changeWorkspace(meta=>({...meta,groups:meta.groups.map(g=>g.id===id?{...g,name:name.trim().slice(0,60)}:g)}))} onGroupDelete={removeCanvasGroup} onGroupCreate={createCanvasGroup} activeId={activeCanvasId} autosaveEnabled={autosavePolicy[activeCanvasId]===true} publicWeb={PUBLIC_WEB} archives={PUBLIC_WEB?[]:savedCanvases} archiveTrash={PUBLIC_WEB?[]:trashCanvases} onArchiveOpen={openSavedCanvas} onArchiveTrash={deleteSavedCanvas} onArchiveRestore={restoreSavedCanvas} say={say} time={value=>formatCanvasTime(value,uiLanguage)}/>}
+      {canvasMenuOpen&&<CanvasHome managementOpen={canvasManagementOpen} onManagementChange={open=>{setCanvasManagementOpen(open);if(open&&!PUBLIC_WEB)void refreshSavedCanvases();}} items={pickerItems} meta={workspaceMeta} summaries={canvasSummaries} filter={canvasFilter} setFilter={setCanvasFilter} onOpen={id=>canvases.some(canvas=>canvas.id===id)?switchCanvas(id):openSavedCanvas(id)} onCreate={createCanvas} onImport={()=>canvasImportRef.current?.click()} onStar={id=>changeWorkspace(meta=>({...meta,cards:{...meta.cards,[id]:{...meta.cards[id],starred:!meta.cards[id]?.starred}}}))} onRename={renameCanvas} onMove={setCanvasGroup} onTrash={moveCanvasesToTrash} onRestore={restoreBrowserCanvases} onDuplicate={duplicateBrowserCanvas} onExport={exportCanvases} canReturn={Boolean(activeCanvasId)&&!workspaceMeta.cards[activeCanvasId]?.trashedAt} onClose={closeCanvasHome} onGroupRename={(id,name)=>changeWorkspace(meta=>({...meta,groups:meta.groups.map(g=>g.id===id?{...g,name:name.trim().slice(0,60)}:g)}))} onGroupDelete={removeCanvasGroup} onGroupCreate={createCanvasGroup} activeId={activeCanvasId} autosaveEnabled={autosavePolicy[activeCanvasId]===true} publicWeb={PUBLIC_WEB} archives={PUBLIC_WEB?[]:savedCanvases} archiveTrash={PUBLIC_WEB?[]:trashCanvases} onArchiveOpen={openSavedCanvas} onArchiveTrash={deleteSavedCanvas} onArchiveRestore={restoreSavedCanvas} say={say} time={value=>formatCanvasTime(value,uiLanguage)}/>}
       {workspaceBusy&&<div className="workspace-loading" role="status">{say('正在打开画布…','Opening canvas…')}</div>}
       <input ref={canvasImportRef} type="file" accept=".wdf,application/x-branchspace-wdf" hidden onChange={importProject}/>
 
       <main
         ref={canvasRef} inert={workspaceBusy||canvasMenuOpen?true:undefined} style={workspaceMeta.cards[activeCanvasId]?.trashedAt?{visibility:'hidden'}:undefined} aria-hidden={canvasMenuOpen} data-drop-label={tr("松开以添加文件","Release to add files")} data-drop-hint={tr("支持图片、文档、代码与其他附件","Images, documents, code, and other attachments")}
-        className={`canvas ${quickThought ? 'quick-thinking' : ''} ${panning ? 'panning' : ''} ${marquee ? 'marquee-active' : ''} ${canvasFileDragActive ? 'file-drag-active' : ''} ${canvasTransition ? `canvas-${canvasTransition}` : ''}`}
+        className={`canvas ${quickThought ? 'quick-thinking' : ''} ${panning ? 'panning' : ''} ${dragging?.started ? 'dragging-cards' : ''} ${marquee ? 'marquee-active' : ''} ${canvasFileDragActive ? 'file-drag-active' : ''} ${canvasTransition ? `canvas-${canvasTransition}` : ''}`}
         onPointerDown={beginPan}
         onPointerMove={movePointer}
         onPointerUp={endPointer}
@@ -3908,7 +4137,14 @@ function App() {
         {PUBLIC_WEB && <aside className="public-web-note">{say('本地画布保存在此浏览器 · 登录后可主动上传并同步 · AI 需自备密钥。','Local canvases stay in this browser · Sign in to upload and sync · Bring your own API key.')} <a href="/source.tar.gz">{say('源码','Source')}</a></aside>}
         {(canvasHints||marquee)&&<div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>}
         {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
-        {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span></div>}
+        {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span>
+          {!quickThought && <div className="empty-starters">{[
+            ['conversation', tr('拆解一个目标','Break down a goal'), tr('帮我把这个目标拆成几个可执行的阶段：','Help me break this goal into a few doable stages:')],
+            ['thought', tr('先写下想法','Jot down ideas'), ''],
+            ['draw', tr('画一张流程图','Draw a flowchart'), tr('画出这个流程：','Draw this process:')],
+            ...(PUBLIC_WEB ? [] : [['action', tr('让 Pi 整理文件夹','Have Pi tidy a folder'), tr('看看工作目录里有什么，给出整理建议，先不要改动文件。','Look through the working folder and suggest how to organize it; do not change any files yet.')]]),
+          ].map(([type, label, prompt]) => <button key={type} onClick={() => { setNodeType(type); setDraft(prompt); setRootComposerOpen(true); window.setTimeout(() => document.querySelector('.composer textarea')?.focus(), 0); }}>{label}</button>)}</div>}
+        </div>}
         {marquee && (() => { const m = marqueeLiveRef.current ? { ...marquee, ...marqueeLiveRef.current } : marquee; return <div ref={marqueeElRef} className="selection-marquee" style={{ left: Math.min(m.startX, m.x), top: Math.min(m.startY, m.y), width: Math.abs(m.x - m.startX), height: Math.abs(m.y - m.startY) }} />; })()}
         <svg ref={quickSliceTrailRef} className="quick-slice-trail" style={{display:'none'}} aria-hidden="true"><polyline /></svg>
         <svg ref={connectionsRef} className="connections" style={{ transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})` }}>
@@ -3942,17 +4178,15 @@ function App() {
           {renderedConnections.parents.map(({node,parent,extra}) => {
             const parentSize = nodeSizes.get(parent.id) || { width: 224, height: 110 };
             const nodeSize = nodeSizes.get(node.id) || { width: 224, height: 110 };
-            const x1 = parent.x + parentSize.width;
-            const y1 = parent.y + parentSize.height / 2;
-            const x2 = node.x;
-            const y2 = node.y + nodeSize.height / 2;
-            const mid = (x1 + x2) / 2;
             const active = activeIds.has(parent.id) && activeIds.has(node.id);
             const folding = foldingId && graph.isDescendant(node.id,foldingId);
             const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
             const deleting = deletingIds.has(node.id) || deletingIds.has(parent.id);
             const connectionKey = `parent:${parent.id}:${node.id}`;
-            return <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && !relationDrag.extra && !extra && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
+            // A Pi card that is still running gets a light travelling along the line into it.
+            const flowing = node.type === 'action' && node.status === 'running';
+            const line = <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && !relationDrag.extra && !extra && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={connectionPath('parent', parent, node, parentSize, nodeSize)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
+            return flowing ? <React.Fragment key={extra ? `${parent.id}>${node.id}` : node.id}>{line}<path className="connection-flow" data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" aria-hidden="true" d={connectionPath('parent', parent, node, parentSize, nodeSize)} /></React.Fragment> : line;
           })}
         </svg>
         {lineSelectionMenu && selectedConnections.length > 0 && <section className="line-selection-menu" onPointerDown={(event) => event.stopPropagation()}><span>{tr(`已选 ${selectedConnections.length} 条连线`,`${selectedConnections.length} connections selected`)}</span><small>{selectedConnections.some((item) => item.kind === 'parent') ? tr('包含继承关系；删除会解除父子继承。','Includes inheritance links; deleting removes the parent-child relationship.') : tr('可批量移除引用或合并关系。','Remove reference or merge links in a batch.')}</small><div><button onClick={() => { setSelectedConnections([]); setLineSelectionMenu(null); }}>{tr('取消','Cancel')}</button><button className="danger" onClick={() => removeConnections()}>{tr('删除连线','Delete links')}</button></div></section>}
@@ -3973,7 +4207,7 @@ function App() {
             // Let CSS interpolate these dimensions from --semantic. Updating
             // a CSS variable on the world every animation frame is smoother
             // than waiting for React's deliberately throttled viewport render.
-            const fullWidth = node.manualWidth || (node.type==='thought'&&node.attachments?.length?320:node.content.length > 650 ? 380 : node.content.length > 220 ? 290 : longPreviewTitle ? 292 : 224);
+            const fullWidth = node.manualWidth || (node.type==='thought'&&node.attachments?.length?320:node.type==='action'&&node.content.length > 400 ? 540 : node.type==='action'&&(node.status==='running'||node.content.length > 120) ? 440 : node.content.length > 650 ? 380 : node.content.length > 220 ? 290 : longPreviewTitle ? 292 : 224);
             const previewWidth = Math.min(fullWidth, longPreviewTitle ? fullWidth : 184);
             // Preview cards are title-first.  Work out the space the actual
             // preview title needs instead of relying on a fixed two-line box:
@@ -4009,30 +4243,38 @@ function App() {
           <section className={`composer ${composerClosing ? 'closing' : 'branching'} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建分支","Create branch")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}>
             <div className="composer-context-row">{renderModeSwitch()}
               <div className="composer-context">{tr(`新分支 · 从「${branchSource.title}」开始`,`New branch · from “${branchSource.title}”`)}</div>
+              {renderPiSessionPills(branchSource)}
               <button className={`context-toggle ${contextInspectorOpen ? 'active' : ''}`} onClick={() => setContextInspectorOpen((value) => !value)}>{text('context')} {contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} · {tr('附件','Attachments')} {contextAttachments(nodes, branchSource.id, attachments, [...excludedContextIds], pendingContextRelations).length}</button>
               <button className="composer-close" aria-label={tr('取消创建分支','Cancel branch')} onClick={closeBranch}>×</button>
             </div>
             {contextInspectorOpen && <div className="context-inspector"><header><strong>{tr("发送前上下文检查器","Pre-send context inspector")}</strong><span>{tr("点击节点可临时排除","Click a node to exclude it temporarily")}</span></header><p className="context-summary">{tr(`当前将发送 ${contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} 条上下文；已排除 ${excludedContextIds.size} 条。排除节点会同时移除它携带的附件，但不会删除画布上的关系。`,`Sending ${contextPlan(nodes, branchSource.id, [...excludedContextIds], pendingContextRelations).length} context nodes; ${excludedContextIds.size} excluded. Excluding a node also excludes its attachments, without deleting any links.`)}</p><div>{contextPlan(nodes, branchSource.id, [], pendingContextRelations).map(({ node, relation }, index) => { const excluded = excludedContextIds.has(node.id); const fileCount = (node.attachments || []).length; return <button key={node.id} className={excluded ? 'excluded' : ''} onClick={() => setExcludedContextIds((current) => { const next = new Set(current); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; })}><i>{excluded ? '−' : index + 1}</i><span><strong>{node.title}</strong><small>{relation === 'merge' ? tr('合并上下文',"Merged context") : relation === 'reference' ? tr('引用上下文',"Referenced context") : node.type === 'thought' ? tr('想法背景',"Idea background") : tr('继承上下文',"Inherited context")}</small></span>{fileCount > 0 && <em>{tr(`${fileCount} 个附件`,`${fileCount} attachments`)}</em>}</button>; })}</div></div>}
-            <div className="branch-intents">{[[tr('继续追问',"Ask further"),tr('请沿着这里继续深入分析。',"Continue analyzing this in depth.")],[tr('换个角度',"Another angle"),tr('请换一个角度重新思考。',"Reconsider this from another perspective.")],[tr('反驳它',"Challenge this"),tr('请寻找这个观点的漏洞、反例与风险。',"Find weaknesses, counterexamples, and risks in this view.")],[tr('总结此处',"Summarize here"),tr('请总结以上上下文的核心结论。',"Summarize the key conclusions of the context above.")],[tr('变成行动',"Turn into action"),tr('请将以上内容转化为可执行步骤。',"Turn the above into actionable steps.")]].map(([label,prompt]) => <button key={label} onClick={() => { setNodeType(label === tr('变成行动',"Turn into action") ? 'action' : 'conversation'); setDraft(prompt); }}>{label}</button>)}</div>
-            <SuggestTextarea value={draft} onChange={setDraft} onSubmit={createBranch} placeholder={comicPlugin.active ? comicPlugin.placeholder : nodeType === 'draw' ? tr('描述要画的图，新节点会接在画布右侧……','Describe the diagram; new cards are added to the right…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : tr('沿着这个节点继续思考，或交给 AI 执行……','Continue from this node, or ask AI to act…')} {...suggestProps} />
+            {renderPiRunningStrip(branchSource)}
+            <SuggestTextarea value={draft} onChange={setDraft} onSubmit={runningPiSource(branchSource) ? () => void sendToRunningPi(branchSource, 'followUp') : createBranch} onModSubmit={runningPiSource(branchSource) ? () => void sendToRunningPi(branchSource, 'steer') : undefined} placeholder={comicPlugin.active ? comicPlugin.placeholder : nodeType === 'draw' ? tr('描述要画的图，新节点会接在画布右侧……','Describe the diagram; new cards are added to the right…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : nodeType === 'action' && actionRunner === 'pi' ? (runningPiSource(branchSource) ? tr('给正在运行的 Pi 补充指令：回车排队，⌘/Ctrl+回车立即引导','Tell the running Pi more: Enter queues, Cmd/Ctrl+Enter steers now') : tr('让 Pi 接着做什么……','What should Pi do next…') + '  ' + tr('@ 引用文件 · / 命令和技能 · ! 直接运行命令', '@ files · / commands and skills · ! run a command')) : tr('沿着这个节点继续思考，或交给 AI 执行……','Continue from this node, or ask AI to act…')} {...suggestProps} />
             {!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}
-            {nodeType === 'conversation' && parallelMode && <div className="parallel-models">{modelOptions.map((item) => <button key={item.value} className={parallelModels.has(item.value) ? 'selected' : ''} onClick={() => setParallelModels((current) => { const next = new Set(current); if (next.has(item.value)) next.delete(item.value); else next.add(item.value); return next; })}>{item.label}</button>)}</div>}
             <div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />
               {(nodeType === 'conversation' || nodeType === 'draw' || comicPlugin.active) && renderConversationControls()}
               {nodeType === 'action' && renderActionRunnerControls()}
-              {nodeType === 'conversation' && <button className={`parallel-toggle ${parallelMode ? 'active' : ''}`} onClick={() => setParallelMode((value) => !value)}>{tr('并行','Parallel')}</button>}
+              {nodeType === 'conversation' && <span className="parallel-anchor">
+                <button className={`parallel-toggle ${parallelMode ? 'active' : ''}`} aria-expanded={parallelMenuOpen} onClick={() => { if (!parallelMode) setParallelMode(true); setParallelMenuOpen((value) => !value); }}>{parallelMode ? tr(`并行 · ${parallelModels.size}`, `Parallel · ${parallelModels.size}`) : tr('并行','Parallel')}</button>
+                {parallelMenuOpen && <ExitAnimated as="div" exit={POP_EXIT} className="parallel-pop" role="dialog" aria-label={tr('同时问几个模型','Ask several models at once')} onWheel={handleContentWheel}>
+                  <header><strong>{tr('同时问几个模型','Ask several models at once')}</strong><small>{tr('每个选中的模型各回答一张卡片，方便对比。','Each chosen model answers on its own card, side by side.')}</small></header>
+                  <div className="parallel-list">{modelOptions.map((item) => { const on = parallelModels.has(item.value); return <button key={item.value} role="checkbox" aria-checked={on} className={on ? 'on' : ''} onClick={() => setParallelModels((current) => { const next = new Set(current); if (next.has(item.value)) next.delete(item.value); else next.add(item.value); return next; })}><i aria-hidden="true">{on ? '✓' : ''}</i><span>{item.label}</span></button>; })}</div>
+                  <footer><button onClick={() => { setParallelMode(false); setParallelMenuOpen(false); }}>{tr('关闭并行','Turn off parallel')}</button><button className="primary" onClick={() => setParallelMenuOpen(false)}>{tr('完成','Done')}</button></footer>
+                </ExitAnimated>}
+              </span>}
               
               <span className="shortcut">{copy.shortcut}</span>
-              <button className="send-button" onClick={createBranch}>{drawBusy && (nodeType === 'draw' || comicPlugin.active) ? '■' : '↑'}</button>
+              <button className="send-button" onClick={runningPiSource(branchSource) ? () => void sendToRunningPi(branchSource, 'followUp') : createBranch}>{drawBusy && (nodeType === 'draw' || comicPlugin.active) ? '■' : '↑'}</button>
             </div>
           </section>
         )}
-        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row">{renderModeSwitch()}<div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><SuggestTextarea autoFocus value={draft} onChange={setDraft} onSubmit={createFirstNode} placeholder={comicPlugin.active ? comicPlugin.placeholder : nodeType === 'draw' ? tr('描述要画的图，例如：画出这个程序的原理图……','Describe the diagram, e.g. the architecture of this app…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) : tr('先在 设置 → 执行器 里启用一个执行器','Enable an agent in Settings → Agents first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} {...suggestProps} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />{(nodeType === 'conversation' || nodeType === 'draw' || comicPlugin.active) && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<span className="shortcut">{copy.shortcut}</span><button className="send-button" aria-label={tr("发送","Send")} disabled={!(drawBusy && (nodeType === 'draw' || comicPlugin.active)) && !draft.trim() && !attachments.length} onClick={createFirstNode}>{drawBusy && (nodeType === 'draw' || comicPlugin.active) ? '■' : '↑'}</button></div></section>}
+        {!quickThought && (!nodes.length || rootComposerOpen) && <section className={`composer branching empty-composer root-composer ${rootComposerClosing ? 'closing' : ''} ${composerFileDragActive ? 'file-drag-active' : ''}`} data-drop-label={copy.dropChat} aria-label={tr("创建新的起点","Create a starting point")} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}><div className="composer-context-row">{renderModeSwitch()}<div className="composer-context">{nodes.length ? (tr('新起点 · 不继承任何上下文','New starting point · No inherited context')) : copy.newCanvas}</div>{renderPiSessionPills(null)}{!!nodes.length && <button className="composer-close" aria-label={tr("取消创建新起点","Cancel new starting point")} onClick={closeRootComposer}>×</button>}</div><SuggestTextarea autoFocus value={draft} onChange={setDraft} onSubmit={createFirstNode} placeholder={comicPlugin.active ? comicPlugin.placeholder : nodeType === 'draw' ? tr('描述要画的图，例如：画出这个程序的原理图……','Describe the diagram, e.g. the architecture of this app…') + (drawThinkingOn ? tr('（思考已开启，会更慢）','(thinking is on, so it is slower)') : '') : nodeType === 'action' ? (enabledAgents.length ? tr(`描述要交给${AGENT_LABELS[actionRunner] || actionRunner}的任务……`,`Describe the task for ${AGENT_LABELS[actionRunner] || actionRunner}…`) + (actionRunner === 'pi' ? '  ' + tr('@ 引用文件 · / 命令和技能 · ! 直接运行命令', '@ files · / commands and skills · ! run a command') : '') : tr('先在 设置 → 行动模式 里启用一个执行器','Enable an agent in Settings → Action mode first')) : nodeType === 'thought' ? copy.ideaHint : copy.rootHint} {...suggestProps} />{!!attachments.length && <div className="attachment-chips">{attachments.map((item) => <button key={item.id} onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== item.id))}>{item.name}<span>×</span></button>)}</div>}<div className="composer-bottom"><button className="attach-button" aria-label={copy.attach} title={copy.attach} onClick={() => attachmentRef.current?.click()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 7.4 8.2 12.2a3 3 0 0 1-4.3-4.2l5-5a2 2 0 0 1 2.8 2.9l-5 5a1 1 0 0 1-1.4-1.4L9.6 5" /></svg></button><input ref={attachmentRef} type="file" multiple hidden onChange={addAttachments} />{(nodeType === 'conversation' || nodeType === 'draw' || comicPlugin.active) && renderConversationControls()}{nodeType === 'action' && renderActionRunnerControls()}<span className="shortcut">{copy.shortcut}</span><button className="send-button" aria-label={tr("发送","Send")} disabled={!(drawBusy && (nodeType === 'draw' || comicPlugin.active)) && !draft.trim() && !attachments.length} onClick={createFirstNode}>{drawBusy && (nodeType === 'draw' || comicPlugin.active) ? '■' : '↑'}</button></div></section>}
       </main>
 
       {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留；按住 Alt 改为移动分支）','Release to add another parent (keeps current; hold Alt to move branch)'):say('松开将移动分支（替换原父节点）','Release to move branch (replaces current parent)')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
       {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
+      {piHistoryNode && <PiHistory node={piHistoryNode} workspace={piHistoryNode.actionWorkspace || piHistoryNode.execution?.workspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} command={agentSettings.pi?.command || ''} tr={tr} onFork={(entryId, text) => forkPiAt(piHistoryNode, entryId, text)} onClose={() => setPiHistoryNode(null)} />}
       {piImportOpen && <Suspense fallback={null}><PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} /></Suspense>}
       {compareGroupOpen && <Suspense fallback={null}><CompareView cards={nodes.filter((node) => node.compareGroup === compareGroupOpen).sort((x, y) => String(x.variant).localeCompare(String(y.variant)))} tr={tr} runnerLabels={AGENT_LABELS} applyAgentChanges={applyAgentChanges} onClose={() => setCompareGroupOpen(null)} notify={notify} /></Suspense>}
       {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? detachParent(node, contextMenu.parentId) : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
@@ -4052,7 +4294,7 @@ function App() {
           mindMapState, setMindMapState, generateMindMapSuggestions, addMindMapSuggestions,
           deletionIds, deletingIds, deleteSelection: () => deleteSelection(), onClose: closeInspector,
           onOpenSettings: () => { setSettingsSection('models'); openSettings(); },
-          titleExpanded: inspectorTitleExpanded, setTitleExpanded: setInspectorTitleExpanded,
+          titleExpanded: inspectorTitleExpanded, setTitleExpanded: setInspectorTitleExpanded, applyAgentChanges,
         }} />
       ) : selected && selectedIds.size === 1 ? <button className="open-inspector" aria-label={tr('打开卡片详情','Open card details')} title={`${tr('打开卡片详情','Open card details')} (I)`} onClick={openInspector}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button> : null}
       {deleteUndo && deleteUndo.atNodes===nodes && <div className="undo-toast"><span>{deleteUndo.sliced?quickCopy.sliced:tr(`已删除 ${deleteUndo.nodes.length} 个节点`,`${deleteUndo.nodes.length} nodes deleted`)}</span><button onClick={undoDelete}>{tr('撤销','Undo')} <small>Ctrl Z</small></button></div>}
@@ -4071,7 +4313,7 @@ function App() {
           sections={[
             { id: 'models', label: text('modelConnections') },
             { id: 'appearance', label: text('appearance') },
-            ...(PUBLIC_WEB ? [] : [{ id: 'agents', label: tr('执行器','Agents') }]),
+            ...(PUBLIC_WEB ? [] : [{ id: 'agents', label: tr('行动模式','Action mode') }]),
             { id: 'notifications', label: tr('通知','Notifications') },
             { id: 'plugins', label: tr('插件','Plugins') },
             ...(comicPlugin.settingsSection ? [comicPlugin.settingsSection] : []),
@@ -4079,45 +4321,9 @@ function App() {
             { id: 'about', label: tr('关于','About') },
           ]}
         >
-          {settingsSection === 'models' && (
-            <Page title={text('modelConnections')} description={tr('管理本地模型与云端 API。修改会自动保存。','Manage local models and cloud APIs. Changes are saved automatically.')}>
-              <Group title={`${tr('本地模型','Local models')} · Ollama`} hint={`${tr('请求只发送到你填写的本机地址。','Requests are sent only to the local address you enter.')} ${tr('可以保存多个本地模型，并在输入框里直接切换。','Save multiple local models and switch between them in the composer.')}`} action={localProfiles.length > 0 ? <Button kind="danger" className="small" onClick={removeActiveLocal}>{tr('删除当前','Delete current')}</Button> : null}>
-                <Chips items={localProfiles} activeId={ollama.id} onSelect={(id) => { setActiveLocalId(id); setOllamaStatus(''); }} onAdd={addLocalProfile} addLabel={`＋ ${tr('本地模型','Local models')}`} />
-                {localProfiles.length === 0 && <p className="sx-note" style={{ padding: '12px 18px 0' }}>{tr('尚未添加本地模型，点击 ＋ 添加。','No local models yet. Click ＋ to add one.')}</p>}
-                <Fields>
-                  <Field label={tr('显示名称','Display name')}><Input value={ollama.name} onChange={(event) => updateActiveLocal({ name: event.target.value })} /></Field>
-                  <Field label={tr('模型名称','Model name')}><Input value={ollama.model} onChange={(event) => updateActiveLocal({ model: event.target.value })} /></Field>
-                  <Field label={tr('服务地址','Server URL')} span><Input value={ollama.endpoint} onChange={(event) => updateActiveLocal({ endpoint: event.target.value })} /></Field>
-                </Fields>
-                <div className="sx-actionbar">
-                  <Status tone={ollamaStatus ? 'ok' : 'idle'}>{systemText(ollamaStatus) || tr('尚未测试连接','Connection not tested')}</Status>
-                  <Button kind="primary" onClick={testOllama}>{tr('测试连接','Test connection')}</Button>
-                </div>
-              </Group>
-              <Group title={`${tr('云端模型库','Cloud model library')} · ${tr('API 配置','API configuration')}`} hint={tr('每个模型独立保存协议、地址和模型名。','Each model keeps its own protocol, endpoint, and model name.')} action={cloudProfiles.length > 0 ? <Button kind="danger" className="small" onClick={removeActiveCloud}>{tr('删除当前','Delete current')}</Button> : null}>
-                <Chips items={cloudProfiles} activeId={activeCloud.id} onSelect={setActiveCloudId} onAdd={addCloudProfile} addLabel={`＋ ${tr('云端模型库','Cloud model library')}`} />
-                {cloudProfiles.length === 0 && <p className="sx-note" style={{ padding: '12px 18px 0' }}>{tr('尚未添加云端模型，点击 ＋ 添加。','No cloud models yet. Click ＋ to add one.')}</p>}
-                <Fields>
-                  <Field label={tr('显示名称','Display name')}><Input value={activeCloud.name} onChange={(event) => updateActiveCloud({ name: event.target.value })} /></Field>
-                  <Field label={tr('接口格式','API format')}>
-                    <Select value={activeCloud.format} onChange={(event) => { const format = event.target.value; const preset = CLOUD_FORMAT_PRESETS[format]; updateActiveCloud({ format, endpoint: preset.endpoint, model: preset.model }); }}>
-                      <option value="responses">OpenAI Responses</option>
-                      <option value="openai-compatible">OpenAI-compatible</option>
-                      <option value="anthropic">Anthropic Messages</option>
-                      <option value="gemini">Google Gemini</option>
-                    </Select>
-                  </Field>
-                  <Field label={tr('接口地址','Endpoint')} span><Input value={activeCloud.endpoint} onChange={(event) => updateActiveCloud({ endpoint: event.target.value })} placeholder={activeCloud.format === 'gemini' ? GEMINI_ENDPOINT : 'https://…'} /></Field>
-                  <Field label={tr('模型名称','Model name')}><Input value={activeCloud.model} onChange={(event) => updateActiveCloud({ model: event.target.value })} /></Field>
-                  <Field label={tr('API 密钥','API key')}><Input type="password" autoComplete="off" value={activeCloud.apiKey} onChange={(event) => updateActiveCloud({ apiKey: event.target.value })} placeholder={tr('仅保存在本次会话','Stored only for this session')} /></Field>
-                </Fields>
-                <div className="sx-actionbar">
-                  <Status tone={activeCloud.apiKey ? 'ok' : 'idle'}>{activeCloud.apiKey ? tr('已配置，可在输入框直接选择','Configured and available in the composer') : tr('等待配置','Not configured')}</Status>
-                </div>
-              </Group>
-            </Page>
-          )}
-          {settingsSection === 'appearance' && <Suspense fallback={null}><AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} onRestoreColors={()=>setCustomTheme(DEFAULT_CUSTOM_THEME)} text={text} copy={copy} tr={tr} /></Suspense>}
+          {settingsSection === 'models' && <ModelConnectionsPanel cloudProfiles={cloudProfiles} setCloudProfiles={setCloudProfiles} localProfiles={localProfiles} setLocalProfiles={setLocalProfiles} chatModel={model} setChatModel={setModel} defaultChatModel={defaultChatModel} makeDefaultChatModel={makeDefaultChatModel} tr={tr}
+            testLocal={async (endpoint) => { try { const found = await listOllamaModels(endpoint); return found.length ? tr(`已连接 · 检测到 ${found.length} 个模型`,`Connected · ${found.length} models detected`) : tr('已连接 · 尚未安装模型',"Connected · No models installed"); } catch (error) { return tr(`连接失败：${error.message}`,`Could not connect: ${error.message}`); } }} />}
+          {settingsSection === 'appearance' && <Suspense fallback={null}><AppearancePanel theme={theme} onThemeChange={setTheme} language={uiLanguage} onLanguageChange={setUiLanguage} languages={UI_LANGUAGES} previewEnabled={previewEnabled} onPreviewChange={setPreviewEnabled} canvasHints={canvasHints} onCanvasHintsChange={setCanvasHints} customTheme={customTheme} onCustomThemeChange={setCustomTheme} text={text} copy={copy} tr={tr} /></Suspense>}
           {settingsSection === 'agents' && <Suspense fallback={null}><AgentsPanel enabled={enabledAgents} onToggle={toggleAgent} settings={agentSettings} onSettingChange={(runner, patch) => setAgentSettings((current) => ({ ...current, [runner]: { ...current[runner], ...patch } }))} detection={agentDetection} onRedetect={detectAgents} piInfo={piInfo} piLevels={piLevels} piResources={piResources} onReloadPi={loadPiInfo} systemNotifications={systemNotifications} onSystemNotificationsChange={changeSystemNotifications} workspaceConfig={workspaceConfig} onSaveWorkspace={saveDefaultWorkspace} onPickWorkspace={pickDefaultWorkspace} tr={tr} /></Suspense>}
           {settingsSection === 'comic' && comicPlugin.renderSettings()}
           {settingsSection === 'notifications' && (

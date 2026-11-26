@@ -1,11 +1,6 @@
 /* Shared dark surfaces: explicit foregrounds prevent pale native button faces
    and light-only control styles from washing out the inspector. */
-:root:is(
-  [data-theme="midnight"],
-  [data-theme="graphite"],
-  [data-theme="contrast-black"],
-  [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-) {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) {
   color-scheme: dark;
   --dark-panel: #171c24;
   --dark-control: #252c38;
@@ -21,76 +16,37 @@
   --dark-border: #5a5a5a;
   --dark-active: #26394f;
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   .segmented::before {
   background: var(--dark-active);
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   .segmented
   button.selected {
   color: var(--dark-text);
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   :is(input, select, textarea) {
   background-color: var(--dark-panel);
   color: var(--dark-text);
   border-color: var(--dark-border);
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   :is(input, textarea)::placeholder {
   color: var(--dark-muted);
   opacity: 1;
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
-  :is(
-    .quick-thought-toggle,
-    .quick-thought-editor textarea,
-    .composer textarea
-  ) {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
+  :is(.quick-thought-toggle, .quick-thought-editor textarea, .composer textarea) {
   background: transparent;
   color: var(--dark-text);
 }
 
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   :is(.node h2, .node p, .markdown-content, .markdown-content strong) {
   color: var(--dark-text);
 }
-:root:is(
-    [data-theme="midnight"],
-    [data-theme="graphite"],
-    [data-theme="contrast-black"],
-    [data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]
-  )
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
   :is(.node.colored, article.node[style*="--node-tint"]) {
   background: color-mix(
     in srgb,
@@ -100,18 +56,18 @@
 }
 
 /* Editing surfaces must use the same dark palette as their containing card. */
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) :is(.inline-node-editor,.quick-thought-editor) {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) :is(.inline-node-editor, .quick-thought-editor) {
   background:var(--dark-panel);color:var(--dark-text);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .inline-node-editor :is(input,textarea,button) {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .inline-node-editor :is(input, textarea, button) {
   background:var(--dark-control);color:var(--dark-text);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .node.conversation .markdown-content {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .node.conversation .markdown-content {
   color:var(--dark-text);font-size:13px;line-height:1.75;
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .node .image-attachment {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .node .image-attachment {
   background:var(--dark-panel);color:var(--dark-accent);border-color:var(--dark-border);
 }
-:root:is([data-theme="midnight"],[data-theme="graphite"],[data-theme="contrast-black"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .inline-node-editor button.save {
+:root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .inline-node-editor button.save {
   background:#286447;color:#fff;border-color:#86c5a1;
 }

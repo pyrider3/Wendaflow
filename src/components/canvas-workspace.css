@@ -1,5 +1,5 @@
 :root {--workspace-bg:#fff;--workspace-panel:#f7f9f7;--workspace-text:#26372f;--workspace-muted:#64766a;--workspace-border:#dde5df;--workspace-hover:#edf3ef;--workspace-active:#e5efe9;--workspace-accent:#36735b;}
-:root:is([data-theme="midnight"],[data-theme="starlight"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"],[data-theme="graphite"],[data-theme="contrast-black"]) {--workspace-bg:#202527;--workspace-panel:#191e20;--workspace-text:#edf3ef;--workspace-muted:#b1c1b8;--workspace-border:#46524b;--workspace-hover:#2d3932;--workspace-active:#2c4639;--workspace-accent:#9ad5b7;}
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"], [data-theme="contrast-black"]) {--workspace-bg:#202527;--workspace-panel:#191e20;--workspace-text:#edf3ef;--workspace-muted:#b1c1b8;--workspace-border:#46524b;--workspace-hover:#2d3932;--workspace-active:#2c4639;--workspace-accent:#9ad5b7;}
 .canvas-sidebar,.canvas-home,.canvas-switcher {color:var(--workspace-text);font:14px/1.5 system-ui;}
 .canvas-sidebar button,.canvas-home button,.canvas-switcher button {font:inherit;cursor:pointer;}
 .canvas-sidebar input,.canvas-home input,.canvas-home select,.canvas-switcher input {box-sizing:border-box;font:inherit;color:inherit;background:var(--workspace-bg);border:1px solid var(--workspace-border);border-radius:7px;min-width:0;}
@@ -295,3 +295,11 @@
 .canvas-manager-detail .workspace-card-menu {position:absolute;right:0;top:7px;}
 .canvas-manager-detail .workspace-card-bottom:has(>span:empty) {min-height:0;}
 .canvas-manager-detail .workspace-local-archives {flex:0 1 auto;min-height:28px;max-height:180px;overflow:auto;scrollbar-width:thin;margin-top:12px;padding-top:10px;}
+.canvas-manager .workspace-card { cursor: pointer; }
+.canvas-picker .picker-list { max-height: min(360px, calc(100dvh - 220px)); }
+/* The trash action reads as a real, available action in every theme. */
+.canvas-manager .workspace-card-menu > div, .canvas-manager .workspace-group-menu > div { background: var(--workspace-bg); border: 1px solid var(--workspace-border); box-shadow: 0 12px 32px rgba(0, 0, 0, .28); }
+.canvas-manager .workspace-card-menu button, .canvas-manager .workspace-group-menu button { background: transparent; color: var(--workspace-text); }
+.canvas-manager .workspace-card-menu button:hover, .canvas-manager .workspace-group-menu button:hover { background: color-mix(in srgb, var(--workspace-text) 9%, transparent); }
+.canvas-manager .workspace-card-menu .workspace-danger { color: #e5675c; }
+.canvas-manager .workspace-card-menu .workspace-danger:hover { background: color-mix(in srgb, #e5675c 14%, transparent); color: #ff7b70; }

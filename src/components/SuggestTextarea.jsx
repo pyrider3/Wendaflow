@@ -10,7 +10,7 @@ const post = async (route, body) => {
 
 // The composer's text box. In action mode it suggests workspace files after "@" and Pi's slash commands/skills
 // at the start of the text. Everything else behaves like a plain textarea (Enter sends, Shift+Enter breaks the line).
-export function SuggestTextarea({ value, onChange, onSubmit, placeholder, autoFocus, workspace, piCommand, enabled, commandsEnabled, tr }) {
+export function SuggestTextarea({ value, onChange, onSubmit, onModSubmit, placeholder, autoFocus, workspace, piCommand, enabled, commandsEnabled, tr }) {
   const ref = useRef(null);
   const [trigger, setTrigger] = useState(null);   // { kind, from, to, query }
   const [items, setItems] = useState([]);
@@ -76,7 +76,7 @@ export function SuggestTextarea({ value, onChange, onSubmit, placeholder, autoFo
             if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); accept(items[index]); return; }
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setTrigger(null); return; }
           }
-          if (event.key === "Enter" && !event.shiftKey && !composing) { event.preventDefault(); onSubmit(); }
+          if (event.key === "Enter" && !event.shiftKey && !composing) { event.preventDefault(); if ((event.metaKey || event.ctrlKey) && onModSubmit) onModSubmit(); else onSubmit(); }
         }}
       />
       {open && (

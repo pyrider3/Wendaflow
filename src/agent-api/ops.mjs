@@ -1,3 +1,4 @@
+import { tidyLayout } from '../canvas/tidy-layout.mjs';
 // Canvas edits made by an external agent, expressed as small node-level
 // operations. The server applies them to the WDF file and the browser applies
 // the very same list to its live canvas, so both sides converge on one result.
@@ -116,21 +117,9 @@ function estimatedHeight(node) {
   return Math.min(360, CARD_H + Math.ceil(Math.min(text.length, 600) / 34) * 6);
 }
 
-// Left-to-right tree: column = depth along primary parents, rows keep their order.
+// Same tidy tree as the app's "arrange": each card next to its own children, trees stacked.
 export function layoutTree(nodes) {
-  const byId = new Map(nodes.map(n => [n.id, n]));
-  const depthOf = (node) => { let depth = 0, cursor = node; const seen = new Set(); while (cursor?.parentId && byId.has(cursor.parentId) && !seen.has(cursor.id)) { seen.add(cursor.id); depth++; cursor = byId.get(cursor.parentId); } return depth; };
-  const columns = new Map();
-  for (const node of nodes) { const d = depthOf(node); if (!columns.has(d)) columns.set(d, []); columns.get(d).push(node); }
-  const positions = new Map();
-  let x = 100;
-  for (const depth of [...columns.keys()].sort((a, b) => a - b)) {
-    const items = columns.get(depth).sort((a, b) => a.y - b.y || a.x - b.x);
-    let y = 110;
-    for (const node of items) { positions.set(node.id, { x, y }); y += estimatedHeight(node) + 74; }
-    x += Math.max(CARD_W, ...items.map(n => sizeOf(n).width)) + 92;
-  }
-  return positions;
+  return tidyLayout(nodes, (node) => ({ width: sizeOf(node).width, height: estimatedHeight(node) }));
 }
 
 export function layoutOps(nodes) {

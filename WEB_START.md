@@ -2,7 +2,7 @@
 
 在线使用：[Wendaflow 网页版](https://api.qnjyxh.xyz/)。画布保存在当前浏览器，云模型需要自行配置密钥。新建画布首次手动保存后才启用自动保存；尚未保存的新画布关闭或刷新后丢弃。导出 WDF 可备份或迁移。
 
-需要安装符合 package.json 依赖要求的 Node.js 和 npm。
+需要 Node.js 22.19+ 和 npm。`npm ci` 会同时装好行动模式用的 Pi。
 
 在项目根目录执行：
 

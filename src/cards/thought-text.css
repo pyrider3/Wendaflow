@@ -99,5 +99,6 @@
 .node.thought .image-attachment {border:0;background:transparent;border-radius:6px;}
 .node.thought .node-attachments img {height:auto;max-height:360px;object-fit:contain;border-radius:6px;background:transparent;}
 .node.thought:has(>h2[hidden]) .node-attachments {margin-top:0;}
-.node.thought.full:not(.text-thought)>h2 {font-size:16px;line-height:1.5;margin:0 0 8px;}
+/* An image idea's text looks exactly as it did in the editor: same type, line breaks and blank lines kept. */
+.node.thought.full:not(.text-thought)>h2 {font:500 16px/24px system-ui;letter-spacing:normal;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px;-webkit-line-clamp:unset;max-height:none;}
 .media-thought-editor textarea {max-width:100%;}

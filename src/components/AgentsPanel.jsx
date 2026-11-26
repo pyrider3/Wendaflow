@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { LOCAL_PROXY_URL } from "../localProxy.js";
 import { AGENT_IDS, AGENT_LABELS } from "../agents/catalog.mjs";
-import { Button, Empty, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
+import { Button, Field, Fields, Group, Input, Page, Row, Select, Status, Switch } from "./settings/ui.jsx";
+import { PiAccountPanel } from "./PiAccountPanel.jsx";
+import { PiResourcesPanel } from "./PiResourcesPanel.jsx";
 import { PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue } from "./PiOptions.jsx";
 
 export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, detection, onRedetect, piInfo, piLevels, piResources, onReloadPi, systemNotifications, onSystemNotificationsChange, workspaceConfig, onSaveWorkspace, onPickWorkspace, tr }) {
   const hints = {
-    pi: tr("可自己配置命令、模型和参数的编程智能体。", "A coding agent whose command, model and arguments you configure yourself."),
+    pi: tr("随 Wendaflow 一起安装，直接使用 设置 → 模型连接 里的模型。也可以填写路径，改用你自己装的 Pi。", "Installed with Wendaflow and uses the models from Settings → Model connections. Enter a path to use your own Pi install instead."),
     codex: tr("OpenAI 的 Codex 命令行。", "OpenAI's Codex command line."),
     claude: tr("Anthropic 的 Claude Code 命令行。", "Anthropic's Claude Code command line."),
     deepseek: tr("DeepSeek Harness，需要 DeepSeek API 密钥。", "DeepSeek Harness; needs a DeepSeek API key."),
   };
   const set = (id) => (patch) => onSettingChange(id, patch);
+  const [tab, setTab] = useState("pi");
   const [folderDraft, setFolderDraft] = useState("");
   const [folderError, setFolderError] = useState("");
   const applyFolder = async (value) => {
@@ -45,7 +48,7 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
       return (
         <Fields>
           <Field label={tr("命令或完整路径", "Command or full path")} span>
-            <Input value={o.command} onChange={(e) => update({ command: e.target.value })} onBlur={onRedetect} placeholder={tr("留空则使用 PATH 里的 pi", "Leave empty to use pi from PATH")} spellCheck={false} />
+            <Input value={o.command} onChange={(e) => update({ command: e.target.value })} onBlur={onRedetect} placeholder={tr("留空则使用内置的 Pi", "Leave empty to use the built-in Pi")} spellCheck={false} />
           </Field>
           <Field label={tr("模型", "Model")} span>
             <Select value={piSelectionValue(o)} onChange={(e) => update({ ...parsePiSelection(e.target.value), thinking: "" })}>
@@ -74,16 +77,6 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           <Field label={tr("额外参数", "Extra arguments")} span>
             <Input value={o.extraArgs} onChange={(e) => update({ extraArgs: e.target.value })} placeholder="--append-system-prompt ./notes.md" spellCheck={false} />
           </Field>
-          {piResources && (
-            <Field label={tr("技能与 MCP 服务器", "Skills and MCP servers")} span>
-              <div className="sx-tags">
-                {piResources.skills.map((skill) => <span key={`s-${skill.name}`} title={skill.description}>{skill.name}</span>)}
-                {piResources.mcp.map((server) => <span key={`m-${server.name}`} className={`mcp ${server.enabled ? "" : "off"}`} title={server.description}>{server.name}{server.enabled ? "" : ` · ${tr("已关闭", "Off")}`}</span>)}
-                {!piResources.skills.length && !piResources.mcp.length && <span className="sx-hint">{tr("没有", "None")}</span>}
-              </div>
-              <span className="sx-hint">{tr("只读显示。要增减或开关它们，请在 Pi 里用 pi config 和 pi mcp。", "Read-only. To add, remove or switch them, use pi config and pi mcp in Pi.")}</span>
-            </Field>
-          )}
         </Fields>
       );
     },
@@ -143,7 +136,44 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
   };
 
   return (
-    <Page title={tr("执行器", "Agents")} description={tr("行动模式会把任务交给这里启用的执行器。默认没有启用任何一个，请开启你要用的。", "Action mode hands tasks to the agents enabled here. None is enabled by default; turn on the ones you want.")}>
+    <Page title={tr("行动模式", "Action mode")} description={tr("行动模式默认使用内置的 Pi。Codex、Claude Code 等其他执行器需要时再单独启用；启用后行动模式里才会出现执行器选择。", "Action mode uses the built-in Pi. Turn on other agents such as Codex or Claude Code only if you need them; the agent picker appears in Action mode once one is on.")}>
+      <section className="ag-hero">
+        <span className="ag-logo" aria-hidden="true">π</span>
+        <div className="ag-hero-text">
+          <strong>Pi</strong>
+          <small>{detection?.pi?.installed ? `${detection.pi.version || ""} · ${settings.pi?.command ? tr("你指定的 Pi", "Your own Pi") : tr("内置", "Built in")}` : detection ? tr("没有找到 Pi", "Pi not found") : tr("正在检测…", "Detecting…")}</small>
+        </div>
+        <div className="ag-stats">
+          <span><b>{piInfo?.models?.length ?? "–"}</b>{tr("个模型", "models")}</span>
+          <span><b>{piResources?.skills?.filter((item) => item.enabled !== false).length ?? "–"}</b>{tr("个技能", "skills")}</span>
+          <span><b>{piResources?.mcp?.filter((item) => item.enabled !== false).length ?? "–"}</b>MCP</span>
+        </div>
+      </section>
+      <nav className="ag-tabs" role="tablist">
+        {[["pi", tr("Pi 设置", "Pi settings")], ["account", tr("账号与用量", "Account and usage")], ["extensions", tr("扩展与技能", "Extensions and skills")], ["workspace", tr("目录与审批", "Folders and approvals")], ["others", tr("其他执行器", "Other agents")]].map(([key, label]) => (
+          <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>
+        ))}
+      </nav>
+      <div key={tab} className="ag-tab-body">
+      {tab === "pi" && <>
+      {["pi"].map((id) => (<React.Fragment key={id}>
+        <Group
+          key={id}
+          title={id === "pi" ? tr("Pi · 内置", "Pi · built in") : AGENT_LABELS[id]}
+          hint={hints[id]}
+          action={id === "pi" ? undefined : <Switch checked={enabled.includes(id)} onChange={(value) => onToggle(id, value)} label={tr(`启用 ${AGENT_LABELS[id]}`, `Enable ${AGENT_LABELS[id]}`)} onLabel={tr("已启用", "Enabled")} offLabel={tr("未启用", "Off")} />}
+        >
+          <div className="sx-row">
+            <div className="sx-row-text"><strong>{tr("本机状态", "On this computer")}</strong>{detection?.[id]?.path && <span>{detection[id].path}</span>}</div>
+            <div className="sx-row-control">{status(id)} <Button onClick={onRedetect}>{tr("重新检测", "Re-check")}</Button></div>
+          </div>
+          {enabled.includes(id) && fields[id](settings[id] || {}, set(id))}
+        </Group>
+      </React.Fragment>))}
+      </>}
+      {tab === "account" && <PiAccountPanel command={settings.pi?.command || ""} onReloadPi={onReloadPi} tr={tr} />}
+      {tab === "extensions" && (piResources ? <PiResourcesPanel resources={piResources} command={settings.pi?.command || ""} onChanged={() => onReloadPi?.()} tr={tr} /> : <p className="sx-hint">{tr("正在读取 Pi 的扩展与技能…", "Loading Pi's extensions and skills…")}</p>)}
+      {tab === "workspace" && <>
       <Group title={tr("默认工作目录", "Default working directory")} hint={tr("没有指定文件夹的行动会在这里运行，而不是在 Wendaflow 自己的程序目录里。", "Actions with no folder chosen run here instead of in Wendaflow's own program folder.")}>
         <div className="sx-row">
           <div className="sx-row-text">
@@ -174,17 +204,14 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           </div>
         ))}
       </Group>
-      {!enabled.length && (
-        <Group>
-          <Empty icon="⌘" title={tr("还没有启用执行器", "No agent enabled yet")}>{tr("开启下面的一个或几个，行动模式里才能选它们。", "Enable one or more below to use them in Action mode.")}</Empty>
-        </Group>
-      )}
-      {AGENT_IDS.map((id) => (
+      </>}
+      {tab === "others" && <>
+      {AGENT_IDS.filter((id) => id !== "pi").map((id) => (<React.Fragment key={id}>
         <Group
           key={id}
-          title={AGENT_LABELS[id]}
+          title={id === "pi" ? tr("Pi · 内置", "Pi · built in") : AGENT_LABELS[id]}
           hint={hints[id]}
-          action={<Switch checked={enabled.includes(id)} onChange={(value) => onToggle(id, value)} label={tr(`启用 ${AGENT_LABELS[id]}`, `Enable ${AGENT_LABELS[id]}`)} onLabel={tr("已启用", "Enabled")} offLabel={tr("未启用", "Off")} />}
+          action={id === "pi" ? undefined : <Switch checked={enabled.includes(id)} onChange={(value) => onToggle(id, value)} label={tr(`启用 ${AGENT_LABELS[id]}`, `Enable ${AGENT_LABELS[id]}`)} onLabel={tr("已启用", "Enabled")} offLabel={tr("未启用", "Off")} />}
         >
           <div className="sx-row">
             <div className="sx-row-text"><strong>{tr("本机状态", "On this computer")}</strong>{detection?.[id]?.path && <span>{detection[id].path}</span>}</div>
@@ -192,7 +219,9 @@ export function AgentsPanel({ enabled, onToggle, settings, onSettingChange, dete
           </div>
           {enabled.includes(id) && fields[id](settings[id] || {}, set(id))}
         </Group>
-      ))}
+      </React.Fragment>))}
+      </>}
+      </div>
     </Page>
   );
 }

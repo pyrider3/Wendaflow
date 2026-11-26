@@ -579,3 +579,318 @@
   :root .app-shell .composer .agent-chips .agent-chip.model-chip { flex: 0 1 auto; min-width: 60px; }
   :root .app-shell .composer .agent-chips .agent-chip.model-chip span { overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* ===== Pi action composer: More panel, session pills, running strip ===== */
+:root .app-shell .composer .chip-pop.pop-more { --w: 320px; }
+:root .app-shell .composer .agent-chip .chip-note { margin-left: 4px; font-style: normal; color: var(--sx-muted); }
+:root .app-shell .composer .agent-chip.more svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; fill: none; }
+:root .app-shell .composer .pop-more { display: grid; gap: 2px; }
+:root .app-shell .composer .pop-toggle { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 12px; cursor: pointer; }
+:root .app-shell .composer .pop-toggle:hover { background: color-mix(in srgb, var(--sx-accent) 7%, transparent); }
+:root .app-shell .composer .pop-toggle.muted { cursor: default; opacity: .6; }
+:root .app-shell .composer .pop-toggle input { margin-top: 3px; accent-color: var(--sx-accent); }
+:root .app-shell .composer .pop-toggle span { display: grid; gap: 2px; }
+:root .app-shell .composer .pop-toggle b { font-weight: 600; font-size: 14px; }
+:root .app-shell .composer .pop-toggle em { font-style: normal; font-size: 12px; line-height: 1.4; color: var(--sx-muted); }
+:root .app-shell .composer .pop-more .pop-section { padding: 8px 10px 2px; font-size: 12px; color: var(--sx-muted); }
+:root .app-shell .composer .pop-resources { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 10px 8px; font-size: 13px; }
+:root .app-shell .composer .pop-resources label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+:root .app-shell .composer .pop-resources input { accent-color: var(--sx-accent); }
+:root .app-shell .composer .pi-session-pills { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+:root .app-shell .composer .pi-pill { display: inline-flex; align-items: center; gap: 5px; max-width: 280px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 7%, transparent); color: var(--sx-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .app-shell .composer .pi-pill svg { flex: none; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+:root .app-shell .composer .pi-pill.warn { background: color-mix(in srgb, #c18401 16%, transparent); color: #b06f00; }
+:root .app-shell .composer .pi-running-strip { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; padding: 8px 10px; border-radius: 14px; background: color-mix(in srgb, var(--sx-accent) 8%, transparent); font-size: 13px; }
+:root .app-shell .composer .pi-running-strip > i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sx-accent); animation: pi-pulse 1.4s ease-in-out infinite; }
+:root .app-shell .composer .pi-running-strip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sx-text); }
+:root .app-shell .composer .pi-running-strip button { flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-text); font-size: 12.5px; cursor: pointer; }
+:root .app-shell .composer .pi-running-strip button:disabled { opacity: .45; cursor: default; }
+:root .app-shell .composer .pi-running-strip button.danger { border-color: color-mix(in srgb, var(--sx-danger, #c0392b) 55%, transparent); color: var(--sx-danger, #c0392b); }
+:root .app-shell .composer .pi-running-strip kbd { margin-left: 3px; font: 11px ui-monospace, monospace; color: var(--sx-muted); }
+@keyframes pi-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .composer .pi-running-strip > i { animation: none; } }
+
+/* ===== Pi bar (v3): + menu · model pill · quiet controls on the right ===== */
+:root .app-shell .composer:has(.pi-bar) .composer-bottom > .attach-button,
+:root .app-shell .composer:has(.pi-bar) .composer-bottom > .shortcut { display: none; }
+:root .app-shell .composer .pi-bar { flex: 1; min-width: 0; }
+:root .app-shell .composer .pi-bar .agent-chips { flex-wrap: nowrap; gap: 4px; }
+:root .app-shell .composer .pi-bar .chip-spacer { flex: 1; min-width: 4px; }
+:root .app-shell .composer .pi-bar .agent-chip.add { width: 36px; padding: 0; justify-content: center; }
+:root .app-shell .composer .pi-bar .agent-chip.add svg { width: 16px; height: 16px; stroke-width: 1.8; }
+:root .app-shell .composer .pi-bar .agent-chip.model-pill { max-width: 320px; gap: 7px; padding: 0 12px 0 14px; color: var(--sx-text); font-weight: 500; }
+:root .app-shell .composer .pi-bar .model-pill .model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .pi-bar .model-pill .model-effort { flex: none; font-weight: 600; color: var(--sx-accent); }
+:root .app-shell .composer .pi-bar .agent-chip.quiet { border-color: transparent; background: transparent; color: var(--sx-muted); }
+:root .app-shell .composer .pi-bar .agent-chip.quiet:hover, :root .app-shell .composer .pi-bar .agent-chip.quiet.active { color: var(--sx-text); background: color-mix(in srgb, var(--sx-text) 7%, transparent); border-color: transparent; }
+:root .app-shell .composer .pi-bar .agent-chip.quiet.danger { color: #c9703f; }
+:root .app-shell .composer .pi-bar .agent-chip.quiet.plan.active, :root .app-shell .composer .pi-bar .agent-chip.quiet.more.active { color: var(--sx-accent); background: var(--sx-accent-soft); }
+:root .app-shell .composer .pi-bar .agent-chip.icon { width: 36px; padding: 0; justify-content: center; }
+:root .app-shell .composer .pi-bar .agent-chip.more svg { width: 16px; height: 16px; stroke-width: 2.6; }
+:root .app-shell .composer .context-ring { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; color: var(--sx-muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root .app-shell .composer .context-ring i { width: 14px; height: 14px; border-radius: 50%; background: conic-gradient(var(--sx-accent) var(--p), color-mix(in srgb, var(--sx-text) 14%, transparent) 0); -webkit-mask: radial-gradient(circle, transparent 3.5px, #000 4px); mask: radial-gradient(circle, transparent 3.5px, #000 4px); }
+:root .app-shell .composer .context-ring.warn { color: #b06f00; }
+:root .app-shell .composer .context-ring.warn i { background: conic-gradient(#c18401 var(--p), color-mix(in srgb, var(--sx-text) 14%, transparent) 0); }
+:root .app-shell .composer .chip-pop.pop-add { --w: 260px; }
+:root .app-shell .composer .pop-menu { display: grid; gap: 1px; }
+:root .app-shell .composer .pop-menu button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13.5px; text-align: left; cursor: pointer; transition: background .14s var(--ease-out); }
+:root .app-shell .composer .pop-menu button:hover { background: color-mix(in srgb, var(--sx-accent) 8%, transparent); }
+:root .app-shell .composer .pop-menu svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--sx-muted); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+:root .app-shell .composer .pop-menu .pop-glyph { width: 16px; flex: none; text-align: center; color: var(--sx-muted); font: 600 14px ui-monospace, monospace; }
+:root .app-shell .composer .pop-menu span { flex: 1; }
+:root .app-shell .composer .pop-menu em { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; font-size: 12px; color: var(--sx-muted); }
+
+/* favorite models */
+:root .app-shell .composer .model-row { display: flex; align-items: center; border-radius: 10px; }
+:root .app-shell .composer .model-row > button[role="radio"] { flex: 1; min-width: 0; }
+:root .app-shell .composer .model-list-scroll .model-row > .model-star { flex: none; width: 30px; min-height: 30px; padding: 0; justify-content: center; color: var(--sx-muted); font-size: 14px; opacity: 0; transition: opacity .14s var(--ease-out), color .14s; }
+:root .app-shell .composer .model-row:hover > .model-star, :root .app-shell .composer .model-row > .model-star:focus-visible, :root .app-shell .composer .model-row > .model-star.on { opacity: 1; }
+:root .app-shell .composer .model-list-scroll .model-row > .model-star.on { color: #d99a1e; }
+:root .app-shell .composer .model-list-scroll .model-row > .model-star:hover { background: transparent; color: #d99a1e; }
+:root .app-shell .composer .model-group.pinned { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid var(--sx-line); }
+
+/* Composer popovers fade out too, and re-animate when switching from one to another. */
+:root .app-shell .composer .chip-pop.closing { pointer-events: none; animation: chip-pop-out .15s var(--ease-out) both; }
+@keyframes chip-pop-out { to { opacity: 0; transform: translateY(4px) scale(.98); } }
+/* Canvas manager "···" menus open with the same motion as the other menus. */
+.workspace-card-menu[open] > div, .workspace-group-menu[open] > div { animation: chip-pop-in .16s var(--ease-out) both; transform-origin: top right; }
+.workspace-card-menu[open] > div { transform-origin: bottom right; }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .composer .chip-pop, :root .app-shell .composer .chip-pop.closing, .workspace-card-menu[open] > div, .workspace-group-menu[open] > div { animation: none; } }
+:root .app-shell .composer button.pi-pill { border: 0; cursor: pointer; font: inherit; font-size: 12px; transition: background .14s var(--ease-out), color .14s; }
+:root .app-shell .composer button.pi-pill:hover { background: color-mix(in srgb, var(--sx-text) 12%, transparent); color: var(--sx-text); }
+:root .app-shell .composer .pi-pill em { font-style: normal; opacity: .8; }
+
+/* Empty canvas: clickable starting points under the hint. */
+:root .app-shell .empty-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; pointer-events: auto; }
+:root .app-shell .empty-starters button { height: 34px; padding: 0 14px; border: 1px solid var(--sx-line); border-radius: 999px; background: color-mix(in srgb, var(--sx-raised) 70%, transparent); color: var(--sx-text); font-size: 13px; cursor: pointer; animation: chip-pop-in .35s var(--ease-out) both; transition: border-color .16s var(--ease-out), background .16s var(--ease-out), transform .2s var(--ease-spring, ease); }
+:root .app-shell .empty-starters button:nth-child(2) { animation-delay: .05s; }
+:root .app-shell .empty-starters button:nth-child(3) { animation-delay: .1s; }
+:root .app-shell .empty-starters button:nth-child(4) { animation-delay: .15s; }
+:root .app-shell .empty-starters button:hover { border-color: var(--sx-accent); background: var(--sx-accent-soft); transform: translateY(-1px); }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .empty-starters button { animation: none; } }
+
+/* Pi session history: branch from any message */
+.pi-history { width: min(560px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 60px)); display: flex; flex-direction: column; border: 1px solid var(--sx-line); border-radius: 20px; background: var(--sx-raised); color: var(--sx-text); box-shadow: var(--sx-shadow); overflow: hidden; animation: chip-pop-in .2s var(--ease-out) both; }
+.pi-history header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--sx-line); }
+.pi-history header strong { display: block; font-size: 16px; }
+.pi-history header small { display: block; margin-top: 3px; color: var(--sx-muted); font-size: 12.5px; line-height: 1.5; }
+.pi-history header button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: var(--sx-sunken); color: var(--sx-muted); font-size: 18px; cursor: pointer; }
+.pi-history ol { margin: 0; padding: 8px; overflow: auto; list-style: none; display: grid; gap: 4px; }
+.pi-history li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 10px; border-radius: 12px; transition: background .14s var(--ease-out); }
+.pi-history li:hover { background: color-mix(in srgb, var(--sx-accent) 6%, transparent); }
+.pi-history-index { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--sx-sunken); color: var(--sx-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pi-history li p { margin: 2px 0 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.pi-history li button { height: 30px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-text); font-size: 12.5px; white-space: nowrap; cursor: pointer; opacity: .7; transition: opacity .14s, border-color .14s; }
+.pi-history li:hover button { opacity: 1; border-color: var(--sx-accent); }
+.pi-history-note { margin: 0; padding: 24px 18px; color: var(--sx-muted); font-size: 13px; }
+.pi-history-note.error { color: var(--sx-danger, #c0392b); }
+.pi-history-open { margin-top: 6px; padding: 0; border: 0; background: none; color: var(--sx-muted, #6f7e76); font-size: 11.5px; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; transition: color .14s, text-decoration-color .14s; }
+.pi-history-open:hover { color: var(--sx-accent, #247b56); text-decoration-color: currentColor; }
+:root .app-shell .composer .pi-pill.fork { background: var(--sx-accent-soft); color: var(--sx-accent); }
+:root .app-shell .composer .pi-pill.fork button { margin-left: 2px; padding: 0 2px; border: 0; background: none; color: inherit; font-size: 13px; cursor: pointer; }
+
+/* ===== Model menu (v4): family marks, staggered rows, glowing selection, starry thinking rail ===== */
+:root .app-shell .composer .chip-pop.pop-model { --w: 380px; padding: 6px; }
+:root .app-shell .composer .mm { display: grid; gap: 6px; }
+:root .app-shell .composer .mm-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px 2px; color: var(--sx-muted); font-size: 12.5px; }
+:root .app-shell .composer .mm-head input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 9px; background: var(--sx-sunken); color: var(--sx-text); font-size: 12.5px; }
+:root .app-shell .composer .mm-list { max-height: 300px; overflow-y: auto; overflow-x: hidden; display: grid; gap: 2px; padding: 2px; scrollbar-width: thin; }
+:root .app-shell .composer .mm-row { position: relative; display: flex; align-items: center; border: 1px solid transparent; border-radius: 12px; animation: mm-row-in .32s var(--ease-out) both; animation-delay: calc(var(--i) * 18ms); transition: background .18s var(--ease-out), border-color .18s var(--ease-out); }
+:root .app-shell .composer .mm-row:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+:root .app-shell .composer .mm-row.selected { border-color: color-mix(in srgb, var(--sx-accent) 45%, transparent); background: color-mix(in srgb, var(--sx-accent) 10%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--sx-accent) 12%, transparent), 0 6px 22px -10px color-mix(in srgb, var(--sx-accent) 70%, transparent); }
+:root .app-shell .composer .mm-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border: 0; background: transparent; color: var(--sx-text); font-size: 13.5px; text-align: left; cursor: pointer; }
+:root .app-shell .composer .mm-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .mm-level { flex: none; color: var(--sx-accent); font-weight: 600; animation: mm-pop .3s var(--ease-spring, ease) both; }
+:root .app-shell .composer .mm-pick em { flex: none; max-width: 40%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 7%, transparent); color: var(--sx-muted); font-style: normal; font-size: 11px; }
+:root .app-shell .composer .mm-glyph { flex: none; width: 17px; height: 17px; fill: none; stroke: color-mix(in srgb, var(--sx-text) 55%, transparent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s, transform .35s var(--ease-spring, ease); }
+:root .app-shell .composer .mm-glyph.spark { fill: color-mix(in srgb, var(--sx-text) 45%, transparent); stroke: none; }
+:root .app-shell .composer .mm-row:hover .mm-glyph { transform: rotate(-12deg) scale(1.08); }
+:root .app-shell .composer .mm-row.selected .mm-glyph { stroke: var(--sx-accent); filter: drop-shadow(0 0 5px color-mix(in srgb, var(--sx-accent) 60%, transparent)); }
+:root .app-shell .composer .mm-row.selected .mm-glyph.spark { fill: var(--sx-accent); }
+:root .app-shell .composer .mm-star { flex: none; width: 30px; height: 30px; margin-right: 4px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--sx-muted); font-size: 14px; cursor: pointer; opacity: 0; transition: opacity .15s, color .15s, transform .25s var(--ease-spring, ease); }
+:root .app-shell .composer .mm-row:hover .mm-star, :root .app-shell .composer .mm-star.on, :root .app-shell .composer .mm-star:focus-visible { opacity: 1; }
+:root .app-shell .composer .mm-star.on { color: #e5a72a; }
+:root .app-shell .composer .mm-star:active { transform: scale(1.3); }
+:root .app-shell .composer .mm-note { margin: 6px 10px; color: var(--sx-muted); font-size: 12px; }
+
+:root .app-shell .composer .mm-effort-card { margin: 2px; padding: 10px 12px 12px; border: 1px solid color-mix(in srgb, var(--sx-accent) 40%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--sx-accent) 7%, var(--sx-raised)); box-shadow: inset 0 0 24px -12px color-mix(in srgb, var(--sx-accent) 60%, transparent); animation: mm-row-in .36s var(--ease-out) both; animation-delay: .08s; }
+:root .app-shell .composer .mm-effort-card.disabled { border-color: var(--sx-line); background: transparent; box-shadow: none; }
+:root .app-shell .composer .mm-effort-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; font-size: 13.5px; font-weight: 600; }
+:root .app-shell .composer .mm-effort-head b { color: var(--sx-accent); animation: mm-pop .32s var(--ease-spring, ease) both; }
+:root .app-shell .composer .mm-track { position: relative; height: 34px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 9%, transparent); cursor: pointer; touch-action: none; outline: none; }
+:root .app-shell .composer .mm-track:focus-visible { box-shadow: 0 0 0 2px var(--sx-accent); }
+:root .app-shell .composer .mm-fill { position: absolute; inset: 0 auto 0 0; width: calc(28px + var(--p) * (100% - 28px)); border-radius: inherit; overflow: hidden; background: linear-gradient(90deg, color-mix(in srgb, var(--sx-accent) 30%, #170c2b), color-mix(in srgb, var(--sx-accent) 75%, #6d3cf0) 60%, var(--sx-accent)); box-shadow: 0 0 18px -2px color-mix(in srgb, var(--sx-accent) 70%, transparent); transition: width .45s cubic-bezier(.3, 1.4, .5, 1); }
+:root .app-shell .composer .mm-track.unset .mm-fill { width: 28px; opacity: .5; }
+:root .app-shell .composer .mm-fill i { position: absolute; inset: 0; background-image: radial-gradient(1.4px 1.4px at 12% 30%, #fff 60%, transparent), radial-gradient(1px 1px at 27% 70%, #fff 60%, transparent), radial-gradient(1.6px 1.6px at 41% 40%, #fff 60%, transparent), radial-gradient(1px 1px at 56% 75%, #fff 60%, transparent), radial-gradient(1.3px 1.3px at 68% 25%, #fff 60%, transparent), radial-gradient(1px 1px at 81% 60%, #fff 60%, transparent), radial-gradient(1.5px 1.5px at 93% 35%, #fff 60%, transparent); background-size: 220px 100%; animation: mm-stars 6s linear infinite, mm-twinkle 2.4s ease-in-out infinite alternate; opacity: .85; }
+:root .app-shell .composer .mm-fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .28) 50%, transparent 70%); transform: translateX(-100%); animation: mm-sheen 3.2s ease-in-out infinite; }
+:root .app-shell .composer .mm-stop { position: absolute; top: 50%; left: calc(14px + var(--x) * (100% - 28px)); width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: color-mix(in srgb, var(--sx-text) 35%, transparent); pointer-events: none; transition: background .3s; }
+:root .app-shell .composer .mm-stop.lit { background: rgba(255, 255, 255, .55); }
+:root .app-shell .composer .mm-thumb { position: absolute; top: 50%; left: calc(14px + var(--p) * (100% - 28px)); width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sx-accent) 35%, transparent), 0 0 16px 2px color-mix(in srgb, var(--sx-accent) 75%, transparent), 0 2px 6px rgba(0, 0, 0, .35); pointer-events: none; transition: left .45s cubic-bezier(.3, 1.4, .5, 1), transform .2s var(--ease-out); }
+:root .app-shell .composer .mm-track:active .mm-thumb { transform: scale(1.12); }
+:root .app-shell .composer .mm-track.unset .mm-thumb { left: 14px; opacity: .7; }
+:root .app-shell .composer .mm-usage { display: flex; align-items: center; gap: 10px; height: 38px; margin: 0 2px 2px; padding: 0 10px; border: 0; border-top: 1px solid var(--sx-line); border-radius: 0 0 12px 12px; background: transparent; color: var(--sx-text); font-size: 13.5px; cursor: pointer; transition: background .15s; }
+:root .app-shell .composer .mm-usage:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+:root .app-shell .composer .mm-usage svg { width: 17px; height: 17px; fill: none; stroke: var(--sx-muted); stroke-width: 1.5; stroke-linecap: round; }
+:root .app-shell .composer .mm-usage span { flex: 1; text-align: left; }
+:root .app-shell .composer .mm-usage i { font-style: normal; color: var(--sx-muted); transition: transform .2s var(--ease-out); }
+:root .app-shell .composer .mm-usage:hover i { transform: translateX(3px); }
+@keyframes mm-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes mm-pop { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes mm-stars { to { background-position: 220px 0; } }
+@keyframes mm-twinkle { from { opacity: .55; } to { opacity: 1; } }
+@keyframes mm-sheen { 0%, 40% { transform: translateX(-100%); } 80%, 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .composer :is(.mm-row, .mm-effort-card, .mm-level, .mm-effort-head b, .mm-fill i, .mm-fill::after) { animation: none; } }
+:root .app-shell .composer .pi-bar .agent-chip.runner-switch { padding: 0 10px; color: var(--sx-text); font-weight: 600; }
+
+/* Pi session tree */
+.pi-tree { padding: 10px 14px 14px; overflow: auto; display: grid; gap: 2px; }
+.pi-tree-entry { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 6px 8px; border-radius: 10px; animation: mm-row-in .25s var(--ease-out) both; }
+.pi-tree-entry:hover { background: color-mix(in srgb, var(--sx-text) 5%, transparent); }
+.pi-tree-entry > i { width: 9px; height: 9px; margin: 6px 0 0 2px; border-radius: 50%; background: color-mix(in srgb, var(--sx-text) 30%, transparent); }
+.pi-tree-entry.user > i { background: var(--sx-accent); }
+.pi-tree-entry.compaction > i, .pi-tree-entry.branch > i { border-radius: 2px; background: #c18401; }
+.pi-tree-entry p { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.pi-tree-entry.assistant p { color: var(--sx-muted); font-size: 12.5px; -webkit-line-clamp: 2; }
+.pi-tree-entry small { display: block; color: #b06f00; font-size: 11.5px; font-weight: 600; }
+.pi-tree-entry.off-branch { opacity: .62; }
+.pi-tree-entry button { height: 28px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-text); font-size: 12px; white-space: nowrap; cursor: pointer; opacity: 0; transition: opacity .14s, border-color .14s; }
+.pi-tree-entry:hover button, .pi-tree-entry button:focus-visible { opacity: 1; border-color: var(--sx-accent); }
+.pi-tree-entry em { align-self: center; font-style: normal; font-size: 11px; color: var(--sx-muted); }
+.pi-tree-label { display: inline-block; margin-bottom: 2px; padding: 0 7px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-size: 11px; font-weight: 600; }
+.pi-tree-split { display: grid; gap: 6px; margin: 2px 0 2px 13px; }
+.pi-tree-branch { padding-left: 12px; border-left: 2px solid color-mix(in srgb, var(--sx-text) 14%, transparent); }
+.pi-tree-branch.active { border-left-color: var(--sx-accent); }
+
+/* ===== Model menu (v5): official marks, favourites first, "All models" sub-menu, 3D thumb ===== */
+:root .app-shell .composer .mm-mark { flex: none; width: 18px; height: 18px; object-fit: contain; transition: transform .35s var(--ease-spring, ease); }
+:root .app-shell .composer span.mm-mark.mono { background: var(--sx-text); -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat; }
+:root .app-shell .composer .mm-mark.none { width: 8px; height: 8px; margin: 0 5px; border-radius: 50%; background: color-mix(in srgb, var(--sx-text) 30%, transparent); }
+:root .app-shell .composer .mm-row:hover .mm-mark { transform: scale(1.12); }
+:root .app-shell .composer .mm-row.selected .mm-mark { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--sx-accent) 55%, transparent)); }
+:root .app-shell .composer .mm-head.sub { padding-left: 4px; }
+:root .app-shell .composer .mm-head.sub > span { color: var(--sx-text); font-weight: 600; }
+:root .app-shell .composer .mm-back { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--sx-text); font-size: 18px; line-height: 1; cursor: pointer; transition: background .15s, transform .2s var(--ease-out); }
+:root .app-shell .composer .mm-back:hover { background: color-mix(in srgb, var(--sx-text) 8%, transparent); transform: translateX(-2px); }
+:root .app-shell .composer .mm-list.slide-in { animation: mm-slide-in .26s var(--ease-out) both; }
+:root .app-shell .composer .mm-list.slide-back { animation: mm-slide-back .26s var(--ease-out) both; }
+:root .app-shell .composer .mm-more { display: flex; align-items: center; gap: 8px; height: 38px; margin: 0 2px; padding: 0 12px; border: 0; border-top: 1px solid var(--sx-line); border-radius: 0 0 10px 10px; background: transparent; color: var(--sx-text); font-size: 13.5px; cursor: pointer; transition: background .15s; }
+:root .app-shell .composer .mm-more:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+:root .app-shell .composer .mm-more span { flex: 1; text-align: left; }
+:root .app-shell .composer .mm-more em { font-style: normal; font-size: 11.5px; color: var(--sx-muted); padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 7%, transparent); }
+:root .app-shell .composer .mm-more i { font-style: normal; color: var(--sx-muted); transition: transform .2s var(--ease-out); }
+:root .app-shell .composer .mm-more:hover i { transform: translateX(3px); }
+@keyframes mm-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes mm-slide-back { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+/* The rail sits in a recessed groove; the thumb is a lit glossy ball with a soft contact shadow. */
+:root .app-shell .composer .mm-track { height: 36px; box-shadow: inset 0 2px 6px rgba(0, 0, 0, .32), inset 0 -1px 0 rgba(255, 255, 255, .08); }
+:root .app-shell .composer .mm-fill { width: calc(32px + var(--p) * (100% - 32px)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 0 18px -2px color-mix(in srgb, var(--sx-accent) 70%, transparent); }
+:root .app-shell .composer .mm-stop { left: calc(16px + var(--x) * (100% - 32px)); }
+:root .app-shell .composer .mm-thumb { left: calc(16px + var(--p) * (100% - 32px)); width: 30px; height: 30px; margin: -15px 0 0 -15px; background: radial-gradient(circle at 34% 28%, #ffffff 0%, #f7f7fa 30%, #dedfe6 68%, #c2c3cc 100%); box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--sx-accent) 45%, transparent), 0 0 16px 2px color-mix(in srgb, var(--sx-accent) 55%, transparent), 0 5px 10px -2px rgba(0, 0, 0, .45), inset 0 -3px 6px rgba(0, 0, 0, .16), inset 0 2px 2px rgba(255, 255, 255, .95); }
+:root .app-shell .composer .mm-thumb i { position: absolute; left: 7px; top: 5px; width: 11px; height: 7px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255, 255, 255, .95), rgba(255, 255, 255, 0) 70%); transform: rotate(-20deg); }
+:root .app-shell .composer .mm-track:active .mm-thumb { transform: scale(1.1); }
+:root .app-shell .composer .mm-track.unset .mm-thumb { left: 16px; }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .composer .mm-list.slide-in, :root .app-shell .composer .mm-list.slide-back { animation: none; } }
+
+/* Notifications sit at the far right of the top bar. */
+:root .app-shell .topbar-actions > .notification-anchor { order: 10; }
+
+/* ===== Action activity (v2): line icons, quiet progress notes, nothing scrolls sideways ===== */
+.action-live-feed > div { overflow-x: hidden; }
+.action-live-feed article { min-width: 0; }
+.action-live-feed article > span { min-width: 0; }
+.action-live-feed article small, .action-live-feed article code { overflow-wrap: anywhere; white-space: pre-wrap; }
+.action-live-feed article.tool code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; vertical-align: bottom; }
+.action-live-feed pre { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+.activity-icon { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); color: var(--sx-muted, #7d8a83); font-style: normal; }
+.activity-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.activity-icon.thinking { color: #8f7cf0; }
+.activity-icon.thinking svg { fill: currentColor; stroke: none; }
+.activity-icon.edit, .activity-icon.write, .activity-icon.file { color: #3aa776; }
+.activity-icon.bash { color: #d39a3a; }
+.activity-icon.stderr { color: #e0685d; }
+.activity-icon.message, .activity-icon.user { color: var(--sx-accent, #247b56); }
+.activity-status { position: relative; margin: 2px 0 2px 34px; color: var(--sx-muted, #7d8a83); font-size: 11.5px; line-height: 1.5; }
+.activity-status::before { content: ""; position: absolute; left: -21px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .55; }
+.tool-diff { margin-left: 6px; font: 600 11px ui-monospace, monospace; font-style: normal; }
+.tool-diff ins { color: #2f9e62; text-decoration: none; }
+.tool-diff del { color: #d0574a; text-decoration: none; }
+
+/* ===== Files from a run (v2) ===== */
+.action-artifacts.v2 { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sx-line, rgba(127,127,127,.2)); }
+.action-artifacts.v2 header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--sx-text); }
+.action-artifacts.v2 header small { color: var(--sx-muted); font-weight: 500; }
+.action-artifacts.v2 ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.artifact-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 8px; border: 1px solid var(--sx-line, rgba(127,127,127,.2)); border-radius: 10px; background: color-mix(in srgb, currentColor 3%, transparent); transition: border-color .15s, background .15s; }
+.artifact-row:hover { border-color: color-mix(in srgb, var(--sx-accent) 45%, transparent); background: color-mix(in srgb, var(--sx-accent) 6%, transparent); }
+.artifact-type { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: color-mix(in srgb, #7d8a83 16%, transparent); color: var(--sx-muted); font: 700 9.5px/1 ui-monospace, monospace; letter-spacing: .02em; }
+.artifact-row.doc .artifact-type { background: color-mix(in srgb, #4f8ef7 18%, transparent); color: #5b95f5; }
+.artifact-row.code .artifact-type { background: color-mix(in srgb, #d39a3a 20%, transparent); color: #d39a3a; }
+.artifact-row.image .artifact-type { background: color-mix(in srgb, #3aa776 20%, transparent); color: #3aa776; }
+.artifact-text { flex: 1; min-width: 0; display: grid; }
+.artifact-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.artifact-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sx-muted); font-size: 11px; }
+.artifact-action { flex: none; height: 26px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: var(--sx-accent); color: var(--sx-accent-ink, #fff); font-size: 11.5px; cursor: pointer; }
+.artifact-action.quiet { border-color: var(--sx-line, rgba(127,127,127,.3)); background: transparent; color: var(--sx-text); }
+
+/* Model menu: default badge, "set default" on hover, creativity segment; stars stream faster at higher levels. */
+:root .app-shell .composer .mm-default { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-size: 11px; font-weight: 600; }
+:root .app-shell .composer .mm-set-default { flex: none; height: 26px; margin-right: 2px; padding: 0 9px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-muted); font-size: 11.5px; white-space: nowrap; cursor: pointer; opacity: 0; transition: opacity .14s, color .14s, border-color .14s; }
+:root .app-shell .composer .mm-row:hover .mm-set-default, :root .app-shell .composer .mm-set-default:focus-visible { opacity: 1; }
+:root .app-shell .composer .mm-set-default:hover { color: var(--sx-accent); border-color: var(--sx-accent); }
+:root .app-shell .composer .mm-seg { display: grid; gap: 6px; margin: 2px; padding: 10px 12px; border: 1px solid var(--sx-line); border-radius: 14px; }
+:root .app-shell .composer .mm-seg small { color: var(--sx-muted); font-size: 12px; }
+:root .app-shell .composer .mm-seg > div { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--sx-sunken); }
+:root .app-shell .composer .mm-seg button { flex: 1; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--sx-muted); font-size: 12.5px; cursor: pointer; transition: background .15s, color .15s; }
+:root .app-shell .composer .mm-seg button.selected { background: var(--sx-raised); color: var(--sx-text); box-shadow: 0 1px 4px rgba(0, 0, 0, .18); }
+:root .app-shell .composer .mm-fill i { animation: mm-twinkle 2.2s ease-in-out infinite alternate; will-change: background-position; }
+:root .app-shell .composer .mm-fill::after { animation-duration: calc(3.6s - 2.4s * var(--p, 0)); }
+:root .app-shell .composer .agent-chip.model-pill.chat { max-width: 300px; gap: 7px; padding: 0 12px 0 14px; color: var(--sx-text); font-weight: 500; }
+:root .app-shell .composer .agent-chip.model-pill.chat .model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .agent-chip.model-pill.chat .model-effort { flex: none; font-weight: 600; color: var(--sx-accent); }
+
+/* Parallel: chosen models live in a popover, so the composer never changes size. */
+:root .app-shell .composer .parallel-anchor { position: relative; flex: none; }
+:root .app-shell .composer .parallel-toggle.active { color: var(--sx-accent); border-color: var(--sx-accent); background: var(--sx-accent-soft); }
+:root .app-shell .composer .parallel-pop { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 60; width: 300px; padding: 8px; border: 1px solid var(--sx-line); border-radius: 18px; background: var(--sx-raised); color: var(--sx-text); box-shadow: var(--sx-shadow); transform-origin: bottom right; animation: chip-pop-in .18s var(--ease-out) both; }
+:root .app-shell .composer .parallel-pop header { display: grid; gap: 2px; padding: 6px 8px 8px; }
+:root .app-shell .composer .parallel-pop header strong { font-size: 13.5px; }
+:root .app-shell .composer .parallel-pop header small { color: var(--sx-muted); font-size: 12px; line-height: 1.4; }
+:root .app-shell .composer .parallel-list { display: grid; gap: 2px; max-height: 240px; overflow: auto; }
+:root .app-shell .composer .parallel-list button { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13px; text-align: left; cursor: pointer; transition: background .14s; }
+:root .app-shell .composer .parallel-list button:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+:root .app-shell .composer .parallel-list button i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--sx-line-strong, var(--sx-line)); border-radius: 6px; font-style: normal; font-size: 11px; color: var(--sx-accent-ink, #fff); transition: background .15s, border-color .15s; }
+:root .app-shell .composer .parallel-list button.on i { background: var(--sx-accent); border-color: var(--sx-accent); }
+:root .app-shell .composer .parallel-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .parallel-pop footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 4px 2px; border-top: 1px solid var(--sx-line); }
+:root .app-shell .composer .parallel-pop footer button { height: 30px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 12.5px; cursor: pointer; }
+:root .app-shell .composer .parallel-pop footer button.primary { border-color: transparent; background: var(--sx-accent); color: var(--sx-accent-ink, #fff); }
+
+/* ===== Pi "More" panel (v2): switches on the right, resources as toggle pills ===== */
+:root .app-shell .composer .chip-pop.pop-more { --w: 340px; padding: 10px; }
+:root .app-shell .composer .pop-more { gap: 4px; }
+:root .app-shell .composer .pop-toggle { align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid transparent; border-radius: 14px; transition: background .15s, border-color .15s; }
+:root .app-shell .composer .pop-toggle:hover { background: color-mix(in srgb, var(--sx-text) 5%, transparent); }
+:root .app-shell .composer .pop-toggle:has(input:checked) { border-color: color-mix(in srgb, var(--sx-accent) 35%, transparent); background: color-mix(in srgb, var(--sx-accent) 7%, transparent); }
+:root .app-shell .composer .pop-toggle span { flex: 1; min-width: 0; }
+:root .app-shell .composer .pop-toggle input { order: 2; flex: none; appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 21px; margin: 0; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 18%, transparent); cursor: pointer; transition: background .2s var(--ease-out); }
+:root .app-shell .composer .pop-toggle input::after { content: ""; position: absolute; top: 2.5px; left: 2.5px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); }
+:root .app-shell .composer .pop-toggle input:checked { background: var(--sx-accent); }
+:root .app-shell .composer .pop-toggle input:checked::after { transform: translateX(15px); }
+:root .app-shell .composer .pop-toggle input:disabled { opacity: .45; cursor: default; }
+:root .app-shell .composer .pop-toggle.muted { opacity: .55; }
+:root .app-shell .composer .pop-more .pop-section { padding: 10px 12px 4px; }
+:root .app-shell .composer .pop-resources { gap: 6px; padding: 2px 10px 10px; }
+:root .app-shell .composer .pop-resources label { position: relative; height: 30px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 999px; color: var(--sx-muted); font-size: 12.5px; transition: background .15s, border-color .15s, color .15s; }
+:root .app-shell .composer .pop-resources label:has(input:checked) { border-color: transparent; background: var(--sx-accent-soft); color: var(--sx-accent); font-weight: 600; }
+:root .app-shell .composer .pop-resources input { position: absolute; opacity: 0; pointer-events: none; }
+:root .app-shell .composer .pop-resources label:has(input:checked)::before { content: "✓"; margin-right: 2px; font-size: 11px; }
+:root .app-shell .composer .pop-more .pop-link { display: flex; align-items: center; height: 36px; margin: 0; padding: 0 12px; border-radius: 12px; color: var(--sx-text); font-size: 13px; }
+:root .app-shell .composer .pop-more .pop-link:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+
+/* The composer's border lights up where the pointer is and follows it. */
+:root .app-shell .composer::after { content: ""; position: absolute; inset: 0; z-index: 3; padding: 1.5px; border-radius: inherit; background: radial-gradient(240px circle at var(--glow-x, 50%) var(--glow-y, 0), color-mix(in srgb, var(--sx-accent) 95%, #fff), color-mix(in srgb, var(--sx-accent) 35%, transparent) 40%, transparent 70%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; opacity: 0; transition: opacity .35s var(--ease-out); }
+:root .app-shell .composer.glowing::after { opacity: 1; }
+/* A menu or popover is open: the border glow steps back so it does not compete with it. */
+:root .app-shell .composer:has(.chip-pop, .parallel-pop, .agent-config-popover, [role="dialog"])::after { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { :root .app-shell .composer::after { transition: none; } }

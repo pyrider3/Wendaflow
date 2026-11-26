@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useExitAnimation } from "./useExitAnimation.js";
 import { LOCAL_PROXY_URL } from "../localProxy.js";
 
 const post = async (route, body) => {
@@ -19,6 +20,8 @@ const ago = (iso, tr) => {
 
 // Pi sessions that already exist on disk (including the ones started in a terminal), importable as cards.
 export function PiSessionImport({ tr, workspace, onImport, onClose }) {
+  const panel = useRef(null);
+  useExitAnimation(panel);
   const [query, setQuery] = useState("");
   const [here, setHere] = useState(false);
   const [sessions, setSessions] = useState(null);
@@ -46,7 +49,7 @@ export function PiSessionImport({ tr, workspace, onImport, onClose }) {
   };
 
   return (
-    <div className="compare-backdrop" role="dialog" aria-modal="true" aria-label={tr("导入 Pi 会话", "Import a Pi session")} onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={panel} className="compare-backdrop" role="dialog" aria-modal="true" aria-label={tr("导入 Pi 会话", "Import a Pi session")} onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="compare-sheet pi-import">
         <header>
           <strong>{tr("导入 Pi 会话", "Import a Pi session")}</strong>

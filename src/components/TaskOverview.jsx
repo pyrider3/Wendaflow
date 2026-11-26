@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ExitAnimated } from "./useExitAnimation.js";
 
 const clock = (ms) => { const total = Math.max(0, Math.round(ms / 1000)); const m = Math.floor(total / 60), s = total % 60; return m ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`; };
 
@@ -40,7 +41,7 @@ export function TaskOverview({ nodes, tr, runnerLabels, onFocus, onRespond }) {
         {(active > 0 || approvals > 0) && <b>{approvals || active}</b>}
       </button>
       {open && (
-        <section className="task-overview-panel" role="dialog" aria-label={tr("任务总览", "Task overview")}>
+        <ExitAnimated className="task-overview-panel" role="dialog" aria-label={tr("任务总览", "Task overview")}>
           <header><strong>{tr("任务总览", "Task overview")}</strong><small>{active > 0 ? tr("{0} 个在运行", "{0} running").replace("{0}", active) : tr("没有在运行的任务", "Nothing running")}</small></header>
           <ul>
             {sorted.map((node) => {
@@ -53,7 +54,13 @@ export function TaskOverview({ nodes, tr, runnerLabels, onFocus, onRespond }) {
                     <span><strong>{node.title}</strong><small>{runnerLabels[node.actionRunner] || node.actionRunner}{took(node) ? ` · ${took(node)}` : ""}{cost > 0 ? ` · $${cost.toFixed(cost >= 0.01 ? 3 : 4)}` : ""}</small></span>
                     <em>{statusLabel(node)}</em>
                   </button>
-                  {pending && (
+                  {pending && pending.kind && pending.kind !== "approval" && (
+                    <div className="task-approval">
+                      <code>{pending.title || pending.tool}</code>
+                      <div><button className="approve" onClick={() => { onFocus(node); setOpen(false); }}>{tr("去回答", "Answer")}</button></div>
+                    </div>
+                  )}
+                  {pending && (!pending.kind || pending.kind === "approval") && (
                     <div className="task-approval">
                       <code>{pending.preview?.kind === "command" ? `$ ${pending.preview.command}` : pending.preview?.path ? `${pending.tool} ${pending.preview.path}` : pending.tool}</code>
                       <div>
@@ -66,7 +73,7 @@ export function TaskOverview({ nodes, tr, runnerLabels, onFocus, onRespond }) {
               );
             })}
           </ul>
-        </section>
+        </ExitAnimated>
       )}
     </div>
   );

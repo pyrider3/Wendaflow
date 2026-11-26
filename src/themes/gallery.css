@@ -50,7 +50,7 @@
   --g-swatch: linear-gradient(135deg, #fbf4e6 35%, #f0b46a 70%, #d98a6a);
 }
 
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) { color-scheme: dark;
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) { color-scheme: dark;
   --dark-panel: var(--g-panel); --dark-control: var(--g-raised); --dark-border: var(--g-edge);
   --dark-text: var(--g-text); --dark-muted: var(--g-muted); --dark-active: var(--g-sel-bg); --dark-accent: var(--g-accent);
   --card-selection-surface: var(--g-sel-bg); --card-selection-gap: var(--g-bg);
@@ -58,22 +58,22 @@
   --workspace-muted: var(--g-muted); --workspace-border: var(--g-edge); --workspace-hover: var(--g-raised);
   --workspace-active: var(--g-sel-bg); --workspace-accent: var(--g-accent);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) {
   --card-selection: var(--g-sel); --ui-focus: var(--g-accent); --ui-muted: var(--g-muted);
 }
-:root:is([data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) {
+:root:is([data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="bauhaus"], [data-theme="custom"][data-tone="light"]) {
   color-scheme: light; --card-selection-surface: var(--g-sel-bg); --card-selection-gap: var(--g-bg);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) :is(.sx, .app-shell) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) :is(.sx, .app-shell) {
   --sx-bg: var(--g-panel); --sx-side: var(--g-bg); --sx-raised: var(--g-raised); --sx-sunken: var(--g-bg);
   --sx-line: var(--g-edge); --sx-line-strong: var(--g-node-bd); --sx-text: var(--g-text); --sx-muted: var(--g-muted);
   --sx-accent: var(--g-accent); --sx-accent-ink: var(--g-ink);
   --sx-accent-soft: color-mix(in srgb, var(--g-accent) 16%, var(--g-panel));
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) .app-shell {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) .app-shell {
   background: var(--g-bg); color: var(--g-text);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) .canvas {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) .canvas {
   background-color: var(--g-bg); color: var(--g-text);
   background-image:
     radial-gradient(var(--g-dot) 0.8px, transparent 1px),
@@ -81,20 +81,20 @@
     radial-gradient(ellipse at 12% 88%, var(--g-glow2), transparent 55%);
   background-size: 24px 24px, 100% 100%, 100% 100%;
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) .node {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) .node {
   background: var(--g-node); color: var(--g-text); border: 1px solid var(--g-node-bd);
   box-shadow: 0 10px 30px color-mix(in srgb, var(--g-sel) 10%, transparent), inset 0 1px 0 #ffffff14;
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) :is(.node h2, .node p, .markdown-content) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) :is(.node h2, .node p, .markdown-content) {
   color: var(--g-text);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) .connection {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) .connection {
   stroke: var(--g-line);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) :is(.canvas-tabs button, .quiet-button, .rail-button, .composer, .agent-config-popover) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) :is(.canvas-tabs button, .quiet-button, .rail-button, .composer, .agent-config-popover) {
   background: var(--g-panel); border-color: var(--g-edge); color: var(--g-text);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) :is(button, input, select, textarea) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) :is(button, input, select, textarea) {
   color: inherit;
 }
 .theme-presets i[data-swatch="aurora"] { background: #07131a linear-gradient(135deg, #07131a 30%, #1fd1a4 62%, #8a5cff); }
@@ -115,25 +115,291 @@
     radial-gradient(ellipse at 8% 95%, var(--g-glow2), transparent 50%);
 }
 /* Card controls: the shared `button { color: inherit }` above must not wash out their icons. */
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) :is(.node .fork-button, .node .collapse-button, .node .relation-handle) {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) :is(.node .fork-button, .node .collapse-button, .node .relation-handle) {
   background: var(--g-raised); border-color: var(--g-node-bd); color: var(--g-accent);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--g-bg) 60%, transparent);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"]) .node .fork-button.armed {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="sakura"], [data-theme="lavender"], [data-theme="dune"], [data-theme="moonstone"], [data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"], [data-theme="custom"]) .node .fork-button.armed {
   background: var(--g-accent); border-color: var(--g-accent); color: var(--g-ink);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .branch-intents button {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .branch-intents button {
   background: var(--g-raised); border-color: var(--g-edge); color: var(--g-muted);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .open-inspector {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .open-inspector {
   background: var(--g-raised); border-color: var(--g-edge); color: var(--g-muted);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .parallel-models button {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .parallel-models button {
   background: var(--g-raised); border-color: var(--g-edge); color: var(--g-muted);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .parallel-models button.selected {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .parallel-models button.selected {
   background: color-mix(in srgb, var(--g-accent) 22%, var(--g-raised)); border-color: var(--g-accent); color: var(--g-text);
 }
-:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"]) .attachment-chips button {
+:root:is([data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"]) .attachment-chips button {
   background: var(--g-raised); border-color: var(--g-edge); color: var(--g-text);
 }
+
+/* Moonstone (白曜): the light counterpart of Obsidian - the same cool indigo and teal on near-white,
+   quiet borders and crisp text, like Daylight but with Obsidian's character. */
+:root[data-theme="moonstone"] {
+  --g-bg: #f4f5f9; --g-glow1: #6d7cff1c; --g-glow2: #2fd0c014; --g-dot: #d5d9e5;
+  --g-node: #fffffff5; --g-node-bd: #d8dce8; --g-sel: #4f5fe0; --g-sel-bg: #eceffe;
+  --g-text: #191d29; --g-line: #8792b4; --g-panel: #fafbfd; --g-raised: #ffffff;
+  --g-edge: #e1e4ee; --g-muted: #656c86; --g-accent: #4f5fe0; --g-ink: #ffffff;
+  --g-swatch: linear-gradient(135deg, #f4f5f9 40%, #6d7cff 85%, #2fd0c0);
+}
+.theme-presets i[data-swatch="moonstone"] { background: linear-gradient(135deg, #f4f5f9 40%, #6d7cff 85%, #2fd0c0); }
+/* Moonstone: cards carry a solid ink outline like Daylight (极昼), with a crisp offset shadow, so they stand off the pale background. */
+:root[data-theme="moonstone"] { --g-node: #ffffff; --g-node-bd: #b4bbd0; }
+:root[data-theme="moonstone"] .node { border: 2px solid #191d29; box-shadow: 0 5px 0 rgba(36, 44, 92, .20), 0 14px 30px -12px rgba(79, 95, 224, .28); }
+:root[data-theme="moonstone"] .node:hover { box-shadow: 0 6px 0 rgba(36, 44, 92, .24), 0 18px 34px -12px rgba(79, 95, 224, .32); }
+:root[data-theme="moonstone"] .node.selected { border-color: var(--g-sel); background: var(--g-sel-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--g-sel) 28%, transparent), 0 7px 0 color-mix(in srgb, var(--g-sel) 26%, transparent); }
+
+/* ===== Four candidate default light themes. Each separates cards from the canvas a different way. ===== */
+:root:is([data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"]) { --g-glow1: transparent; --g-glow2: transparent; }
+:root:is([data-theme="fog"], [data-theme="notebook"], [data-theme="inkline"], [data-theme="float"], [data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"]) :is(.node p, .node .markdown-content) { color: var(--g-body); }
+
+/* Fog (雾白): cool grey canvas, white cards on a hairline, a soft two-layer shadow; indigo only for selection and send. */
+:root[data-theme="fog"] {
+  --g-bg: #f3f4f7; --g-dot: #d6d9e2; --g-node: #ffffff; --g-node-bd: #dfe2ea; --g-sel: #4f5fe0; --g-sel-bg: #ffffff;
+  --g-text: #1b1e27; --g-body: #4b5263; --g-line: #a3aabd; --g-panel: #ffffff; --g-raised: #ffffff;
+  --g-edge: #e3e6ed; --g-muted: #6a7184; --g-accent: #4f5fe0; --g-ink: #ffffff;
+}
+.theme-presets i[data-swatch="fog"] { background: linear-gradient(135deg, #f3f4f7 45%, #ffffff 46% 70%, #4f5fe0 71%); box-shadow: inset 0 0 0 1px #0002; }
+:root[data-theme="fog"] .node { border: 1px solid #dfe2ea; box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(20, 24, 40, .06), 0 6px 16px -6px rgba(20, 24, 40, .14); }
+:root[data-theme="fog"] .node:hover { box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(20, 24, 40, .07), 0 10px 24px -8px rgba(20, 24, 40, .20); }
+:root[data-theme="fog"] .canvas .node.node.node.selected, :root[data-theme="fog"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none;  border-color: #4f5fe0; background: #fff; box-shadow: 0 0 0 3px rgba(79, 95, 224, .16), 0 6px 16px -6px rgba(20, 24, 40, .14); }
+:root[data-theme="fog"] .composer { box-shadow: 0 1px 2px rgba(20, 24, 40, .05), 0 14px 36px -12px rgba(20, 24, 40, .22); }
+
+/* Notebook (纸感): warm paper, ink-black accent, selection drawn in ink rather than colour. */
+:root[data-theme="notebook"] {
+  --g-bg: #f6f5f1; --g-dot: #dedad0; --g-node: #fffefb; --g-node-bd: #e4e1d8; --g-sel: #1f1d1a; --g-sel-bg: #fffefb;
+  --g-text: #1f1d1a; --g-body: #55514a; --g-line: #b4aea0; --g-panel: #fffefb; --g-raised: #ffffff;
+  --g-edge: #e6e2d8; --g-muted: #77726a; --g-accent: #1f1d1a; --g-ink: #fffefb;
+}
+.theme-presets i[data-swatch="notebook"] { background: linear-gradient(135deg, #f6f5f1 45%, #fffefb 46% 70%, #1f1d1a 71%); box-shadow: inset 0 0 0 1px #0002; }
+:root[data-theme="notebook"] .node { border: 1px solid #e4e1d8; box-shadow: 0 1px 2px rgba(40, 30, 10, .05), 0 4px 12px -4px rgba(40, 30, 10, .10); }
+:root[data-theme="notebook"] .node:hover { border-color: #d6d1c5; box-shadow: 0 2px 4px rgba(40, 30, 10, .06), 0 8px 20px -6px rgba(40, 30, 10, .14); }
+:root[data-theme="notebook"] .canvas .node.node.node.selected, :root[data-theme="notebook"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none;  border: 1.5px solid #1f1d1a; background: #fffefb; box-shadow: 0 0 0 3px rgba(31, 29, 26, .08), 0 4px 12px -4px rgba(40, 30, 10, .14); }
+:root[data-theme="notebook"] .composer { box-shadow: 0 1px 2px rgba(40, 30, 10, .05), 0 12px 30px -12px rgba(40, 30, 10, .22); }
+
+/* Ink line (墨线): white canvas, every card drawn with a 1px ink line and a slight grounded shadow; blue marks selection. */
+:root[data-theme="inkline"] {
+  --g-bg: #ffffff; --g-dot: #d8dbe1; --g-node: #ffffff; --g-node-bd: #2a2d36; --g-sel: #2f5bea; --g-sel-bg: #f3f6ff;
+  --g-text: #15171c; --g-body: #4a4f5c; --g-line: #2a2d36; --g-panel: #ffffff; --g-raised: #ffffff;
+  --g-edge: #d9dce3; --g-muted: #626877; --g-accent: #2f5bea; --g-ink: #ffffff;
+}
+.theme-presets i[data-swatch="inkline"] { background: #fff linear-gradient(135deg, transparent 45%, #15171c 46% 49%, transparent 50% 70%, #2f5bea 71%); box-shadow: inset 0 0 0 1px #15171c; }
+:root[data-theme="inkline"] .node { border: 1px solid #2a2d36; box-shadow: 0 2px 0 rgba(21, 23, 28, .08); }
+:root[data-theme="inkline"] .node:hover { box-shadow: 0 3px 0 rgba(21, 23, 28, .12); translate: 0 -1px; }
+:root[data-theme="inkline"] .canvas .node.node.node.selected, :root[data-theme="inkline"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none;  border: 1.5px solid #2f5bea; background: #f3f6ff; box-shadow: 0 3px 0 rgba(47, 91, 234, .22); }
+:root[data-theme="inkline"] .connection { stroke-width: 1.2; }
+:root[data-theme="inkline"] .composer { border-color: #2a2d36; box-shadow: 0 3px 0 rgba(21, 23, 28, .08); }
+
+/* Float (浮岛): a deeper grey canvas, borderless rounded white cards lifted by a large soft shadow. */
+:root[data-theme="float"] {
+  --g-bg: #eceef2; --g-dot: #d3d7df; --g-node: #ffffff; --g-node-bd: transparent; --g-sel: #2563eb; --g-sel-bg: #ffffff;
+  --g-text: #181b22; --g-body: #4b5263; --g-line: #b3b9c7; --g-panel: #ffffff; --g-raised: #ffffff;
+  --g-edge: #dfe2e8; --g-muted: #656b7b; --g-accent: #2563eb; --g-ink: #ffffff;
+}
+.theme-presets i[data-swatch="float"] { background: linear-gradient(135deg, #eceef2 45%, #ffffff 46% 70%, #2563eb 71%); box-shadow: inset 0 0 0 1px #0002, 0 3px 8px -2px #0003; }
+:root[data-theme="float"] .node { border: 1px solid transparent; border-radius: 16px; box-shadow: 0 1px 1px rgba(20, 24, 40, .05), 0 10px 24px -8px rgba(20, 24, 40, .18); }
+:root[data-theme="float"] .node:hover { box-shadow: 0 1px 2px rgba(20, 24, 40, .06), 0 16px 32px -10px rgba(20, 24, 40, .24); translate: 0 -1px; }
+:root[data-theme="float"] .canvas .node.node.node.selected, :root[data-theme="float"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none;  border-color: transparent; background: #fff; box-shadow: 0 0 0 2px #2563eb, 0 12px 28px -8px rgba(37, 99, 235, .28); }
+:root[data-theme="float"] .composer { border-color: transparent; border-radius: 20px; box-shadow: 0 2px 4px rgba(20, 24, 40, .05), 0 18px 40px -14px rgba(20, 24, 40, .28); }
+
+/* ===== Character themes: each changes the card's material, not just its colour. ===== */
+:root:is([data-theme="blueprint"], [data-theme="sticky"], [data-theme="inkwash"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="bauhaus"], [data-theme="neon"]) :is(.node p, .node .markdown-content) { color: var(--g-body); }
+:root:is([data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"]) { color-scheme: dark; }
+
+/* Blueprint (蓝图): drafting-blue sheet with a fine and a coarse grid; cards are white line frames, notes in amber. */
+:root[data-theme="blueprint"] {
+  --g-bg: #0f3b6e; --g-glow1: transparent; --g-glow2: transparent; --g-dot: transparent;
+  --g-node: rgba(16, 66, 122, .72); --g-node-bd: rgba(235, 244, 255, .85); --g-sel: #ffd166; --g-sel-bg: rgba(255, 209, 102, .10);
+  --g-text: #f2f7ff; --g-body: #c6daf3; --g-line: #e6f0ff; --g-panel: #0d3462; --g-raised: #134a85;
+  --g-edge: rgba(235, 244, 255, .28); --g-muted: #9fbbdf; --g-accent: #ffd166; --g-ink: #0f3b6e;
+}
+.theme-presets i[data-swatch="blueprint"] { background: #0f3b6e linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px) 0 0 / 6px 6px, linear-gradient(90deg, rgba(255,255,255,.35) 1px, transparent 1px) 0 0 / 6px 6px; }
+:root[data-theme="blueprint"] .canvas {
+  background-image: linear-gradient(rgba(235, 244, 255, .16) 1px, transparent 1px), linear-gradient(90deg, rgba(235, 244, 255, .16) 1px, transparent 1px),
+    linear-gradient(rgba(235, 244, 255, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(235, 244, 255, .06) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+}
+:root[data-theme="blueprint"] .node { border: 1.5px solid rgba(235, 244, 255, .85); border-radius: 4px; box-shadow: none; backdrop-filter: none; }
+:root[data-theme="blueprint"] .node h2 { letter-spacing: .02em; }
+:root[data-theme="blueprint"] .node:hover { border-color: #fff; background: rgba(20, 78, 140, .8); }
+:root[data-theme="blueprint"] .canvas .node.node.node.selected, :root[data-theme="blueprint"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; border: 1.5px dashed #ffd166; background: rgba(255, 209, 102, .10); box-shadow: 0 0 0 4px rgba(255, 209, 102, .14); }
+:root[data-theme="blueprint"] .connection { stroke-width: 1.4; }
+:root[data-theme="blueprint"] .composer { border-color: rgba(235, 244, 255, .55); border-radius: 6px; box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .5); }
+
+/* Sticky notes (便利贴): a cork board; every card is a slightly tilted paper note in one of four colours. */
+:root[data-theme="sticky"] {
+  --g-bg: #d6b88f; --g-glow1: transparent; --g-glow2: transparent; --g-dot: rgba(110, 72, 30, .18);
+  --g-node: #fff1a6; --g-node-bd: transparent; --g-sel: #e8590c; --g-sel-bg: #fff1a6;
+  --g-text: #3a301c; --g-body: #5a4c30; --g-line: #7a5a36; --g-panel: #fffaf0; --g-raised: #ffffff;
+  --g-edge: #e5d6bd; --g-muted: #7d6d55; --g-accent: #e8590c; --g-ink: #ffffff;
+}
+.theme-presets i[data-swatch="sticky"] { background: linear-gradient(135deg, #d6b88f 40%, #fff1a6 41% 62%, #ffc9d6 63% 80%, #bfe3ff 81%); }
+:root[data-theme="sticky"] .canvas {
+  background-image: radial-gradient(rgba(110, 72, 30, .22) 1px, transparent 1.6px), radial-gradient(rgba(255, 245, 225, .35) 1px, transparent 1.6px);
+  background-size: 9px 9px, 13px 13px; background-position: 0 0, 4px 6px;
+}
+:root[data-theme="sticky"] .node { transition: transform .42s var(--ease-out), width .34s var(--ease-out), min-height .34s var(--ease-out), height .34s var(--ease-out), opacity .16s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out), background-color .18s var(--ease-out), rotate .25s ease; --note: #fff1a6; background-color: var(--note); border: 0; border-radius: 2px; backdrop-filter: none; rotate: -.7deg;
+  background-image: linear-gradient(rgba(0, 0, 0, .05), transparent 22px);
+  box-shadow: 0 1px 1px rgba(60, 40, 10, .18), 0 10px 16px -8px rgba(60, 40, 10, .45); }
+:root[data-theme="sticky"] .node:not(.colored):nth-child(4n+2) { --note: #ffc9d6; rotate: .6deg; }
+:root[data-theme="sticky"] .node:not(.colored):nth-child(4n+3) { --note: #bfe3ff; rotate: -.3deg; }
+:root[data-theme="sticky"] .node:not(.colored):nth-child(4n) { --note: #c8f0bd; rotate: .9deg; }
+:root[data-theme="sticky"] .node:hover { rotate: 0deg; box-shadow: 0 2px 2px rgba(60, 40, 10, .18), 0 16px 22px -10px rgba(60, 40, 10, .5); }
+:root[data-theme="sticky"] .canvas .node.node.node.selected, :root[data-theme="sticky"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; rotate: 0deg; background-color: var(--note); box-shadow: 0 0 0 3px #e8590c, 0 16px 22px -10px rgba(60, 40, 10, .5); }
+:root[data-theme="sticky"] .connection { stroke-width: 2; }
+:root[data-theme="sticky"] .composer { border-color: #e5d6bd; box-shadow: 0 18px 40px -16px rgba(60, 40, 10, .5); }
+
+/* Ink wash (水墨): rice paper with a faint wash of distant hills; serif text, ink lines, a cinnabar seal for selection. */
+:root[data-theme="inkwash"] {
+  --g-bg: #f2ede0; --g-glow1: transparent; --g-glow2: transparent; --g-dot: transparent;
+  --g-node: #faf7ee; --g-node-bd: rgba(40, 36, 30, .16); --g-sel: #b8312f; --g-sel-bg: #faf7ee;
+  --g-text: #1c1a17; --g-body: #4a463d; --g-line: #56524a; --g-panel: #faf7ee; --g-raised: #fffdf6;
+  --g-edge: #ddd6c4; --g-muted: #7a7466; --g-accent: #b8312f; --g-ink: #fffdf6;
+}
+.theme-presets i[data-swatch="inkwash"] { background: radial-gradient(ellipse at 70% 85%, #3a3832 0 22%, transparent 48%), radial-gradient(ellipse at 30% 95%, #8c887d 0 20%, transparent 50%), #f2ede0; box-shadow: inset 0 0 0 1px #0002; }
+:root[data-theme="inkwash"] .canvas {
+  background-image: radial-gradient(ellipse 60% 26% at 82% 100%, rgba(40, 38, 32, .10), transparent 70%), radial-gradient(ellipse 45% 20% at 62% 104%, rgba(40, 38, 32, .07), transparent 70%),
+    radial-gradient(ellipse 50% 22% at 8% 104%, rgba(40, 38, 32, .06), transparent 70%), repeating-linear-gradient(97deg, rgba(120, 100, 60, .018) 0 2px, transparent 2px 7px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, auto;
+}
+:root[data-theme="inkwash"] .node { font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, serif; border: 1px solid rgba(40, 36, 30, .16); border-radius: 3px; backdrop-filter: none;
+  box-shadow: 0 1px 0 rgba(40, 36, 30, .06), 0 10px 24px -14px rgba(40, 36, 30, .35); }
+:root[data-theme="inkwash"] .node:hover { border-color: rgba(40, 36, 30, .32); }
+:root[data-theme="inkwash"] .canvas .node.node.node.selected, :root[data-theme="inkwash"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; background-color: #faf7ee; border-color: rgba(184, 49, 47, .55); box-shadow: inset 4px 0 0 #b8312f, 0 10px 24px -14px rgba(40, 36, 30, .45); }
+:root[data-theme="inkwash"] .connection { stroke-width: 1.5; }
+:root[data-theme="inkwash"] .composer { border-color: #ddd6c4; border-radius: 6px; box-shadow: 0 18px 40px -18px rgba(40, 36, 30, .4); }
+
+/* Terminal (终端): black glass with faint scanlines; monospace phosphor-green text that glows a little. */
+:root[data-theme="terminal"] {
+  --g-bg: #070a07; --g-glow1: rgba(51, 255, 102, .05); --g-glow2: transparent; --g-dot: #133018;
+  --g-node: #0b120c; --g-node-bd: #1f5f2c; --g-sel: #33ff66; --g-sel-bg: #0e1d10;
+  --g-text: #c8ffd5; --g-body: #8fe7a5; --g-line: #2f9e4f; --g-panel: #0a100b; --g-raised: #0f1a10;
+  --g-edge: #17351c; --g-muted: #5fae74; --g-accent: #33ff66; --g-ink: #04110a;
+}
+.theme-presets i[data-swatch="terminal"] { background: #070a07 linear-gradient(90deg, transparent 22%, #33ff66 22% 30%, transparent 30%) 0 55% / 100% 18% no-repeat; box-shadow: inset 0 0 0 1px #1f5f2c; }
+:root[data-theme="terminal"] .canvas {
+  background-image: repeating-linear-gradient(0deg, rgba(120, 255, 150, .025) 0 1px, transparent 1px 3px), radial-gradient(var(--g-dot) .8px, transparent 1px), radial-gradient(ellipse at 50% 0%, var(--g-glow1), transparent 60%);
+  background-size: auto, 24px 24px, 100% 100%;
+}
+:root[data-theme="terminal"] .node { font-family: "JetBrains Mono", "Sarasa Mono SC", "Cascadia Code", ui-monospace, monospace; border: 1px solid #1f5f2c; border-radius: 3px; backdrop-filter: none; box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 12px 28px -12px rgba(0, 0, 0, .8); }
+:root[data-theme="terminal"] .node h2 { text-shadow: 0 0 8px rgba(51, 255, 102, .35); }
+:root[data-theme="terminal"] .node:hover { border-color: #2f9e4f; }
+:root[data-theme="terminal"] .canvas .node.node.node.selected, :root[data-theme="terminal"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; border-color: #33ff66; background: #0e1d10; box-shadow: 0 0 0 1px #33ff66, 0 0 22px rgba(51, 255, 102, .22); }
+:root[data-theme="terminal"] .composer { border-color: #1f5f2c; border-radius: 4px; font-family: "JetBrains Mono", "Sarasa Mono SC", ui-monospace, monospace; }
+
+/* Chalkboard (黑板): a slate board with chalk smudges; hand-drawn white chalk frames and Kai script, yellow chalk for selection. */
+:root[data-theme="chalkboard"] {
+  --g-bg: #23372e; --g-glow1: rgba(255, 255, 255, .05); --g-glow2: rgba(255, 255, 255, .035); --g-dot: rgba(255, 255, 255, .05);
+  --g-node: rgba(255, 255, 255, .03); --g-node-bd: rgba(243, 241, 231, .75); --g-sel: #ffe28a; --g-sel-bg: rgba(255, 226, 138, .07);
+  --g-text: #f3f1e7; --g-body: #d8d5c6; --g-line: rgba(243, 241, 231, .7); --g-panel: #1d2f27; --g-raised: #2a4237;
+  --g-edge: rgba(243, 241, 231, .2); --g-muted: #a9b3a6; --g-accent: #ffe28a; --g-ink: #23372e;
+}
+.theme-presets i[data-swatch="chalkboard"] { background: radial-gradient(ellipse at 30% 30%, rgba(255,255,255,.18), transparent 55%), #23372e; box-shadow: inset 0 0 0 2px #6b4a2b; }
+:root[data-theme="chalkboard"] .canvas {
+  background-image: radial-gradient(ellipse 40% 18% at 25% 30%, var(--g-glow1), transparent 70%), radial-gradient(ellipse 35% 16% at 75% 65%, var(--g-glow2), transparent 70%), radial-gradient(var(--g-dot) .8px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+}
+:root[data-theme="chalkboard"] .node { font-family: "LXGW WenKai", "Kaiti SC", STKaiti, KaiTi, "Comic Sans MS", cursive; border: 2px solid rgba(243, 241, 231, .75); border-radius: 8px 13px 9px 15px / 14px 8px 15px 9px; backdrop-filter: none; box-shadow: none; }
+:root[data-theme="chalkboard"] .node h2 { font-size: 1.06em; }
+:root[data-theme="chalkboard"] .node:hover { border-color: #fff; background: rgba(255, 255, 255, .05); }
+:root[data-theme="chalkboard"] .canvas .node.node.node.selected, :root[data-theme="chalkboard"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; border-color: #ffe28a; background: rgba(255, 226, 138, .07); box-shadow: 0 0 0 3px rgba(255, 226, 138, .14); }
+:root[data-theme="chalkboard"] .connection { stroke-width: 2; stroke-linecap: round; }
+:root[data-theme="chalkboard"] .composer { border-color: rgba(243, 241, 231, .35); }
+
+/* Coffee (咖啡): the warm dark counterpart of Notebook; espresso browns with caramel accents. */
+:root[data-theme="coffee"] {
+  --g-bg: #1c1511; --g-glow1: rgba(212, 149, 90, .08); --g-glow2: rgba(150, 90, 50, .06); --g-dot: #3a2d24;
+  --g-node: #2a1f19; --g-node-bd: #44352b; --g-sel: #d4955a; --g-sel-bg: #33261e;
+  --g-text: #f2e7da; --g-body: #c9b7a4; --g-line: #8a7360; --g-panel: #231a15; --g-raised: #30241d;
+  --g-edge: #3a2d24; --g-muted: #a08c78; --g-accent: #d4955a; --g-ink: #1c1511;
+}
+.theme-presets i[data-swatch="coffee"] { background: linear-gradient(135deg, #1c1511 40%, #6b4a33 70%, #d4955a); }
+:root[data-theme="coffee"] .node { border: 1px solid #44352b; box-shadow: inset 0 1px 0 rgba(255, 235, 215, .05), 0 12px 28px -12px rgba(0, 0, 0, .7); }
+:root[data-theme="coffee"] .node:hover { border-color: #5a4637; }
+:root[data-theme="coffee"] .canvas .node.node.node.selected, :root[data-theme="coffee"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; border-color: #d4955a; background: #2f231c; box-shadow: 0 0 0 3px rgba(212, 149, 90, .22), 0 12px 28px -12px rgba(0, 0, 0, .7); }
+:root[data-theme="coffee"] .composer { box-shadow: 0 18px 44px -16px rgba(0, 0, 0, .75); }
+
+/* Bauhaus (包豪斯): cream paper, heavy black lines, square corners, primary-colour bands and a hard offset shadow. */
+:root[data-theme="bauhaus"] {
+  --g-bg: #f3ede0; --g-glow1: transparent; --g-glow2: transparent; --g-dot: transparent;
+  --g-node: #fffdf7; --g-node-bd: #111111; --g-sel: #e63322; --g-sel-bg: #fffdf7;
+  --g-text: #111111; --g-body: #33312c; --g-line: #111111; --g-panel: #fffdf7; --g-raised: #ffffff;
+  --g-edge: #cfc6b4; --g-muted: #5f5a50; --g-accent: #1f4fb4; --g-ink: #ffffff;
+}
+.theme-presets i[data-swatch="bauhaus"] { background: radial-gradient(circle at 30% 32%, #e63322 0 22%, transparent 23%), linear-gradient(135deg, transparent 55%, #1f4fb4 56%), linear-gradient(90deg, #f5c400 0 28%, transparent 29%) 0 100% / 100% 30% no-repeat, #f3ede0; box-shadow: inset 0 0 0 1.5px #111; }
+:root[data-theme="bauhaus"] .canvas {
+  background-image: radial-gradient(circle at 92% 12%, rgba(245, 196, 0, .20) 0 70px, transparent 71px), radial-gradient(circle at 6% 92%, rgba(31, 79, 180, .10) 0 110px, transparent 111px);
+  background-size: 100% 100%, 100% 100%;
+}
+:root[data-theme="bauhaus"] .node { font-family: "Futura", "Avenir Next", "Montserrat", system-ui, sans-serif; border: 2.5px solid #111; border-radius: 0; backdrop-filter: none; box-shadow: inset 0 7px 0 #e63322, 5px 5px 0 #111; }
+:root[data-theme="bauhaus"] .node:not(.colored):nth-child(3n+2) { box-shadow: inset 0 7px 0 #f5c400, 5px 5px 0 #111; }
+:root[data-theme="bauhaus"] .node:not(.colored):nth-child(3n) { box-shadow: inset 0 7px 0 #1f4fb4, 5px 5px 0 #111; }
+:root[data-theme="bauhaus"] .node h2 { font-weight: 700; letter-spacing: -.01em; }
+:root[data-theme="bauhaus"] .node:hover { translate: -1px -1px; }
+:root[data-theme="bauhaus"] .canvas .node.node.node.selected, :root[data-theme="bauhaus"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; background-color: #fffdf7; border-color: #111; translate: -2px -2px; box-shadow: inset 0 7px 0 #1f4fb4, 7px 7px 0 #e63322; }
+:root[data-theme="bauhaus"] .connection { stroke-width: 2.2; }
+:root[data-theme="bauhaus"] .composer { border: 2.5px solid #111; border-radius: 0; box-shadow: 6px 6px 0 #111; }
+
+/* Neon (霓虹): midnight violet with magenta and cyan glows; cards are lit tubes, cyan marks selection. */
+:root[data-theme="neon"] {
+  --g-bg: #0c0716; --g-glow1: rgba(255, 46, 151, .16); --g-glow2: rgba(0, 229, 255, .12); --g-dot: #2a1d40;
+  --g-node: rgba(22, 12, 38, .88); --g-node-bd: #ff2e97; --g-sel: #00e5ff; --g-sel-bg: rgba(0, 229, 255, .06);
+  --g-text: #fdeaff; --g-body: #d6c2ef; --g-line: #00e5ff; --g-panel: #130b22; --g-raised: #1c1030;
+  --g-edge: #3a2457; --g-muted: #a891c8; --g-accent: #00e5ff; --g-ink: #0c0716;
+}
+.theme-presets i[data-swatch="neon"] { background: radial-gradient(circle at 35% 40%, #ff2e97 0 18%, transparent 45%), radial-gradient(circle at 70% 70%, #00e5ff 0 14%, transparent 42%), #0c0716; }
+:root[data-theme="neon"] .node { border: 1px solid #ff2e97; backdrop-filter: none; box-shadow: 0 0 0 1px rgba(255, 46, 151, .25), 0 0 18px rgba(255, 46, 151, .35), inset 0 0 14px rgba(255, 46, 151, .12); }
+:root[data-theme="neon"] .node h2 { text-shadow: 0 0 10px rgba(255, 46, 151, .55); }
+:root[data-theme="neon"] .node:hover { box-shadow: 0 0 0 1px rgba(255, 46, 151, .35), 0 0 26px rgba(255, 46, 151, .5), inset 0 0 16px rgba(255, 46, 151, .16); }
+:root[data-theme="neon"] .canvas .node.node.node.selected, :root[data-theme="neon"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) { outline: none; border-color: #00e5ff; background: rgba(10, 30, 44, .9); box-shadow: 0 0 0 1px rgba(0, 229, 255, .35), 0 0 26px rgba(0, 229, 255, .45), inset 0 0 14px rgba(0, 229, 255, .14); }
+:root[data-theme="neon"] .connection { filter: drop-shadow(0 0 3px rgba(0, 229, 255, .7)); }
+:root[data-theme="neon"] .canvas:is(.dragging-cards, .panning) .connection { filter: none; }
+:root[data-theme="neon"] .composer { border-color: #ff2e97; box-shadow: 0 0 22px rgba(255, 46, 151, .25); }
+@media (prefers-reduced-motion: reduce) { :root[data-theme="sticky"] .node { transition: none; } }
+
+/* ===== Custom theme: every value comes from Settings → Appearance (see themes/custom-theme.mjs). ===== */
+:root[data-theme="custom"] {
+  --g-bg: var(--custom-bg); --g-glow1: var(--custom-glow1); --g-glow2: var(--custom-glow2); --g-dot: var(--custom-grid);
+  --g-node: var(--custom-card); --g-node-bd: var(--custom-card-border); --g-sel: var(--custom-selection);
+  --g-sel-bg: color-mix(in srgb, var(--custom-selection) 9%, var(--custom-card-solid));
+  --g-text: var(--custom-text); --g-body: var(--custom-body); --g-line: var(--custom-line); --g-panel: var(--custom-panel);
+  --g-raised: color-mix(in srgb, var(--custom-panel) 90%, var(--custom-text) 4%);
+  --g-edge: color-mix(in srgb, var(--custom-card-border) 70%, var(--custom-panel)); --g-muted: var(--custom-muted);
+  --g-accent: var(--custom-accent); --g-ink: var(--custom-accent-ink);
+}
+:root[data-theme="custom"][data-tone="dark"] { color-scheme: dark; }
+:root[data-theme="custom"][data-tone="light"] { color-scheme: light; }
+.theme-presets i[data-swatch="custom"] { background: conic-gradient(from 45deg, var(--custom-bg, #f4f5f8) 0 25%, var(--custom-accent, #4f5fe0) 0 50%, var(--custom-card-solid, #fff) 0 75%, var(--custom-text, #1b1e27) 0); box-shadow: inset 0 0 0 1px #0002; }
+:root[data-theme="custom"] .canvas {
+  background-image: radial-gradient(var(--g-dot) 1px, transparent 1.3px), radial-gradient(ellipse at 82% 12%, var(--g-glow1), transparent 55%), radial-gradient(ellipse at 12% 88%, var(--g-glow2), transparent 55%);
+  background-size: var(--custom-grid-size) var(--custom-grid-size), 100% 100%, 100% 100%;
+}
+:root[data-theme="custom"][data-custom-grid="lines"] .canvas {
+  background-image: linear-gradient(var(--g-dot) 1px, transparent 1px), linear-gradient(90deg, var(--g-dot) 1px, transparent 1px), radial-gradient(ellipse at 82% 12%, var(--g-glow1), transparent 55%), radial-gradient(ellipse at 12% 88%, var(--g-glow2), transparent 55%);
+  background-size: var(--custom-grid-size) var(--custom-grid-size), var(--custom-grid-size) var(--custom-grid-size), 100% 100%, 100% 100%;
+}
+:root[data-theme="custom"][data-custom-grid="none"] .canvas {
+  background-image: radial-gradient(ellipse at 82% 12%, var(--g-glow1), transparent 55%), radial-gradient(ellipse at 12% 88%, var(--g-glow2), transparent 55%);
+  background-size: 100% 100%, 100% 100%;
+}
+:root[data-theme="custom"] .node {
+  font-family: var(--custom-font); background: var(--custom-card); border: var(--custom-border-width) solid var(--custom-card-border);
+  border-radius: var(--custom-radius); box-shadow: var(--custom-shadow); backdrop-filter: var(--custom-blur);
+}
+:root[data-theme="custom"] :is(.node p, .node .markdown-content) { color: var(--g-body); }
+:root[data-theme="custom"] .node:hover { translate: 0 -1px; }
+:root[data-theme="custom"] .canvas .node.node.node.selected, :root[data-theme="custom"] .canvas .node.node.node.selected:not(.connection-target):not([data-slice-target]) {
+  outline: none; border-color: var(--custom-selection); border-width: max(1.5px, var(--custom-border-width)); background-color: var(--g-sel-bg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--custom-selection) 22%, transparent), var(--custom-shadow);
+}
+:root[data-theme="custom"] .connection { stroke-width: var(--custom-line-width); }
+:root[data-theme="custom"] .composer { font-family: var(--custom-font); border-radius: calc(var(--custom-radius) + 8px); box-shadow: var(--custom-shadow); }
+:root[data-theme="custom"] .quick-thought-editor { background: var(--custom-card-solid); color: var(--custom-text); border-color: var(--custom-accent); }
+
+/* A card being dragged or resized must follow the pointer exactly: no theme may animate it. */
+:root[data-theme] .canvas .node.node.dragging, :root[data-theme] .canvas .node.node.resizing { transition: none; }

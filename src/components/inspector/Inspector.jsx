@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Button, Field, Group, Input, Row, Select } from "../settings/ui.jsx";
 import { Callout, Collapse, Icon, IconButton, Segmented, Swatches, Textarea } from "./ui.jsx";
+import { ToolEvent } from "../../cards/ToolEvent.jsx";
+import { ChangesPanel } from "../../cards/ChangesPanel.jsx";
+import { UsageLine } from "../../cards/UsageLine.jsx";
 import "../settings/settings.css";
 import "./inspector.css";
 
@@ -16,7 +19,7 @@ export function Inspector({ ctx }) {
     linkType, setLinkType, linkingFrom, setLinkingFrom,
     mindMapState, setMindMapState, generateMindMapSuggestions, addMindMapSuggestions,
     deletionIds, deletingIds, deleteSelection, onClose, onOpenSettings,
-    titleExpanded, setTitleExpanded,
+    titleExpanded, setTitleExpanded, applyAgentChanges,
   } = ctx;
   const [contextOpen, setContextOpen] = useState(false);
 
@@ -348,8 +351,10 @@ export function Inspector({ ctx }) {
               {isAction && events.length > 0 && (
                 <div className="ix-record">
                   <strong>{tr("代理执行记录", "Agent execution record")} · {events.length} {tr("条", "items")}</strong>
-                  <div className="ix-timeline">
-                    {events.map((event) => (
+                  <UsageLine usage={selected.execution?.usage} tr={tr} />
+                  {/* The same structured view as the card, with room to read long runs: tool calls fold open to their full output. */}
+                  <div className="ix-timeline wide">
+                    {events.map((event) => event.meta?.tool ? <ToolEvent key={event.id} event={event} tr={tr} /> : (
                       <article key={event.id} className={event.type}>
                         <i />
                         <div>
@@ -359,6 +364,7 @@ export function Inspector({ ctx }) {
                       </article>
                     ))}
                   </div>
+                  {applyAgentChanges && <ChangesPanel node={selected} tr={tr} applyAgentChanges={applyAgentChanges} />}
                   {selected.execution.after?.status && <details><summary>{tr("工作区文件变化", "Workspace file changes")}</summary><pre>{selected.execution.after.status}</pre></details>}
                   {selected.execution.after?.diff && <details><summary>{tr("查看代码差异", "View code diff")}</summary><pre>{selected.execution.after.diff}</pre></details>}
                 </div>

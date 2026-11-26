@@ -1,6 +1,5 @@
 import React from "react";
-
-const CODES = { read: "RD", grep: "GR", find: "FD", ls: "LS", edit: "ED", write: "WR", bash: "›_" };
+import { ActivityIcon } from "./ActivityIcon.jsx";
 
 // One tool call of an agent run: what it did, to what, how it went, and the output behind a fold.
 export function ToolEvent({ event, tr }) {
@@ -8,15 +7,17 @@ export function ToolEvent({ event, tr }) {
   const verbs = { read: tr("读取", "Read"), grep: tr("搜索", "Search"), find: tr("查找", "Find"), ls: tr("列出", "List"), edit: tr("修改", "Edit"), write: tr("写入", "Write"), bash: tr("运行", "Run") };
   const shown = tool === "bash" ? `$ ${target}` : target;
   const lines = result ? result.split("\n").length : 0;
+  const diff = event.meta.diff;
   return (
     <article className={`tool ${state} ${tool === "bash" ? "command" : "file"}`}>
-      <i data-tool={tool}>{CODES[tool] || "·"}</i>
+      <ActivityIcon kind={tool} />
       <span>
         <strong>
           {tool !== "bash" && <>{verbs[tool] || tool} </>}
           <code title={target}>{shown}</code>
           {state === "running" && <em className="tool-state running">…</em>}
           {state === "error" && <em className="tool-state error">{tr("失败", "Failed")}</em>}
+          {diff && (diff.added || diff.removed) ? <em className="tool-diff"><ins>+{diff.added}</ins> <del>−{diff.removed}</del></em> : null}
         </strong>
         {result && (
           <details onPointerDown={(event) => event.stopPropagation()}>

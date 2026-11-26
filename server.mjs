@@ -2,8 +2,8 @@ import {cloudApi} from './cloud/http.mjs';
 import {validatePublicEndpoint,publicRequestAllowed} from './deployment/public-policy.mjs';
 import { matchesRule, suggestRule, sameRule } from './src/agents/allow-rules.mjs';
 import { expandMentions, listWorkspaceFiles } from './src/agents/mentions.mjs';
-import { listPiSessions, readPiSession } from './src/agents/pi-sessions.mjs';
-import { approvalPreview } from './src/agents/approval-preview.mjs';
+import { listPiSessions, readPiSession, piUsage, findPiSessionFile, piModelCatalog, summarizePiTree } from './src/agents/pi-sessions.mjs';
+import { approvalPreview, diffStat } from './src/agents/approval-preview.mjs';
 import { comfyRoutes } from './src/plugins/comic/comfy-proxy.mjs';
 import { createPluginGate } from './src/plugins/server-gate.mjs';
 const plugins = createPluginGate({ comic: comfyRoutes });
@@ -14,6 +14,7 @@ import { createAgentApi, agentApiEnabled, ConflictError } from './src/agent-api/
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { piProvidersFromProfiles, fallbackPiModel } from './src/agents/pi-models.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import { mkdtemp, writeFile, readFile, readdir, mkdir, unlink, rm, stat, copyFile, realpath } from 'node:fs/promises';
@@ -79,6 +80,25 @@ async function findCommand(names) {
     if (found) return found;
   }
   return null;
+}
+
+// Opens a terminal window on this computer running `program`. Returns the terminal's name, or '' if none was found.
+async function openTerminalWith(program) {
+  const detach = (cmd, args) => { const child = spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: false }); child.on('error', () => {}); child.unref(); };
+  if (process.platform === 'win32') { detach('cmd.exe', ['/c', 'start', '"Pi"', 'cmd', '/k', program]); return 'cmd'; }
+  if (process.platform === 'darwin') {
+    const script = `tell application "Terminal" to do script ${JSON.stringify(`'${program.replace(/'/g, `'\\''`)}'`)}\ntell application "Terminal" to activate`;
+    detach('osascript', ['-e', script]); return 'Terminal';
+  }
+  const candidates = [process.env.TERMINAL, 'x-terminal-emulator', 'kitty', 'alacritty', 'foot', 'wezterm', 'ghostty', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'].filter(Boolean);
+  for (const name of candidates) {
+    const found = await findCommand([name]);
+    if (!found) continue;
+    const base = path.basename(found);
+    const args = base === 'gnome-terminal' ? ['--', program] : base === 'wezterm' ? ['start', '--', program] : base === 'konsole' || base === 'xfce4-terminal' || base === 'xterm' || base === 'x-terminal-emulator' || base === 'alacritty' || base === 'ghostty' ? ['-e', program] : [program];
+    detach(found, args); return base;
+  }
+  return '';
 }
 
 function openWithSystemApplication(target, { reveal = false } = {}) {
@@ -255,9 +275,23 @@ async function runHarnessHeadless(prompt, images = [], files = [], workspace = p
 }
 
 // A configured command is either a bare name looked up on PATH or an absolute path.
+// Pi ships with Wendaflow as a pinned npm dependency, so action cards work without a separate
+// install and always run the version the approval extension was tested against. A command the
+// user configured still wins; a Pi on PATH is only the fallback when the bundled one is missing.
+const BUNDLED_PI = fileURLToPath(new URL('./node_modules/.bin/pi', import.meta.url));
+// On Windows npm only leaves a pi.cmd shim, which cannot be spawned without a shell; there the bundled Pi
+// runs as its script under this same Node instead (process.execPath + cli.js).
+const BUNDLED_PI_CLI = fileURLToPath(new URL('./node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js', import.meta.url));
+async function bundledCommand(name) {
+  if (name !== 'pi') return null;
+  if (process.platform === 'win32') { try { return (await stat(BUNDLED_PI_CLI)).isFile() ? process.execPath : null; } catch { return null; } }
+  try { return (await stat(BUNDLED_PI)).isFile() ? BUNDLED_PI : null; } catch { return null; }
+}
+const runsBundledScript = (command) => process.platform === 'win32' && command === process.execPath;
+
 async function resolveAgentCommand(configured, fallbackName) {
   const wanted = String(configured || '').trim();
-  if (!wanted) return findCommand([fallbackName]);
+  if (!wanted) return (await bundledCommand(fallbackName)) || findCommand([fallbackName]);
   if (wanted.includes('\0') || wanted.length > 500) throw new Error('可执行文件路径无效');
   if (wanted.includes('/') || wanted.includes('\\')) {
     if (!path.isAbsolute(wanted)) throw new Error('请填写完整路径（以 / 开头），或只写命令名');
@@ -280,6 +314,42 @@ function piToolArgs(args) {
 }
 
 const PI_APPROVAL_EXTENSION = fileURLToPath(new URL('./src/agents/pi-approval.mjs', import.meta.url));
+const PI_MODELS_EXTENSION = fileURLToPath(new URL('./src/agents/pi-models.mjs', import.meta.url));
+
+// The model connections from Wendaflow's Settings, pushed by the browser (they live in its storage).
+// Every Pi process gets them as providers, so a new user's first action card runs on the keys they
+// already entered. Kept in memory only; the browser sends them again after a restart.
+let wendaflowPiProviders = [], wendaflowPiPreferred = '';
+let piCatalogCache = { at: 0, models: [] };
+async function cachedPiCatalog() {
+  if (Date.now() - piCatalogCache.at > 5 * 60_000) piCatalogCache = { at: Date.now(), models: await piModelCatalog() };
+  return piCatalogCache.models;
+}
+async function setWendaflowPiProfiles(profiles, preferred = '') {
+  const next = piProvidersFromProfiles(profiles, await cachedPiCatalog());
+  if (JSON.stringify(next) !== JSON.stringify(wendaflowPiProviders)) { stopPiWorkers(); piInfoCache.clear(); }
+  wendaflowPiProviders = next;
+  wendaflowPiPreferred = String(preferred || '');
+  return wendaflowPiProviders.map(({ apiKey, ...shown }) => shown);
+}
+
+// Whether the user has set Pi up themselves (a login, a key, a default model, or custom endpoints).
+// Only when they have not does Wendaflow pick the model for a card that names none.
+async function piHasOwnSetup() {
+  const dir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
+  try { const auth = JSON.parse(await readFile(path.join(dir, 'auth.json'), 'utf8')); if (auth && Object.keys(auth).length) return true; } catch {}
+  try { const settings = JSON.parse(await readFile(path.join(dir, 'settings.json'), 'utf8')); if (settings?.defaultProvider || settings?.defaultModel) return true; } catch {}
+  try { await stat(path.join(dir, 'models.json')); return true; } catch {}
+  return false;
+}
+
+// Arguments and environment shared by every Pi launch.
+function piLaunch(args, command = '') {
+  return {
+    args: [...(runsBundledScript(command) ? [BUNDLED_PI_CLI] : []), ...(wendaflowPiProviders.length ? ['-e', PI_MODELS_EXTENSION] : []), ...args],
+    env: { ...process.env, NO_COLOR: '1', WENDAFLOW_PI_PROVIDERS: JSON.stringify(wendaflowPiProviders) },
+  };
+}
 
 function piToolSummary(args) {
   const text = piToolArgs(args);
@@ -301,10 +371,25 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
   const thinking = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(options.thinking) ? options.thinking : '';
   const clean = (value) => String(value || '').trim();
   const extra = clean(options.extraArgs).split(/\s+/).filter(Boolean);
-  const provider = piToken(options.provider), modelId = piToken(options.model), parentSession = piToken(options.parentSession);
+  let provider = piToken(options.provider), modelId = piToken(options.model);
+  const parentSession = piToken(options.parentSession);
+  if (!provider && !modelId && !(await piHasOwnSetup())) {
+    const fallback = fallbackPiModel(wendaflowPiProviders, wendaflowPiPreferred);
+    if (!fallback) throw new Error('Pi 还没有可用的模型。请先在 设置 → 模型连接 里填好一个模型和密钥，Pi 会直接使用它。');
+    provider = fallback.provider; modelId = fallback.model;
+  }
   // Every run gets a session id of its own, so a card can later be forked from the one it ended with.
-  const sessionId = options.saveSession === false ? '' : randomUUID();
-  const sessionArgs = !sessionId ? ['--no-session'] : parentSession ? ['--fork', parentSession, '--session-id', sessionId] : ['--session-id', sessionId];
+  // "!command" in the composer runs the command directly through Pi (like Pi's own "!"). Pi only writes a
+  // session file once a prompt has run, so such a run keeps no session to continue from; the next card gets
+  // its output as ordinary context instead.
+  const bashCommand = typeof options.bashCommand === 'string' ? options.bashCommand.trim().slice(0, 4000) : '';
+  const forkEntryId = typeof options.forkEntryId === 'string' && /^[\w-]{1,200}$/.test(options.forkEntryId) ? options.forkEntryId : '';
+  let sessionId = options.saveSession === false || bashCommand ? '' : randomUUID();
+  // Forking at a message: Pi names the new session itself, so its id is read back with get_state.
+  const forkAtEntry = !!(forkEntryId && parentSession && sessionId);
+  // A parent session is opened by its file, so continuing works even when it ran in an isolated copy.
+  const parentRef = parentSession ? (await findPiSessionFile(parentSession)) || parentSession : '';
+  const sessionArgs = !sessionId ? ['--no-session'] : forkAtEntry ? ['--session', parentRef] : parentSession ? ['--fork', parentRef, '--session-id', sessionId] : ['--session-id', sessionId];
   const permission = ['full', 'ask', 'read'].includes(options.permission) ? options.permission : options.readOnly ? 'read' : 'full';
   const args = ['--mode', 'rpc', ...sessionArgs,
     ...(provider ? ['--provider', provider] : []),
@@ -312,13 +397,20 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
     ...(thinking ? ['--thinking', thinking] : []),
     ...(permission === 'read' ? ['--tools', 'read,grep,find,ls'] : []),
     ...(permission === 'ask' ? ['-e', PI_APPROVAL_EXTENSION] : []),
+    // Per-run switches for what Pi discovers on its own (skills, extensions, MCP servers, AGENTS.md).
+    ...(options.resources?.skills === false ? ['--no-skills'] : []),
+    ...(options.resources?.extensions === false ? ['--no-extensions'] : []),
+    ...(options.resources?.mcp === false ? ['--no-mcp'] : []),
+    ...(options.resources?.contextFiles === false ? ['--no-context-files'] : []),
     ...extra];
+
   try {
     return await new Promise((resolve, reject) => {
-      const child = spawn(command, args, { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+      const launch = piLaunch(args, command);
+      const child = spawn(command, launch.args, { cwd: resolvedWorkspace, stdio: ['pipe', 'pipe', 'pipe'], env: launch.env });
       hooks.onChild?.(child);
       let buffer = '', stderr = '', answer = '', failure = '', aborted = false, settled = false, closed = false, messageNo = 0;
-      const streamed = new Map();
+      const streamed = new Map(), dialogKinds = new Map();
       const send = (record) => { try { child.stdin.write(`${JSON.stringify(record)}\n`); } catch {} };
       const settle = () => { if (settled) return; settled = true; try { child.stdin.end(); } catch {} };
       const timer = setTimeout(() => { failure ||= 'Pi 任务超时（30 分钟）'; child.kill('SIGTERM'); }, 30 * 60_000);
@@ -338,7 +430,19 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
 
       hooks.onControl?.({
         steer: (message, behavior) => { send({ type: behavior === 'followUp' ? 'follow_up' : 'steer', message }); hooks.onEvent?.('user', message); },
-        respond: (requestId, approved) => { send({ type: 'extension_ui_response', id: requestId, confirmed: !!approved }); hooks.onPending?.('remove', { id: requestId }, approved); },
+        // Switch model or thinking level in the middle of a run; Pi applies it from the next model call.
+        setModel: (provider, model) => { send({ id: 'set-model', type: 'set_model', provider, modelId: model }); hooks.onEvent?.('status', `切换模型：${provider} / ${model}`); },
+        setThinking: (level) => { send({ id: 'set-thinking', type: 'set_thinking_level', level }); hooks.onEvent?.('status', `思考强度改为 ${level}`); },
+        // answer: true/false for approvals and confirms, or { value } / { cancelled: true } for the
+        // select, input and editor dialogs an extension opens.
+        respond: (requestId, answer) => {
+          const kind = dialogKinds.get(requestId) || 'approval'; dialogKinds.delete(requestId);
+          const reply = { type: 'extension_ui_response', id: requestId };
+          if (kind === 'approval' || kind === 'confirm') reply.confirmed = answer === true || answer?.value === true;
+          else if (answer && typeof answer === 'object' && !answer.cancelled && typeof answer.value === 'string') reply.value = answer.value;
+          else reply.cancelled = true;
+          send(reply); hooks.onPending?.('remove', { id: requestId }, reply.confirmed === true || reply.value !== undefined);
+        },
         abort: () => { send({ type: 'abort' }); setTimeout(() => { if (!closed) child.kill('SIGTERM'); }, 4000); },
       });
 
@@ -347,6 +451,23 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
           if (record.id === 'stats') {
             const context = record.success ? record.data?.contextUsage : null;
             if (context) { usage.context = { tokens: context.tokens ?? null, window: context.contextWindow || 0, percent: context.percent ?? null }; hooks.onUsage?.({ ...usage }); }
+          } else if (record.id === 'bash') {
+            const data = record.data || {};
+            if (!record.success) failure ||= record.error || '命令没有运行';
+            else answer = `\`$ ${bashCommand}\`（退出码 ${data.exitCode ?? '?'}${data.cancelled ? '，已取消' : ''}）\n\n\`\`\`\n${String(data.output || '').slice(-60000)}\n\`\`\``;
+            update('bash', 'command', `${bashCommand}\n${String(data.output || '').slice(-12000)}`, { final: true });
+            settle();
+          } else if (record.id === 'fork') {
+            if (!record.success || record.data?.cancelled) { failure ||= record.error || '没能从这条消息分岔'; settle(); }
+            else send({ id: 'fork-state', type: 'get_state' });
+          } else if (record.id === 'fork-state') {
+            if (record.success && record.data?.sessionId) sessionId = String(record.data.sessionId);
+            hooks.onEvent?.('status', '已从选中的那条消息分岔出新会话');
+            startPrompt();
+          } else if (record.id === 'compact') {
+            const data = record.data || {};
+            hooks.onEvent?.('status', record.success ? `已压缩上下文：约 ${data.tokensBefore ?? '?'} → ${data.estimatedTokensAfter ?? '?'} tokens` : `压缩上下文失败：${record.error || ''}`);
+            startPrompt();
           } else if (record.id === 'prompt') {
             if (!record.success) { failure ||= record.error || 'Pi 没有接受这个任务'; settle(); }
             else if (record.data?.disposition === 'handled') settle();
@@ -370,19 +491,30 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
           if (record.message.stopReason === 'error') failure ||= record.message.errorMessage || 'Pi 请求模型时出错';
         } else if (record.type === 'tool_execution_start') {
           toolArgs.set(record.toolCallId, record.args);
-          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, record.args), { meta: { tool: record.toolName, target: piToolSummary(record.args).slice(0, 300), state: 'running' } });
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, record.args), { meta: { tool: record.toolName, target: piToolSummary(record.args).slice(0, 300), state: 'running', ...(diffStat(record.args) ? { diff: diffStat(record.args) } : {}) } });
         } else if (record.type === 'tool_execution_update') {
           const partial = piMessageText(record.partialResult?.content);
           if (partial) update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), partial), { meta: { tool: record.toolName, target: piToolSummary(toolArgs.get(record.toolCallId)).slice(0, 300), state: 'running', result: partial.slice(-3000) } });
         } else if (record.type === 'tool_execution_end') {
           const text = piMessageText(record.result?.content) || (typeof record.result === 'string' ? record.result : '');
-          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), text ? `${record.isError ? '失败：' : ''}${text}` : '工具已返回结果'), { final: true, meta: { tool: record.toolName, target: piToolSummary(toolArgs.get(record.toolCallId)).slice(0, 300), state: record.isError ? 'error' : 'done', result: String(text || '').slice(-3000) } });
+          update(toolKey(record.toolCallId), 'command', toolLine(record.toolName, toolArgs.get(record.toolCallId), text ? `${record.isError ? '失败：' : ''}${text}` : '工具已返回结果'), { final: true, meta: { tool: record.toolName, target: piToolSummary(toolArgs.get(record.toolCallId)).slice(0, 300), state: record.isError ? 'error' : 'done', result: String(text || '').slice(-20000), ...(!record.isError && diffStat(toolArgs.get(record.toolCallId)) ? { diff: diffStat(toolArgs.get(record.toolCallId)) } : {}) } });
         } else if (record.type === 'extension_ui_request') {
-          if (record.method === 'confirm' || record.method === 'select') {
-            let detail = {};
-            try { detail = JSON.parse(record.message || '{}'); } catch {}
-            hooks.onPending?.('add', { id: record.id, tool: detail.tool || record.title || '工具', input: piToolSummary(detail.input) || String(record.message || ''), preview: approvalPreview(detail.tool, detail.input), raw: detail.input, at: new Date().toISOString() });
-          } else if (['input', 'editor'].includes(record.method)) send({ type: 'extension_ui_response', id: record.id, cancelled: true });
+          const at = new Date().toISOString(), text = (value, max = 4000) => String(value ?? '').slice(0, max);
+          let detail = null;
+          if (record.method === 'confirm') { try { const parsed = JSON.parse(record.message || ''); if (parsed && typeof parsed.tool === 'string') detail = parsed; } catch {} }
+          if (detail) {
+            // Wendaflow's own approval gate (pi-approval.mjs) asks through confirm with the tool call as JSON.
+            dialogKinds.set(record.id, 'approval');
+            hooks.onPending?.('add', { id: record.id, kind: 'approval', tool: detail.tool, input: piToolSummary(detail.input), preview: approvalPreview(detail.tool, detail.input), raw: detail.input, at });
+          } else if (['confirm', 'select', 'input', 'editor'].includes(record.method)) {
+            // Any other extension dialog becomes a question on the card, answered in the shape Pi expects.
+            dialogKinds.set(record.id, record.method);
+            hooks.onPending?.('add', { id: record.id, kind: record.method, tool: text(record.title, 200) || 'Pi', title: text(record.title, 300), message: text(record.message), placeholder: text(record.placeholder, 300), prefill: text(record.prefill, 20000), options: Array.isArray(record.options) ? record.options.slice(0, 50).map((item) => text(item, 300)) : [], at });
+          } else if (record.method === 'notify') {
+            const level = record.notifyType === 'error' ? '错误' : record.notifyType === 'warning' ? '提醒' : '';
+            hooks.onEvent?.('status', `${level ? `${level}：` : ''}${text(record.message)}`);
+          } else if (record.method === 'setStatus') hooks.onExtensionStatus?.(text(record.statusKey, 100), record.statusText == null ? '' : text(record.statusText, 300));
+          else if (record.method === 'setWidget') hooks.onExtensionWidget?.(text(record.widgetKey, 100), Array.isArray(record.widgetLines) ? record.widgetLines.slice(0, 40).map((line) => text(line, 500)) : []);
         } else if (record.type === 'agent_settled') { aborted = record.aborted === true; settle(); }
       };
 
@@ -400,7 +532,11 @@ async function runPiAgent(prompt, images = [], files = [], workspace = process.c
         if (settled && !failure && !aborted) resolve({ output: answer || 'Pi 已完成任务。', terminal: sessionId ? `Pi session: ${sessionId}` : 'Pi（未保存会话）', sessionId });
         else reject(new Error(failure || (aborted ? 'Pi 任务已中止' : '') || stderr.trim() || `Pi 在完成前退出（退出码 ${code}）`));
       });
-      send({ id: 'prompt', type: 'prompt', message: `${prompt}${attachmentNotice}` });
+      function startPrompt() { send({ id: 'prompt', type: 'prompt', message: `${prompt}${attachmentNotice}` }); }
+      if (bashCommand) send({ id: 'bash', type: 'bash', command: bashCommand });
+      else if (forkAtEntry) send({ id: 'fork', type: 'fork', entryId: forkEntryId });
+      else if (options.compactFirst === true && parentSession) { hooks.onEvent?.('status', '正在压缩上下文…'); send({ id: 'compact', type: 'compact' }); }
+      else startPrompt();
     });
   } finally {
     if (attachmentSet.tempDir) await rm(attachmentSet.tempDir, { recursive: true, force: true }).catch(() => {});
@@ -417,11 +553,68 @@ function piToken(value) {
 
 // Ask a short-lived `pi --mode rpc` process a few questions and stop it. It never calls
 // set_model, so the user's own Pi defaults are left alone.
-async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 30_000, cwd = '') {
+// Questions that need no session (model list, slash commands…) go to a Pi process kept running per
+// folder, instead of cold-starting Pi with all its extensions and MCP servers every time. Workers stop
+// after five idle minutes, when Wendaflow's model connections change, or if they misbehave.
+const piWorkers = new Map();
+const PI_WORKER_IDLE_MS = 5 * 60_000, PI_WORKER_MAX = 4;
+function stopPiWorkers() { for (const worker of piWorkers.values()) { worker.dead = true; try { worker.child.kill('SIGTERM'); } catch {} } piWorkers.clear(); }
+function startPiWorker(command, cwd, key) {
+  const launch = piLaunch(['--mode', 'rpc', '--no-session'], command);
+  const child = spawn(command, launch.args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], env: launch.env });
+  const worker = { child, key, pending: new Map(), seq: 0, idle: null, dead: false, stderr: '' };
+  let buffer = '';
+  const fail = (error) => {
+    if (worker.dead && !worker.pending.size) return;
+    worker.dead = true; clearTimeout(worker.idle);
+    for (const entry of worker.pending.values()) entry.reject(error);
+    worker.pending.clear();
+    if (piWorkers.get(key) === worker) piWorkers.delete(key);
+  };
+  child.stdout.on('data', (chunk) => {
+    buffer += chunk;
+    const lines = buffer.split('\n'); buffer = lines.pop() || '';
+    for (const line of lines) {
+      let record; try { record = JSON.parse(line.replace(/\r$/, '')); } catch { continue; }
+      if (record.type === 'response' && worker.pending.has(record.id)) { const entry = worker.pending.get(record.id); worker.pending.delete(record.id); entry.resolve(record); }
+      // Nobody can answer an extension's question in a background worker.
+      else if (record.type === 'extension_ui_request' && ['confirm', 'select', 'input', 'editor'].includes(record.method)) { try { child.stdin.write(`${JSON.stringify({ type: 'extension_ui_response', id: record.id, cancelled: true })}\n`); } catch {} }
+    }
+  });
+  child.stderr.on('data', (chunk) => { worker.stderr = (worker.stderr + chunk).slice(-600); });
+  child.on('error', (error) => fail(new Error(`Pi 无法启动：${error.message}`)));
+  child.on('close', () => fail(new Error(worker.stderr.trim() || 'Pi 提前退出')));
+  worker.touch = () => { clearTimeout(worker.idle); worker.idle = setTimeout(() => { worker.dead = true; piWorkers.delete(key); try { child.kill('SIGTERM'); } catch {} }, PI_WORKER_IDLE_MS); worker.idle.unref?.(); };
+  return worker;
+}
+async function piWorkerQuery(command, cwd, requests, timeoutMs) {
+  const key = `${command}\n${cwd}\n${JSON.stringify(wendaflowPiProviders)}`;
+  let worker = piWorkers.get(key);
+  if (!worker || worker.dead) {
+    if (piWorkers.size >= PI_WORKER_MAX) { const [oldKey, oldest] = piWorkers.entries().next().value; oldest.dead = true; try { oldest.child.kill('SIGTERM'); } catch {} piWorkers.delete(oldKey); }
+    worker = startPiWorker(command, cwd, key); piWorkers.set(key, worker);
+  }
+  worker.touch();
+  const answers = new Map();
+  await Promise.all(requests.map((request) => new Promise((resolve, reject) => {
+    const id = `w${++worker.seq}`;
+    const timer = setTimeout(() => { worker.pending.delete(id); reject(new Error('Pi 没有在时限内响应')); }, timeoutMs);
+    worker.pending.set(id, { resolve: (record) => { clearTimeout(timer); answers.set(request.id, { ...record, id: request.id }); resolve(); }, reject: (error) => { clearTimeout(timer); reject(error); } });
+    try { worker.child.stdin.write(`${JSON.stringify({ ...request, id })}\n`); } catch (error) { clearTimeout(timer); worker.pending.delete(id); reject(error); }
+  })));
+  return answers;
+}
+
+async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 30_000, cwd = '', session = '') {
   const command = await resolveAgentCommand(configuredCommand, 'pi');
   if (!command) throw new Error('找不到 Pi');
+  if (!session && !selectArgs.length) {
+    try { return await piWorkerQuery(command, cwd || os.tmpdir(), requests, timeoutMs); }
+    catch { /* fall back to a one-off process below */ }
+  }
   return new Promise((resolve, reject) => {
-    const child = spawn(command, ['--mode', 'rpc', '--no-session', ...selectArgs], { cwd: cwd || os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+    const launch = piLaunch(['--mode', 'rpc', ...(session ? ['--session', session] : ['--no-session']), ...selectArgs], command);
+    const child = spawn(command, launch.args, { cwd: cwd || os.tmpdir(), stdio: ['pipe', 'pipe', 'pipe'], env: launch.env });
     const answers = new Map();
     let buffer = '', stderr = '', done = false;
     const finish = (error) => { if (done) return; done = true; clearTimeout(timer); try { child.kill('SIGTERM'); } catch {} error ? reject(error) : resolve(answers); };
@@ -505,8 +698,84 @@ async function piCommands(command, cwd) {
   return commands;
 }
 
+const piAgentDir = () => process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
+async function readJsonFile(file, fallback) { try { return JSON.parse(await readFile(file, 'utf8')); } catch { return fallback; } }
+// Small, careful edits to Pi's own config files: read, change one key, write back with the same layout.
+async function editJsonFile(file, change) {
+  const current = await readJsonFile(file, {});
+  const next = change(current) || current;
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(next, null, 2)}\n`);
+}
+// Pi package / MCP commands, run without a shell so nothing in a name or source is interpreted.
+async function runPiCli(configuredCommand, args, timeoutMs = 5 * 60_000) {
+  const command = await resolveAgentCommand(configuredCommand, 'pi');
+  if (!command) throw new Error('找不到 Pi');
+  const argv = [...(runsBundledScript(command) ? [BUNDLED_PI_CLI] : []), ...args];
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, argv, { cwd: os.homedir(), stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NO_COLOR: '1' } });
+    let out = '';
+    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('Pi 命令超时')); }, timeoutMs);
+    child.stdout.on('data', (chunk) => { out = (out + chunk).slice(-8000); });
+    child.stderr.on('data', (chunk) => { out = (out + chunk).slice(-8000); });
+    child.on('error', (error) => { clearTimeout(timer); reject(error); });
+    child.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out.trim()) : reject(new Error(out.trim().split('\n').slice(-4).join('\n') || `Pi 命令失败（退出码 ${code}）`)); });
+  });
+}
+const PI_SOURCE = /^(npm:|git:|github:|https:\/\/|\/|~\/|\.\.?\/)[\w@.\/:~+#=%-]{1,300}$/;
+const PI_NAME = /^[\w.-]{1,80}$/;
+async function managePi(body) {
+  const { action = '', command = '' } = body || {};
+  const dir = piAgentDir();
+  if (action === 'install' || action === 'remove') {
+    const source = String(body.source || '').trim();
+    if (!PI_SOURCE.test(source)) throw new Error('来源格式不对：用 npm:包名、git:地址、https://… 或本地路径');
+    return runPiCli(command, [action, source]);
+  }
+  if (action === 'update') return runPiCli(command, ['update']);
+  if (action === 'mcp-add') {
+    const name = String(body.name || '').trim(), url = String(body.url || '').trim(), program = String(body.program || '').trim();
+    if (!PI_NAME.test(name)) throw new Error('MCP 服务器名称只能用字母、数字、点、下划线和短横线');
+    if (url) { if (!/^https?:\/\/\S{1,500}$/.test(url)) throw new Error('地址需要以 http:// 或 https:// 开头'); return runPiCli(command, ['mcp', 'add', name, '--url', url]); }
+    const args = Array.isArray(body.args) ? body.args.map(String).filter((arg) => arg.length && arg.length < 500).slice(0, 40) : [];
+    if (!program || program.length > 300) throw new Error('请填写启动 MCP 服务器的命令');
+    return runPiCli(command, ['mcp', 'add', name, '--', program, ...args]);
+  }
+  if (action === 'mcp-remove') {
+    const name = String(body.name || '').trim();
+    if (!PI_NAME.test(name)) throw new Error('MCP 服务器名称无效');
+    return runPiCli(command, ['mcp', 'remove', name]);
+  }
+  if (action === 'mcp-toggle') {
+    const name = String(body.name || '').trim();
+    if (!PI_NAME.test(name)) throw new Error('MCP 服务器名称无效');
+    await editJsonFile(path.join(dir, 'mcp.json'), (config) => {
+      if (!config.mcpServers?.[name]) throw new Error('找不到这个 MCP 服务器');
+      if (body.enabled === false) config.mcpServers[name].enabled = false; else delete config.mcpServers[name].enabled;
+      return config;
+    });
+    return '';
+  }
+  if (action === 'skill-toggle') {
+    // A user-level skill is switched off with an exact exclusion ("-skills/<name>") in settings.json.
+    const name = String(body.name || '').trim();
+    if (!PI_NAME.test(name)) throw new Error('技能名称无效');
+    const rule = `-skills/${name}`;
+    await editJsonFile(path.join(dir, 'settings.json'), (settings) => {
+      const list = Array.isArray(settings.skills) ? settings.skills.filter((item) => item !== rule) : [];
+      if (body.enabled === false) list.push(rule);
+      if (list.length) settings.skills = list; else delete settings.skills;
+      return settings;
+    });
+    return '';
+  }
+  throw new Error('不支持的操作');
+}
+
 async function piResources() {
-  const root = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
+  const root = piAgentDir();
+  const settings = await readJsonFile(path.join(root, 'settings.json'), {});
+  const offSkills = new Set((Array.isArray(settings.skills) ? settings.skills : []).filter((item) => typeof item === 'string' && item.startsWith('-skills/')).map((item) => item.slice(8)));
   const skills = [];
   try {
     for (const entry of await readdir(path.join(root, 'skills'), { withFileTypes: true })) {
@@ -514,7 +783,7 @@ async function piResources() {
       try {
         const text = await readFile(path.join(root, 'skills', entry.name, 'SKILL.md'), 'utf8');
         const description = (text.match(/^description:\s*(.+)$/m)?.[1] || '').replace(/^["']|["']$/g, '').slice(0, 160);
-        skills.push({ name: entry.name, description });
+        skills.push({ name: entry.name, description, enabled: !offSkills.has(entry.name) });
       } catch {}
     }
   } catch {}
@@ -523,7 +792,8 @@ async function piResources() {
     const config = JSON.parse(await readFile(path.join(root, 'mcp.json'), 'utf8'));
     mcp = Object.entries(config.mcpServers || {}).map(([name, value]) => ({ name, enabled: value?.enabled !== false, description: typeof value?.description === 'string' ? value.description.slice(0, 160) : '' }));
   } catch {}
-  return { skills: skills.sort((a, b) => a.name.localeCompare(b.name)), mcp: mcp.sort((a, b) => a.name.localeCompare(b.name)) };
+  const packages = (Array.isArray(settings.packages) ? settings.packages : []).map((item) => typeof item === 'string' ? item : item?.source).filter((item) => typeof item === 'string');
+  return { skills: skills.sort((a, b) => a.name.localeCompare(b.name)), mcp: mcp.sort((a, b) => a.name.localeCompare(b.name)), packages };
 }
 
 async function probeAgent(command, args = ['--version'], via = null) {
@@ -544,7 +814,7 @@ async function detectAgents(piCommand = '') {
   const [codex, claude, pi, deepseek] = await Promise.all([
     safe(async () => probeAgent(await findCommand(['codex']))),
     safe(async () => probeAgent(process.env.CLAUDE_CLI || await findCommand(['claude']))),
-    safe(async () => probeAgent(await resolveAgentCommand(piCommand, 'pi'))),
+    safe(async () => { const pi = await resolveAgentCommand(piCommand, 'pi'); return runsBundledScript(pi) ? probeAgent(BUNDLED_PI_CLI, ['--version'], pi) : probeAgent(pi); }),
     safe(async () => probeAgent(await resolveHarnessBin().catch(() => null), ['--version'], process.execPath)),
   ]);
   return { codex, claude, pi, deepseek };
@@ -796,8 +1066,51 @@ async function collectJobArtifacts(workspace, after = {}, output = '', startedAt
 }
 
 // Per-run workspace snapshots live in the temp dir: jobs only exist in memory, so they never outlive the server.
-const SNAPSHOT_ROOT = path.join(os.tmpdir(), 'wendaflow-snapshots');
-void rm(SNAPSHOT_ROOT, { recursive: true, force: true }).catch(() => {});
+const SNAPSHOT_ROOT = path.join(DATA_ROOT, 'data', 'agent-snapshots');
+// Each action run is also written to disk, so its record, its file changes and their undo survive a
+// backend restart. A run that was still going when the backend stopped comes back as interrupted.
+const JOB_DIR = path.join(DATA_ROOT, 'data', 'agent-jobs');
+const JOB_ID = /^job-\d+-[a-z0-9]+$/;
+async function persistJob(job) {
+  try {
+    await mkdir(JOB_DIR, { recursive: true });
+    const { child, control, abort, pendingRaw, ...plain } = job;
+    // The snapshot's file list is a Map; store it as entries.
+    const snapshot = plain.snapshot ? { ...plain.snapshot, base: plain.snapshot.base instanceof Map ? [...plain.snapshot.base] : plain.snapshot.base } : plain.snapshot;
+    await writeFile(path.join(JOB_DIR, `${job.id}.json`), JSON.stringify({ ...plain, snapshot, pending: [] }));
+  } catch (error) { console.error('Could not save the action run record', error.message); }
+}
+async function getJob(id) {
+  if (agentJobs.has(id)) return agentJobs.get(id);
+  if (!JOB_ID.test(String(id || ''))) return null;
+  try {
+    const job = JSON.parse(await readFile(path.join(JOB_DIR, `${id}.json`), 'utf8'));
+    if (job.status === 'running') { job.status = 'failed'; job.error = '后端重启时这个任务还在运行，已中断'; job.completedAt = job.completedAt || new Date().toISOString(); }
+    if (job.snapshot && Array.isArray(job.snapshot.base)) job.snapshot.base = new Map(job.snapshot.base);
+    if (job.snapshot?.dir) { try { await stat(job.snapshot.dir); } catch { job.snapshot = null; if (job.changes) { job.changes.available = false; job.changes.reason = 'expired'; } } }
+    job.pending = [];
+    agentJobs.set(id, job);
+    return job;
+  } catch { return null; }
+}
+// Old records (30 days) go; snapshots beyond the newest few go too, like they do while running.
+async function pruneJobFiles() {
+  try {
+    const now = Date.now();
+    for (const name of await readdir(JOB_DIR)) {
+      const file = path.join(JOB_DIR, name);
+      try { if (now - (await stat(file)).mtimeMs > 30 * 86_400_000) await rm(file, { force: true }); } catch {}
+    }
+  } catch {}
+}
+void pruneJobFiles();
+// Snapshots now outlive a restart (their runs are on disk too); only the oldest beyond the usual cap go.
+void (async () => {
+  try {
+    const entries = await Promise.all((await readdir(SNAPSHOT_ROOT)).map(async (name) => ({ name, at: (await stat(path.join(SNAPSHOT_ROOT, name)).catch(() => ({ mtimeMs: 0 }))).mtimeMs })));
+    for (const old of entries.sort((a, b) => b.at - a.at).slice(MAX_KEPT_SNAPSHOTS * 2)) await rm(path.join(SNAPSHOT_ROOT, old.name), { recursive: true, force: true });
+  } catch {}
+})();
 const MAX_KEPT_SNAPSHOTS = 12;
 async function startJobSnapshot(job, workspace) {
   try {
@@ -825,7 +1138,7 @@ async function finalizeJobChanges(job) {
 function addJobNote(job, text) { job.events.push({ id: job.events.length + 1, type: 'status', text, at: new Date().toISOString() }); }
 
 function publicJob(job) {
-  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', changes: job.changes || null, usage: job.usage || null, isolated: !!job.isolated, output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
+  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', changes: job.changes || null, usage: job.usage || null, extensionStatus: job.extensionStatus || null, extensionWidgets: job.extensionWidgets || null, isolated: !!job.isolated, output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
 const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
@@ -935,6 +1248,41 @@ const server = http.createServer(async (req, res) => {
     child.on('close', (code) => code === 0 ? reply(res, 200, { path: output.trim() }) : reply(res, 400, { error: error.trim() || '目录选择已取消' }));
     return;
   }
+  if (req.method === 'POST' && req.url === '/agents/pi/login-terminal') {
+    // Subscription logins (Claude Pro/Max, ChatGPT, Copilot…) only exist in Pi's interactive /login, so open
+    // a terminal on this computer running Pi and let the user log in there.
+    try {
+      const { command = '' } = await readJson(req);
+      const pi = await resolveAgentCommand(command, 'pi');
+      if (!pi) throw new Error('找不到 Pi');
+      const launched = await openTerminalWith(runsBundledScript(pi) ? `"${pi}" "${BUNDLED_PI_CLI}"` : pi);
+      if (!launched) throw new Error('没找到可以打开的终端程序。请自己打开终端，运行 pi 后输入 /login。');
+      reply(res, 200, { ok: true, terminal: launched });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/usage') {
+    try { const { days = 30 } = await readJson(req); reply(res, 200, await piUsage({ days: Math.min(365, Math.max(1, Number(days) || 30)) })); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/fork-points') {
+    try {
+      const { sessionId = '', cwd = '', command = '' } = await readJson(req);
+      const session = piToken(sessionId);
+      if (!session) throw new Error('这张卡片没有保存 Pi 会话');
+      const folder = String(cwd || defaultWorkspace); await validateDirectory(folder);
+      const answers = await piRpcQuery(command, [], [{ id: 'points', type: 'get_fork_messages' }, { id: 'tree', type: 'get_tree' }], 30_000, folder, (await findPiSessionFile(session)) || session);
+      const record = answers.get('points'), tree = answers.get('tree');
+      if (!record?.success) throw new Error(record?.error || '读不到这个会话');
+      const points = (record.data?.messages || []).map((item) => ({ entryId: String(item.entryId || ''), text: String(item.text || '').slice(0, 4000) })).filter((item) => item.entryId);
+      reply(res, 200, { points, tree: tree?.success ? summarizePiTree(tree.data?.tree, tree.data?.leafId, points.map((item) => item.entryId)) : null });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/providers') {
+    try { const { profiles = [], preferred = '' } = await readJson(req); piCommandCache.clear(); reply(res, 200, { providers: await setWendaflowPiProfiles(profiles, preferred) }); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agents/pi/models') {
     try { const { command = '' } = await readJson(req); reply(res, 200, await piModels(command)); } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -973,6 +1321,15 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agents/pi/session') {
     try { const { id } = await readJson(req); reply(res, 200, await readPiSession(String(id))); } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/manage') {
+    try {
+      const output = await managePi(await readJson(req));
+      // Anything Pi loads at start may have changed.
+      stopPiWorkers(); piCommandCache.clear(); piInfoCache.clear();
+      reply(res, 200, { output, resources: await piResources() });
+    } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
   if (req.method === 'POST' && req.url === '/agents/pi/resources') {
@@ -1018,12 +1375,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agent/start') {
     try {
-      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {}, isolate = false } = await readJson(req, 90_000_000);
+      const { runner = 'codex', prompt, images = [], files = [], workspace: requestedWorkspace, options = {}, isolate = false, piProviders = null } = await readJson(req, 90_000_000);
+      if (runner === 'pi' && piProviders && Array.isArray(piProviders.profiles)) await setWendaflowPiProfiles(piProviders.profiles, piProviders.preferred);
       const realWorkspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('任务内容不能为空');
       const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const job = { id, runner, realWorkspace, isolated: isolate === true ? { workspace: realWorkspace, copy: path.join(SNAPSHOT_ROOT, `iso-${id}`, 'ws') } : null, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
       agentJobs.set(id, job);
+      void persistJob(job);
       reply(res, 202, publicJob(job));
       void (async () => {
         const addEvent = (type, text) => { const clean = String(text); job.events.push({ id: job.events.length + 1, type, text: clean.slice(-12000), at: new Date().toISOString() }); job.terminal = `${job.terminal || ''}${clean}`.slice(-180000); };
@@ -1037,7 +1396,10 @@ const server = http.createServer(async (req, res) => {
           if (final) job.terminal = `${job.terminal || ''}${clean}\n`.slice(-180000);
         };
         const onPending = (action, entry, approved) => {
-          if (action === 'add') {
+          if (action === 'add' && entry.kind && entry.kind !== 'approval') {
+            job.pending = [...(job.pending || []), entry];
+            addEvent('status', `等待你回答：${entry.title || entry.tool}`);
+          } else if (action === 'add') {
             const { raw, ...shown } = entry;
             const suggestion = suggestRule(entry.tool, raw, workspace);
             job.pending = [...(job.pending || []), { ...shown, ...(suggestion ? { suggestion: { label: suggestion.label, kind: suggestion.kind } } : {}) }];
@@ -1045,11 +1407,10 @@ const server = http.createServer(async (req, res) => {
             addEvent('status', `等待你批准：${entry.tool}`);
             if (matchesRule(allowRules.get(realWorkspace), entry.tool, raw, workspace)) { addEvent('status', '符合你保存的“以后都允许”规则，已自动批准'); job.control?.respond?.(entry.id, true); }
           }
-          else { job.pending = (job.pending || []).filter((item) => item.id !== entry.id); addEvent('status', approved ? '已批准' : '已拒绝'); }
+          else { const asked = (job.pending || []).find((item) => item.id === entry.id); job.pending = (job.pending || []).filter((item) => item.id !== entry.id); addEvent('status', asked?.kind && asked.kind !== 'approval' ? (approved ? '已回答' : '已取消') : approved ? '已批准' : '已拒绝'); }
         };
         // An isolated run works on a copy; the real folder is only touched when its result is applied.
         const workspace = job.isolated ? job.isolated.copy : realWorkspace;
-        if (job.isolated) options.saveSession = false; // a throw-away copy has nothing worth resuming
         try {
           if (job.isolated) {
             const copied = await copyWorkspace(realWorkspace, workspace);
@@ -1059,7 +1420,7 @@ const server = http.createServer(async (req, res) => {
           job.before = await gitWorkspaceState(workspace);
           addEvent('status', '已记录执行前的工作区状态');
           if (await startJobSnapshot(job, workspace)) addEvent('status', '已为本次运行建立文件快照，可随时查看改动或撤销');
-          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onUsage: (usage) => { job.usage = usage; }, onPending, onControl: (control) => { job.control = control; } };
+          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onUsage: (usage) => { job.usage = usage; }, onPending, onExtensionStatus: (key, value) => { const next = { ...(job.extensionStatus || {}) }; if (value) next[key] = value; else delete next[key]; job.extensionStatus = next; }, onExtensionWidget: (key, lines) => { const next = { ...(job.extensionWidgets || {}) }; if (lines.length) next[key] = lines; else delete next[key]; job.extensionWidgets = next; }, onControl: (control) => { job.control = control; } };
           addEvent('config', `执行配置：${JSON.stringify(options)}`);
           const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
           const taskPrompt = await expandMentions(prompt.trim(), workspace);
@@ -1072,7 +1433,7 @@ const server = http.createServer(async (req, res) => {
           if (job.status === 'stopped') { await finalizeJobChanges(job); return; }
           await finalizeJobChanges(job);
           job.status = 'failed'; job.error = error.message; job.completedAt = new Date().toISOString(); addEvent('error', error.message);
-        } finally { job.child = null; job.control = null; job.pending = []; }
+        } finally { job.child = null; job.control = null; job.pending = []; void persistJob(job); }
       })();
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -1080,7 +1441,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/changes/diff') {
     try {
       const { job: jobId, path: rel } = await readJson(req);
-      const job = agentJobs.get(jobId);
+      const job = (await getJob(jobId));
       if (!job?.snapshot || !job.changes?.files?.some((item) => item.path === rel)) throw new Error('找不到这次改动的快照（可能已过期）');
       reply(res, 200, await fileDiff(job.snapshot, rel));
     } catch (error) { reply(res, 404, { error: error.message }); }
@@ -1089,7 +1450,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/changes/rollback') {
     try {
       const { job: jobId, paths, force = false } = await readJson(req);
-      const job = agentJobs.get(jobId);
+      const job = (await getJob(jobId));
       if (!job?.snapshot || !job.changes?.available) throw new Error('找不到这次改动的快照（可能已过期）');
       if (job.status === 'running') throw new Error('任务还在运行，请先停止再撤销');
       if (job.isolated) throw new Error('这次是在隔离副本里运行的，原目录没有被改动，无需撤销');
@@ -1098,6 +1459,7 @@ const server = http.createServer(async (req, res) => {
       const { files, truncated } = await diffSnapshot(job.snapshot);
       job.changes = { ...job.changes, files, truncated, rolledBack: [...(job.changes.rolledBack || []), ...result.restored] };
       addJobNote(job, `已撤销 ${result.restored.length} 个文件的改动${result.skipped.length ? `，${result.skipped.length} 个因之后又被修改而跳过` : ''}`);
+      void persistJob(job);
       reply(res, 200, { ...result, job: publicJob(job) });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -1105,13 +1467,14 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/changes/apply') {
     try {
       const { job: jobId, paths, force = false } = await readJson(req);
-      const job = agentJobs.get(jobId);
+      const job = (await getJob(jobId));
       if (!job?.isolated || !job.snapshot || !job.changes?.available) throw new Error('找不到这次隔离运行的结果（可能已过期）');
       if (job.status === 'running') throw new Error('任务还在运行');
       const only = Array.isArray(paths) && paths.length ? paths.map(String) : null;
       const result = await applyChanges(job.snapshot, job.isolated.workspace, job.changes.files, only, { force: force === true });
       job.changes = { ...job.changes, applied: [...new Set([...(job.changes.applied || []), ...result.applied])] };
       addJobNote(job, `已把 ${result.applied.length} 个文件的改动应用到工作目录${result.skipped.length ? `，${result.skipped.length} 个因工作目录里又被修改而跳过` : ''}`);
+      void persistJob(job);
       reply(res, 200, { ...result, job: publicJob(job) });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -1119,24 +1482,47 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/changes/discard') {
     try {
       const { job: jobId } = await readJson(req);
-      const job = agentJobs.get(jobId);
+      const job = (await getJob(jobId));
       if (!job?.isolated) throw new Error('找不到这次隔离运行');
       if (job.status === 'running') throw new Error('任务还在运行，请先停止');
       await releaseJobFiles(job);
       job.changes = { ...(job.changes || {}), available: false, reason: 'discarded', files: [] };
       addJobNote(job, '已丢弃这次隔离运行的结果');
+      void persistJob(job);
       reply(res, 200, { job: publicJob(job) });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'GET' && req.url?.startsWith('/agent/stream?')) {
+    // Server-sent events for one run: the card follows streaming text, tool calls and approval requests
+    // as they happen instead of polling. The run is checked in-process every 80 ms and sent only when its
+    // visible state changed; the stream ends with the run.
+    const id = new URL(req.url, 'http://local').searchParams.get('id');
+    const job = await getJob(id);
+    if (!job) { reply(res, 404, { error: '找不到任务' }); return; }
+    res.writeHead(200, { ...allowedHeaders, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    let last = '', closed = false;
+    const fingerprint = () => { const events = job.events || [], tail = events[events.length - 1]; return JSON.stringify([job.status, events.length, tail?.id, tail?.text?.length, (job.pending || []).map((item) => item.id), job.usage, job.changes, job.extensionStatus, job.extensionWidgets, !!job.control?.steer, job.artifacts?.length, job.terminal?.length, job.sessionId, job.after?.status, job.error]); };
+    const push = () => {
+      if (closed) return;
+      const now = fingerprint();
+      if (now !== last) { last = now; res.write(`data: ${JSON.stringify(publicJob(job))}\n\n`); }
+      if (job.status !== 'running') { closed = true; clearInterval(timer); clearInterval(ping); res.end(); }
+    };
+    const timer = setInterval(push, 80);
+    const ping = setInterval(() => { if (!closed) res.write(': ping\n\n'); }, 15_000);
+    req.on('close', () => { closed = true; clearInterval(timer); clearInterval(ping); });
+    push();
+    return;
+  }
   if (req.method === 'GET' && req.url?.startsWith('/agent/status?')) {
     const id = new URL(req.url, `http://${HOST}`).searchParams.get('id');
-    const job = agentJobs.get(id); reply(res, job ? 200 : 404, job ? publicJob(job) : { error: '找不到任务' }); return;
+    const job = (await getJob(id)); reply(res, job ? 200 : 404, job ? publicJob(job) : { error: '找不到任务' }); return;
   }
   if (req.method === 'GET' && req.url?.startsWith('/agent/artifact?')) {
     try {
       const url = new URL(req.url, `http://${HOST}`);
-      const job = agentJobs.get(url.searchParams.get('job'));
+      const job = (await getJob(url.searchParams.get('job')));
       const index = Number(url.searchParams.get('index'));
       const artifact = job?.artifacts?.[index];
       if (!artifact || !Number.isInteger(index)) throw new Error('找不到行动产物');
@@ -1149,7 +1535,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/artifact/open') {
     try {
       const { job: jobId, artifactId, path: requestedPath } = await readJson(req);
-      const job = agentJobs.get(jobId);
+      const job = (await getJob(jobId));
       const index = (job?.artifacts || []).findIndex((item, itemIndex) => `${jobId}-${itemIndex}` === artifactId);
       let artifact = index >= 0 ? job.artifacts[index] : null;
       if (!artifact && requestedPath) {
@@ -1163,10 +1549,36 @@ const server = http.createServer(async (req, res) => {
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
+  if (req.method === 'POST' && req.url === '/agent/pi-model') {
+    try {
+      const { id, provider = '', model = '', thinking = '' } = await readJson(req);
+      const job = (await getJob(id));
+      if (!job || job.status !== 'running' || !job.control?.setModel) throw new Error('这个任务现在不能切换模型');
+      if (provider && model) job.control.setModel(piToken(provider), piToken(model));
+      if (thinking && ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(thinking)) job.control.setThinking(thinking);
+      reply(res, 200, publicJob(job));
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/agents/pi/compact') {
+    // Compact a saved session in place, so whatever continues from it starts from a summary.
+    try {
+      const { sessionId = '', cwd = '', command = '', instructions = '' } = await readJson(req);
+      const session = piToken(sessionId);
+      if (!session) throw new Error('这张卡片没有保存 Pi 会话');
+      const folder = String(cwd || defaultWorkspace); await validateDirectory(folder);
+      const request = { id: 'compact', type: 'compact', ...(String(instructions).trim() ? { customInstructions: String(instructions).trim().slice(0, 2000) } : {}) };
+      const answers = await piRpcQuery(command, [], [request], 300_000, folder, (await findPiSessionFile(session)) || session);
+      const record = answers.get('compact');
+      if (!record?.success) throw new Error(/nothing to compact/i.test(record?.error || '') ? '会话还很短，没有需要压缩的内容' : record?.error || '压缩失败');
+      reply(res, 200, { tokensBefore: record.data?.tokensBefore ?? null, tokensAfter: record.data?.estimatedTokensAfter ?? null });
+    } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
   if (req.method === 'POST' && req.url === '/agent/steer') {
     try {
       const { id, message = '', behavior = 'steer' } = await readJson(req);
-      const job = agentJobs.get(id);
+      const job = (await getJob(id));
       if (!job || job.status !== 'running' || !job.control?.steer) throw new Error('这个任务现在不能追加指令');
       if (!String(message).trim()) throw new Error('指令不能为空');
       job.control.steer(String(message).trim(), behavior === 'followUp' ? 'followUp' : 'steer');
@@ -1176,23 +1588,23 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && req.url === '/agent/respond') {
     try {
-      const { id, requestId, approved, always = false } = await readJson(req);
-      const job = agentJobs.get(id);
+      const { id, requestId, approved, always = false, value, cancelled = false } = await readJson(req);
+      const job = (await getJob(id));
       if (!job?.control?.respond || !(job.pending || []).some((item) => item.id === requestId)) throw new Error('没有等待你回答的请求');
       const suggestion = job.pendingRaw?.get(requestId);
       if (always === true && approved === true && suggestion) {
         const rules = allowRules.get(job.realWorkspace) || [];
         if (!rules.some((rule) => sameRule(rule, suggestion.rule))) { allowRules.set(job.realWorkspace, [...rules, suggestion.rule]); await saveAgentConfig(); addJobNote(job, '已记住这条“以后都允许”规则（可在 设置 → 执行器 里删除）'); }
       }
-      job.control.respond(requestId, approved === true);
+      job.control.respond(requestId, cancelled === true ? { cancelled: true } : typeof value === 'string' ? { value } : approved === true);
       reply(res, 200, publicJob(job));
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
   }
   if (req.method === 'POST' && req.url === '/agent/stop') {
     try {
-      const { id } = await readJson(req); const job = agentJobs.get(id); if (!job) throw new Error('找不到任务');
-      job.status = 'stopped'; job.completedAt = new Date().toISOString(); job.events.push({ id: job.events.length + 1, type: 'status', text: '用户已停止任务', at: job.completedAt });
+      const { id } = await readJson(req); const job = (await getJob(id)); if (!job) throw new Error('找不到任务');
+      job.status = 'stopped'; job.completedAt = new Date().toISOString(); job.events.push({ id: job.events.length + 1, type: 'status', text: '用户已停止任务', at: job.completedAt }); void persistJob(job);
       job.pending = [];
       if (job.control?.abort) job.control.abort(); else { job.abort?.(); job.child?.kill(); }
       reply(res, 200, publicJob(job));

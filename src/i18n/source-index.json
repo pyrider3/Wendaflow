@@ -1644,8 +1644,8 @@
     "Wendaflow sends requests only through the model connections you configure. Model keys and canvas data stay managed by this device."
   ],
   [
-    "拖动画布 · 右键框选 · Shift 多选 · Alt 拖动子树 · Delete 删除",
-    "Drag canvas · Right-drag to select · Shift multi-select · Alt drag subtree · Delete"
+    "拖动画布 · 右键框选 · Shift / Ctrl 多选 · Alt 拖动子树 · Delete 删除",
+    "Drag canvas · Right-drag to select · Shift / Ctrl multi-select · Alt drag subtree · Delete"
   ],
   [
     "空画布",

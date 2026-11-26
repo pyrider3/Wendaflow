@@ -100,3 +100,24 @@ test('high-frequency card drag and marquee reuse cached frame/rect state and flu
   assert.equal(ctx.marqueeRectRef.current,null);
   assert.equal(ctx.relationRectRef.current,null);
 });
+
+test('parent lines attach to the facing sides so the arrowhead stays visible',()=>{
+  const size={width:100,height:40};
+  const ends=d=>{const n=d.match(/-?[\d.]+/g).map(Number);return {start:[n[0],n[1]],end:n.slice(-2)};};
+  // Parent left of child: right edge → left edge (unchanged mind-map layout).
+  assert.deepEqual(ends(connectionPath('parent',{x:0,y:0},{x:200,y:0},size,size)),{start:[100,20],end:[200,20]});
+  // Parent right of child (extra parent placed to the right): left edge → right edge.
+  assert.deepEqual(ends(connectionPath('parent',{x:300,y:-80},{x:0,y:0},size,size)),{start:[300,-60],end:[100,20]});
+  // Stacked cards: bottom → top, or top → bottom when the child is above.
+  assert.deepEqual(ends(connectionPath('parent',{x:0,y:0},{x:20,y:120},size,size)),{start:[50,40],end:[70,120]});
+  assert.deepEqual(ends(connectionPath('parent',{x:0,y:120},{x:20,y:0},size,size)),{start:[50,120],end:[70,40]});
+});
+
+test('parent line endpoints move continuously as a card is dragged across the switch zone',()=>{
+  const size={width:100,height:40},nums=d=>d.match(/-?[\d.]+(e-?\d+)?/g).map(Number);
+  let prev=nums(connectionPath('parent',{x:0,y:0},{x:160,y:150},size,size));
+  for(let x=159;x>=-160;x--){
+    const next=nums(connectionPath('parent',{x:0,y:0},{x,y:150},size,size));
+    assert.ok(next.every((v,i)=>Math.abs(v-prev[i])<8),`jump at x=${x}`);prev=next;
+  }
+});

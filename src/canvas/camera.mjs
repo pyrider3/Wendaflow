@@ -10,8 +10,25 @@ export function needsViewportSnapshot(previous,next,size,preview=false){
 }
 export function connectionPath(kind,source,target,sourceSize,targetSize){
   if(kind==='parent'){
-    const x1=source.x+sourceSize.width,y1=source.y+sourceSize.height/2,x2=target.x,y2=target.y+targetSize.height/2,mid=(x1+x2)/2;
-    return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
+    // Attach to the sides that face each other so the line (and its arrowhead) never hides
+    // under a card: parent left of child → right edge to left edge (the usual mind-map case),
+    // parent right of child → left edge to right edge, stacked cards → bottom/top edges.
+    // Between those layouts the two curves are blended by how far apart the cards are
+    // horizontally, so dragging a card bends the line smoothly instead of snapping it.
+    const sw=sourceSize.width,sh=sourceSize.height,tw=targetSize.width,th=targetSize.height;
+    const forwardGap=target.x-(source.x+sw),backwardGap=source.x-(target.x+tw);
+    const forward=forwardGap>=backwardGap,hGap=forward?forwardGap:backwardGap;
+    const hx1=forward?source.x+sw:source.x,hy1=source.y+sh/2,hx2=forward?target.x:target.x+tw,hy2=target.y+th/2,mid=(hx1+hx2)/2;
+    const horizontal=[hx1,hy1,mid,hy1,mid,hy2,hx2,hy2];
+    const t=Math.min(1,Math.max(0,(hGap+36)/60)),w=t*t*(3-2*t);
+    if(w===1)return `M ${hx1} ${hy1} C ${mid} ${hy1}, ${mid} ${hy2}, ${hx2} ${hy2}`;
+    // Controls push out of each card by at least 28px, so even touching cards get a visible
+    // S-bend and an arrowhead that points into the child.
+    const below=target.y+th/2>=source.y+sh/2;
+    const vx1=source.x+sw/2,vy1=below?source.y+sh:source.y,vx2=target.x+tw/2,vy2=below?target.y:target.y+th,k=(below?1:-1)*Math.max(28,Math.abs(vy2-vy1)/2);
+    const vertical=[vx1,vy1,vx1,vy1+k,vx2,vy2-k,vx2,vy2];
+    const q=vertical.map((v,i)=>v+(horizontal[i]-v)*w);
+    return `M ${q[0]} ${q[1]} C ${q[2]} ${q[3]}, ${q[4]} ${q[5]}, ${q[6]} ${q[7]}`;
   }
   const x1=source.x+sourceSize.width/2,y1=source.y+sourceSize.height,x2=target.x+targetSize.width/2,y2=target.y,bend=Math.max(46,Math.abs(y2-y1)*.36);
   return `M ${x1} ${y1} C ${x1} ${y1+bend}, ${x2} ${y2-bend}, ${x2} ${y2}`;
@@ -22,7 +39,7 @@ export class ConnectionGeometry {
   }
   bind(svg){
     this.cancel();this.byNode.clear();this.edges=[];
-    for(const path of svg?.querySelectorAll('.connection[data-connection-key]')||[]){const data=path.dataset;
+    for(const path of svg?.querySelectorAll('.connection[data-connection-key], .connection-flow[data-connection-key]')||[]){const data=path.dataset;
       const edge={path,kind:data.connectionKind,sourceId:data.parentId||data.sourceId,targetId:data.childId||data.targetId};
       this.edges.push(edge);for(const id of [edge.sourceId,edge.targetId]){if(!this.byNode.has(id))this.byNode.set(id,new Set());this.byNode.get(id).add(edge);}
     }
