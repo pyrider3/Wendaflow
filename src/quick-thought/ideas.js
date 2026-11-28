@@ -1,4 +1,5 @@
 import {parentIdsOf,reachesUp,dropParents,addExtraParent} from '../canvas/parents.mjs';
+import {marqueeHitsScreenRect,visualGroupRect} from '../canvas/groups.mjs';
 // Capture visible card borders once per gesture, outside the pointer-move loop.
 export function marqueeBounds(world, canvasRect) {
   const bounds = new Map();
@@ -12,18 +13,16 @@ export function thoughtIds(nodes, ids) {
   return new Set(nodes.filter(node => node.type === 'thought' && ids.has(node.id)).map(node => node.id));
 }
 export function boxThoughtIds(nodes, sizes, viewport, box) {
-  const left=Math.min(box.startX,box.x), right=Math.max(box.startX,box.x);
-  const top=Math.min(box.startY,box.y), bottom=Math.max(box.startY,box.y);
   return nodes.filter(node=>{
     if(!box.allCards && node.type!=='thought')return false;
     if(box.bounds){
       const rect=box.bounds.get(node.id);
-      return !!rect && rect.left<=right && rect.top<=bottom && rect.right>=left && rect.bottom>=top;
+      return !!rect && marqueeHitsScreenRect(node,rect,box,viewport?.zoom||1);
     }
-    const size=sizes.get(node.id)||{width:224,height:110};
-    const x=viewport.x+node.x*viewport.zoom,y=viewport.y+node.y*viewport.zoom;
-    // Inclusive intersection selects partial overlap and edge contact.
-    return x<=right && y<=bottom && x+size.width*viewport.zoom>=left && y+size.height*viewport.zoom>=top;
+    const boxRect=visualGroupRect(node,sizes);
+    const x=viewport.x+boxRect.x*viewport.zoom,y=viewport.y+boxRect.y*viewport.zoom;
+    const rect={left:x,top:y,right:x+boxRect.width*viewport.zoom,bottom:y+boxRect.height*viewport.zoom};
+    return marqueeHitsScreenRect(node,rect,box,viewport?.zoom||1);
   }).map(node=>node.id);
 }
 export function newThought(point,title,parentId,id) {

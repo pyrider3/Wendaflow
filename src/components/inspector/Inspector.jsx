@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Button, Field, Group, Input, Row, Select } from "../settings/ui.jsx";
+import { Button, Field, Group, Input, Row, Select, Switch } from "../settings/ui.jsx";
 import { Callout, Collapse, Icon, IconButton, Segmented, Swatches, Textarea } from "./ui.jsx";
 import { ToolEvent } from "../../cards/ToolEvent.jsx";
 import { ChangesPanel } from "../../cards/ChangesPanel.jsx";
@@ -20,14 +20,17 @@ export function Inspector({ ctx }) {
     mindMapState, setMindMapState, generateMindMapSuggestions, addMindMapSuggestions,
     deletionIds, deletingIds, deleteSelection, onClose, onOpenSettings,
     titleExpanded, setTitleExpanded, applyAgentChanges,
+    groupCardCount = 0, fitGroupToCards, selectGroupContents, deleteGroupWithCards,
+    toggleGroupCollapse, toggleGroupLock, toggleGroupAutoFit, unpackGroupToCard,
   } = ctx;
   const [contextOpen, setContextOpen] = useState(false);
 
   const patch = (changes) =>
     setNodes((items) => items.map((node) => (node.id === selected.id ? { ...node, ...changes } : node)));
+  const isGroup = selected.type === "group";
   const isConversation = selected.type === "conversation";
   const isAction = selected.type === "action";
-  const typeLabel = isConversation ? copy.chat : isAction ? copy.action : copy.idea;
+  const typeLabel = isGroup ? tr("分组框", "Group frame") : isConversation ? copy.chat : isAction ? copy.action : copy.idea;
   const state = isConversation || isAction ? statusLabel(selected.status, uiLanguage) : "";
   const busy = ["queued", "thinking", "streaming"].includes(selected.status);
   const linkNames = { inherit: tr("继承", "Inherit"), reference: tr("引用", "Reference"), merge: tr("合并", "Merge") };
@@ -84,6 +87,105 @@ export function Inspector({ ctx }) {
       </header>
 
       <div className="ix-scroll">
+        {isGroup ? (
+          <div className="ix-body" key={selected.id}>
+            <Group title={tr("分组框", "Group frame")}>
+              <div className="ix-form">
+                <Field label={tr("分组名称", "Group name")}>
+                  <Input
+                    value={selected.title || ""}
+                    placeholder={tr("未命名分组", "Untitled group")}
+                    onChange={(event) => patch({ title: event.target.value })}
+                  />
+                </Field>
+                <Field label={tr("分组框颜色", "Group frame color")}>
+                  <Swatches colors={NODE_COLORS} value={selected.color} labelFor={colorLabel} onPick={(color) => patch({ color })} />
+                </Field>
+                <Field label={tr("边框样式", "Border style")}>
+                  <Segmented
+                    label={tr("边框样式", "Border style")}
+                    value={selected.borderStyle || "solid"}
+                    onChange={(borderStyle) => patch({ borderStyle: borderStyle === "solid" ? undefined : borderStyle })}
+                    items={[["solid", tr("实线", "Solid")], ["dashed", tr("虚线", "Dashed")], ["none", tr("无边框", "None")]]}
+                  />
+                </Field>
+                <Field label={tr("背景填充", "Background fill")}>
+                  <Segmented
+                    label={tr("背景填充", "Background fill")}
+                    value={selected.fillMode || "full"}
+                    onChange={(fillMode) => patch({ fillMode: fillMode === "full" ? undefined : fillMode })}
+                    items={[["full", tr("全框填充", "Full frame")], ["title", tr("仅标题条", "Title bar only")]]}
+                  />
+                </Field>
+              </div>
+            </Group>
+            <Group title={tr("分组行为", "Group behavior")}>
+              <Row
+                title={tr("折叠分组", "Collapse group")}
+                hint={tr("收起为双框紧凑卡片，隐藏内部卡片；选中时虚线预览展开范围。", "Fold into a double-bordered card and hide contained cards; select to preview expanded bounds.")}
+              >
+                <Switch
+                  checked={Boolean(selected.collapsed)}
+                  onChange={() => toggleGroupCollapse?.(selected.id)}
+                  label={tr("折叠分组", "Collapse group")}
+                  onLabel={text("enabled")}
+                  offLabel={text("disabled")}
+                />
+              </Row>
+              <Row
+                title={tr("锁定分组", "Lock group")}
+                hint={tr("防止误拖或误删内部卡片，整块区域可直接拖动。", "Protect contained cards from accidental edits or drags; drag anywhere inside to move together.")}
+              >
+                <Switch
+                  checked={Boolean(selected.locked)}
+                  onChange={() => toggleGroupLock?.(selected.id)}
+                  label={tr("锁定分组", "Lock group")}
+                  onLabel={text("enabled")}
+                  offLabel={text("disabled")}
+                />
+              </Row>
+              <Row
+                title={tr("自动贴合内部卡片", "Auto-fit to cards")}
+                hint={tr("移动内部卡片时，分组框会自动跟随伸缩。", "Automatically expands or shrinks as contained cards move.")}
+              >
+                <Switch
+                  checked={Boolean(selected.autoFit)}
+                  onChange={() => toggleGroupAutoFit?.(selected.id)}
+                  label={tr("自动贴合内部卡片", "Auto-fit to cards")}
+                  onLabel={text("enabled")}
+                  offLabel={text("disabled")}
+                />
+              </Row>
+              <Row
+                title={tr(`包含 ${groupCardCount} 张卡片`, `Contains ${groupCardCount} cards`)}
+                hint={tr("拖动标题栏或边框会连同内部卡片一起移动；按住 Alt 仅移动分组框。", "Drag header or border to move cards together; hold Alt to move frame only.")}
+                stack
+              >
+                <div className="ix-form-actions">
+                  <Button className="small" disabled={!groupCardCount || Boolean(selected.collapsed)} onClick={() => fitGroupToCards?.(selected.id)}>
+                    {tr("适配内部卡片", "Fit to contained cards")}
+                  </Button>
+                  <Button className="small" disabled={!groupCardCount || Boolean(selected.collapsed)} onClick={() => selectGroupContents?.(selected.id)}>
+                    {tr("选中内部卡片", "Select contained cards")}
+                  </Button>
+                </div>
+              </Row>
+            </Group>
+            <div className="ix-danger ix-group-actions">
+              <Button onClick={() => unpackGroupToCard?.(selected.id)}>
+                {tr("拆包为想法卡片", "Unpack to idea card")}
+              </Button>
+              <Button onClick={() => deleteSelection()}>
+                {tr("解散分组框（保留卡片）", "Ungroup (keep cards)")}
+              </Button>
+              {groupCardCount > 0 && (
+                <Button kind="danger" onClick={() => deleteGroupWithCards?.(selected.id)}>
+                  <Icon name="trash" /> {tr("删除分组及内部卡片", "Delete group and cards")}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="ix-body" key={selected.id}>
           {selected.prompt && (
             <section className="ix-quote">
@@ -378,13 +480,16 @@ export function Inspector({ ctx }) {
             </Button>
           </div>
         </div>
+        )}
       </div>
 
-      <footer className="ix-foot">
-        <Button kind="primary" className="ix-branch" onClick={() => startBranch(selected)}>
-          <Icon name="plus" /> {tr("分支", "Branch")}
-        </Button>
-      </footer>
+      {!isGroup && (
+        <footer className="ix-foot">
+          <Button kind="primary" className="ix-branch" onClick={() => startBranch(selected)}>
+            <Icon name="plus" /> {tr("分支", "Branch")}
+          </Button>
+        </footer>
+      )}
     </aside>
   );
 }

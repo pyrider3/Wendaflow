@@ -4,6 +4,7 @@ import { matchesRule, suggestRule, sameRule } from './src/agents/allow-rules.mjs
 import { expandMentions, listWorkspaceFiles } from './src/agents/mentions.mjs';
 import { listPiSessions, readPiSession, piUsage, findPiSessionFile, piModelCatalog, summarizePiTree } from './src/agents/pi-sessions.mjs';
 import { approvalPreview, diffStat } from './src/agents/approval-preview.mjs';
+import { probeModelConnection } from './src/agents/model-probe.mjs';
 import { comfyRoutes } from './src/plugins/comic/comfy-proxy.mjs';
 import { createPluginGate } from './src/plugins/server-gate.mjs';
 const plugins = createPluginGate({ comic: comfyRoutes });
@@ -327,7 +328,7 @@ async function cachedPiCatalog() {
 }
 async function setWendaflowPiProfiles(profiles, preferred = '') {
   const next = piProvidersFromProfiles(profiles, await cachedPiCatalog());
-  if (JSON.stringify(next) !== JSON.stringify(wendaflowPiProviders)) { stopPiWorkers(); piInfoCache.clear(); }
+  if (JSON.stringify(next) !== JSON.stringify(wendaflowPiProviders)) clearPiCaches();
   wendaflowPiProviders = next;
   wendaflowPiPreferred = String(preferred || '');
   return wendaflowPiProviders.map(({ apiKey, ...shown }) => shown);
@@ -637,10 +638,21 @@ async function piRpcQuery(configuredCommand, selectArgs, requests, timeoutMs = 3
 }
 
 const piInfoCache = new Map();
+const piThinkingCache = new Map();
+const piThinkingInflight = new Map();
+let piCacheEpoch = 0;
+function clearPiCaches() {
+  piCacheEpoch += 1;
+  stopPiWorkers();
+  piInfoCache.clear();
+  piThinkingCache.clear();
+  piCommandCache.clear();
+}
 async function piModels(configuredCommand) {
   const key = String(configuredCommand || '');
   const cached = piInfoCache.get(key);
   if (cached && Date.now() - cached.at < 60_000) return cached.value;
+  const epoch = piCacheEpoch;
   const answers = await piRpcQuery(configuredCommand, [], [{ id: 'models', type: 'get_available_models' }, { id: 'state', type: 'get_state' }]);
   const list = answers.get('models');
   if (!list?.success) throw new Error(list?.error || 'Pi 没有返回模型列表');
@@ -649,16 +661,28 @@ async function piModels(configuredCommand) {
     models: (list.data?.models || []).map((model) => ({ provider: model.provider, id: model.id, name: model.name || model.id, reasoning: model.reasoning === true, image: (model.input || []).includes('image'), contextWindow: model.contextWindow || 0 })),
     current: state.model ? { provider: state.model.provider, id: state.model.id, thinkingLevel: state.thinkingLevel || '' } : null,
   };
-  piInfoCache.set(key, { at: Date.now(), value });
+  if (epoch === piCacheEpoch) piInfoCache.set(key, { at: Date.now(), value });
   return value;
 }
 
 async function piThinkingLevels(configuredCommand, provider, modelId) {
-  const select = [...(provider ? ['--provider', piToken(provider)] : []), ...(modelId ? ['--model', piToken(modelId)] : [])];
-  const answers = await piRpcQuery(configuredCommand, select, [{ id: 'levels', type: 'get_available_thinking_levels' }]);
-  const reply = answers.get('levels');
-  if (!reply?.success) throw new Error(reply?.error || 'Pi 没有返回思考档位');
-  return reply.data?.levels || ['off'];
+  const key = `${configuredCommand || ''}|${provider || ''}|${modelId || ''}`;
+  const cached = piThinkingCache.get(key);
+  if (cached && Date.now() - cached.at < 5 * 60_000) return cached.levels;
+  const epoch = piCacheEpoch;
+  const inflightKey = `${epoch}|${key}`;
+  if (piThinkingInflight.has(inflightKey)) return piThinkingInflight.get(inflightKey);
+  const query = (async () => {
+    const select = [...(provider ? ['--provider', piToken(provider)] : []), ...(modelId ? ['--model', piToken(modelId)] : [])];
+    const answers = await piRpcQuery(configuredCommand, select, [{ id: 'levels', type: 'get_available_thinking_levels' }]);
+    const reply = answers.get('levels');
+    if (!reply?.success) throw new Error(reply?.error || 'Pi 没有返回思考档位');
+    const levels = reply.data?.levels || ['off'];
+    if (epoch === piCacheEpoch) piThinkingCache.set(key, { at: Date.now(), levels });
+    return levels;
+  })().finally(() => { piThinkingInflight.delete(inflightKey); });
+  piThinkingInflight.set(inflightKey, query);
+  return query;
 }
 
 // Names, descriptions and on/off only; MCP entries also hold commands and env values, which are never read out.
@@ -1115,9 +1139,9 @@ const MAX_KEPT_SNAPSHOTS = 12;
 async function startJobSnapshot(job, workspace) {
   try {
     const snapshot = await takeSnapshot(workspace, path.join(SNAPSHOT_ROOT, job.id));
-    if (snapshot.ok) { job.snapshot = snapshot; return true; }
-    job.changes = { available: false, reason: snapshot.reason, files: [] };
-  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; }
+    if (snapshot.ok) { job.snapshot = snapshot; touchJob(job); return true; }
+    job.changes = { available: false, reason: snapshot.reason, files: [] }; touchJob(job);
+  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; touchJob(job); }
   return false;
 }
 async function releaseJobFiles(job) {
@@ -1131,14 +1155,17 @@ async function finalizeJobChanges(job) {
     job.changes = { available: true, files, truncated, rolledBack: [] };
     if (!files.length) await releaseJobFiles(job);
     const kept = [...agentJobs.values()].filter((item) => item.snapshot);
-    for (const old of kept.slice(0, Math.max(0, kept.length - MAX_KEPT_SNAPSHOTS))) { await releaseJobFiles(old); if (old.changes) old.changes.available = false; if (old.changes) old.changes.reason = 'expired'; }
-  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; }
+    for (const old of kept.slice(0, Math.max(0, kept.length - MAX_KEPT_SNAPSHOTS))) { await releaseJobFiles(old); if (old.changes) old.changes.available = false; if (old.changes) old.changes.reason = 'expired'; touchJob(old); }
+    touchJob(job);
+  } catch (error) { job.changes = { available: false, reason: error.message, files: [] }; touchJob(job); }
 }
 
-function addJobNote(job, text) { job.events.push({ id: job.events.length + 1, type: 'status', text, at: new Date().toISOString() }); }
+function touchJob(job) { if (job) job.rev = (job.rev || 0) + 1; }
+
+function addJobNote(job, text) { job.events.push({ id: job.events.length + 1, type: 'status', text, at: new Date().toISOString() }); touchJob(job); }
 
 function publicJob(job) {
-  return { id: job.id, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', changes: job.changes || null, usage: job.usage || null, extensionStatus: job.extensionStatus || null, extensionWidgets: job.extensionWidgets || null, isolated: !!job.isolated, output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
+  return { id: job.id, rev: job.rev || 0, runner: job.runner, status: job.status, startedAt: job.startedAt, completedAt: job.completedAt, events: job.events.slice(-240), terminal: job.terminal || '', sessionId: job.sessionId || '', pending: job.pending || [], canSteer: !!job.control?.steer && job.status === 'running', changes: job.changes || null, usage: job.usage || null, extensionStatus: job.extensionStatus || null, extensionWidgets: job.extensionWidgets || null, isolated: !!job.isolated, output: job.output, error: job.error, before: job.before, after: job.after, artifacts: (job.artifacts || []).map((item, index) => ({ id: `${job.id}-${index}`, name: item.name, size: item.size, type: item.type, image: item.image, state: item.state, localPath: item.path, url: `http://${HOST}:${PORT}/agent/artifact?job=${encodeURIComponent(job.id)}&index=${index}` })) };
 }
 
 const personalCloud=process.env.WENDAFLOW_CLOUD_DIR?cloudApi({root:process.env.WENDAFLOW_CLOUD_DIR,origin:process.env.WENDAFLOW_PUBLIC_ORIGIN,secure:process.env.WENDAFLOW_CLOUD_INSECURE!=='1'}):null;
@@ -1327,7 +1354,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const output = await managePi(await readJson(req));
       // Anything Pi loads at start may have changed.
-      stopPiWorkers(); piCommandCache.clear(); piInfoCache.clear();
+      clearPiCaches();
       reply(res, 200, { output, resources: await piResources() });
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -1380,12 +1407,12 @@ const server = http.createServer(async (req, res) => {
       const realWorkspace = typeof requestedWorkspace === 'string' && requestedWorkspace.trim() ? requestedWorkspace : defaultWorkspace;
       if (typeof prompt !== 'string' || !prompt.trim()) throw new Error('任务内容不能为空');
       const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const job = { id, runner, realWorkspace, isolated: isolate === true ? { workspace: realWorkspace, copy: path.join(SNAPSHOT_ROOT, `iso-${id}`, 'ws') } : null, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
+      const job = { id, rev: 1, runner, realWorkspace, isolated: isolate === true ? { workspace: realWorkspace, copy: path.join(SNAPSHOT_ROOT, `iso-${id}`, 'ws') } : null, status: 'running', startedAt: new Date().toISOString(), events: [{ id: 1, type: 'status', text: `${runner} 已启动`, at: new Date().toISOString() }], terminal: '', output: '', error: null, child: null, abort: null };
       agentJobs.set(id, job);
       void persistJob(job);
       reply(res, 202, publicJob(job));
       void (async () => {
-        const addEvent = (type, text) => { const clean = String(text); job.events.push({ id: job.events.length + 1, type, text: clean.slice(-12000), at: new Date().toISOString() }); job.terminal = `${job.terminal || ''}${clean}`.slice(-180000); };
+        const addEvent = (type, text) => { const clean = String(text); job.events.push({ id: job.events.length + 1, type, text: clean.slice(-12000), at: new Date().toISOString() }); job.terminal = `${job.terminal || ''}${clean}`.slice(-180000); touchJob(job); };
         // A streamed entry (text, thinking, one tool call) grows in place instead of adding a row per chunk.
         const eventByKey = new Map();
         const updateEvent = (key, type, text, { final = false, meta = null } = {}) => {
@@ -1394,6 +1421,7 @@ const server = http.createServer(async (req, res) => {
           if (existing) { existing.text = clean; existing.at = new Date().toISOString(); if (meta) existing.meta = meta; }
           else { const event = { id: job.events.length + 1, type, text: clean, at: new Date().toISOString(), ...(meta ? { meta } : {}) }; job.events.push(event); eventByKey.set(key, event); }
           if (final) job.terminal = `${job.terminal || ''}${clean}\n`.slice(-180000);
+          touchJob(job);
         };
         const onPending = (action, entry, approved) => {
           if (action === 'add' && entry.kind && entry.kind !== 'approval') {
@@ -1408,6 +1436,7 @@ const server = http.createServer(async (req, res) => {
             if (matchesRule(allowRules.get(realWorkspace), entry.tool, raw, workspace)) { addEvent('status', '符合你保存的“以后都允许”规则，已自动批准'); job.control?.respond?.(entry.id, true); }
           }
           else { const asked = (job.pending || []).find((item) => item.id === entry.id); job.pending = (job.pending || []).filter((item) => item.id !== entry.id); addEvent('status', asked?.kind && asked.kind !== 'approval' ? (approved ? '已回答' : '已取消') : approved ? '已批准' : '已拒绝'); }
+          touchJob(job);
         };
         // An isolated run works on a copy; the real folder is only touched when its result is applied.
         const workspace = job.isolated ? job.isolated.copy : realWorkspace;
@@ -1420,7 +1449,7 @@ const server = http.createServer(async (req, res) => {
           job.before = await gitWorkspaceState(workspace);
           addEvent('status', '已记录执行前的工作区状态');
           if (await startJobSnapshot(job, workspace)) addEvent('status', '已为本次运行建立文件快照，可随时查看改动或撤销');
-          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onUsage: (usage) => { job.usage = usage; }, onPending, onExtensionStatus: (key, value) => { const next = { ...(job.extensionStatus || {}) }; if (value) next[key] = value; else delete next[key]; job.extensionStatus = next; }, onExtensionWidget: (key, lines) => { const next = { ...(job.extensionWidgets || {}) }; if (lines.length) next[key] = lines; else delete next[key]; job.extensionWidgets = next; }, onControl: (control) => { job.control = control; } };
+          const hooks = { onChild: (child) => { job.child = child; }, onAbort: (abort) => { job.abort = abort; }, onEvent: addEvent, onEventUpdate: updateEvent, onUsage: (usage) => { job.usage = usage; touchJob(job); }, onPending, onExtensionStatus: (key, value) => { const next = { ...(job.extensionStatus || {}) }; if (value) next[key] = value; else delete next[key]; job.extensionStatus = next; touchJob(job); }, onExtensionWidget: (key, lines) => { const next = { ...(job.extensionWidgets || {}) }; if (lines.length) next[key] = lines; else delete next[key]; job.extensionWidgets = next; touchJob(job); }, onControl: (control) => { job.control = control; touchJob(job); } };
           addEvent('config', `执行配置：${JSON.stringify(options)}`);
           const safeImages = Array.isArray(images) ? images : [], safeFiles = Array.isArray(files) ? files : [];
           const taskPrompt = await expandMentions(prompt.trim(), workspace);
@@ -1433,7 +1462,7 @@ const server = http.createServer(async (req, res) => {
           if (job.status === 'stopped') { await finalizeJobChanges(job); return; }
           await finalizeJobChanges(job);
           job.status = 'failed'; job.error = error.message; job.completedAt = new Date().toISOString(); addEvent('error', error.message);
-        } finally { job.child = null; job.control = null; job.pending = []; void persistJob(job); }
+        } finally { job.child = null; job.control = null; job.pending = []; touchJob(job); void persistJob(job); }
       })();
     } catch (error) { reply(res, 400, { error: error.message }); }
     return;
@@ -1502,10 +1531,9 @@ const server = http.createServer(async (req, res) => {
     if (!job) { reply(res, 404, { error: '找不到任务' }); return; }
     res.writeHead(200, { ...allowedHeaders, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     let last = '', closed = false;
-    const fingerprint = () => { const events = job.events || [], tail = events[events.length - 1]; return JSON.stringify([job.status, events.length, tail?.id, tail?.text?.length, (job.pending || []).map((item) => item.id), job.usage, job.changes, job.extensionStatus, job.extensionWidgets, !!job.control?.steer, job.artifacts?.length, job.terminal?.length, job.sessionId, job.after?.status, job.error]); };
     const push = () => {
       if (closed) return;
-      const now = fingerprint();
+      const now = `${job.rev || 0}:${job.status}`;
       if (now !== last) { last = now; res.write(`data: ${JSON.stringify(publicJob(job))}\n\n`); }
       if (job.status !== 'running') { closed = true; clearInterval(timer); clearInterval(ping); res.end(); }
     };
@@ -1604,8 +1632,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/agent/stop') {
     try {
       const { id } = await readJson(req); const job = (await getJob(id)); if (!job) throw new Error('找不到任务');
-      job.status = 'stopped'; job.completedAt = new Date().toISOString(); job.events.push({ id: job.events.length + 1, type: 'status', text: '用户已停止任务', at: job.completedAt }); void persistJob(job);
-      job.pending = [];
+      job.status = 'stopped'; job.completedAt = new Date().toISOString(); job.events.push({ id: job.events.length + 1, type: 'status', text: '用户已停止任务', at: job.completedAt }); job.pending = []; touchJob(job); void persistJob(job);
       if (job.control?.abort) job.control.abort(); else { job.abort?.(); job.child?.kill(); }
       reply(res, 200, publicJob(job));
     } catch (error) { reply(res, 404, { error: error.message }); }
@@ -1620,6 +1647,17 @@ const server = http.createServer(async (req, res) => {
       const result = runner === 'codex' ? await runCodex(prompt.trim(), safeImages, safeFiles, workspace, {}, options) : await runCliAgent(runner, prompt.trim(), safeImages, safeFiles, workspace, {}, options);
       reply(res, 200, result);
     } catch (error) { reply(res, 400, { error: error.message }); }
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/models/probe') {
+    try {
+      const { endpoint = '', format = 'openai-compatible', apiKey = '', model = '', local = false } = await readJson(req, 200_000);
+      const result = await probeModelConnection(
+        { endpoint, format, apiKey, model, local: local === true },
+        { validateUrl: validateEndpoint },
+      );
+      reply(res, 200, result);
+    } catch (error) { reply(res, 400, { error: error.message || '检测失败' }); }
     return;
   }
   if (req.method !== 'POST' || req.url !== '/stream') { reply(res, 404, { error: 'Not found' }); return; }

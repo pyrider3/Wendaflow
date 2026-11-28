@@ -152,7 +152,7 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .empty-welcome { position: absolute; left: 50%; top: 44%; z-index: 7; display: flex; flex-direction: column; align-items: center; gap: 6px; transform: translate(-50%,-50%); color: #87928c; pointer-events: none; }
 .empty-welcome strong { color: #59675f; font-size: 18px; font-weight: 550; }
 .empty-welcome span { max-width: min(560px, 80vw); color: var(--ui-muted, #65736b); font-size: 12px; text-align: center; }
-.selection-marquee { position: absolute; z-index: 12; border: 1px solid rgba(37,132,96,.72); border-radius: 8px; background: rgba(50,151,111,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); pointer-events: none; }
+.selection-marquee { position: absolute; left: 0; top: 0; z-index: 12; border: 1px solid rgba(37,132,96,.72); border-radius: 8px; background: rgba(50,151,111,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); pointer-events: none; will-change: transform, width, height; }
 .world, .connections { position: absolute; inset: 0; width: 1800px; height: 1100px; transform-origin: 0 0; backface-visibility: hidden; }
 .world { contain: layout style; }
 .canvas.viewport-animating .world, .canvas.viewport-animating .connections { will-change: transform; }
@@ -184,15 +184,7 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .line-selection-menu { position: fixed; z-index: 90; left: 50%; bottom: 28px; width: 190px; padding: 10px; border: 1px solid rgba(255,255,255,.9); border-radius: 12px; background: rgba(250,254,251,.95); box-shadow: 0 16px 38px rgba(24,47,36,.22); backdrop-filter: blur(20px) saturate(165%); transform: translateX(-50%); animation: line-menu-in .20s var(--ease-out) both; }
 @keyframes line-menu-in { from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.95); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
 .line-selection-menu > span, .line-selection-menu small { display: block; }.line-selection-menu > span { color: #2b4538; font-size: 10px; font-weight: 700; }.line-selection-menu small { margin-top: 4px; color: #748179; font-size: 8px; line-height: 1.4; }.line-selection-menu > div { display: flex; gap: 6px; margin-top: 9px; }.line-selection-menu button { flex: 1; padding: 7px; border: 1px solid #d5dfda; border-radius: 8px; background: rgba(255,255,255,.86); color: #52635a; cursor: pointer; font-size: 8px; }.line-selection-menu button.danger { border-color: rgba(174,75,65,.25); color: #a44e46; }
-.canvas-context-menu { position: fixed; z-index: 90; display: grid; min-width: 164px; padding: 7px; border: 1px solid rgba(255,255,255,.76); border-radius: 13px; background: rgba(249,252,250,.92); box-shadow: 0 18px 42px rgba(25,46,35,.20); backdrop-filter: blur(20px) saturate(150%); transform-origin: top left; animation: context-menu-in .18s var(--ease-out) both; }
-.canvas-context-menu strong { max-width: 210px; overflow: hidden; padding: 5px 8px 7px; color: #65736b; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.canvas-context-menu button { padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: #2d4036; cursor: pointer; text-align: left; font-size: 10px; }
-.canvas-context-menu button:hover { background: rgba(47,132,96,.10); }
-.canvas-context-menu button.danger { color: #a45148; }
-.canvas-context-menu button.danger:hover { background: rgba(180,75,65,.11); }
-.canvas-context-menu.closing { pointer-events: none; animation: context-menu-out .15s ease-in both; }
-@keyframes context-menu-in { from { opacity: 0; transform: translateY(-5px) scale(.96); filter: blur(2px); } to { opacity: 1; transform: translateY(0) scale(1); filter: none; } }
-@keyframes context-menu-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-4px) scale(.97); filter: blur(2px); } }
+/* Context menu styles live in src/components/context-menu.css */
 .mindmap-candidate { position: absolute; width: 185px; min-height: 76px; box-sizing: border-box; display: grid; align-content: center; gap: 5px; padding: 13px; border: 1px dashed rgba(111,78,151,.6); border-radius: 13px; background: rgba(245,239,253,.78); box-shadow: 0 10px 25px rgba(90,61,124,.11); pointer-events: none; animation: candidate-in .28s var(--ease-out) both; }
 .mindmap-candidate.excluded { opacity: .25; filter: grayscale(.45); }
 .mindmap-candidate small { color: #765a92; font-size: 8px; }.mindmap-candidate strong { color: #3f3150; font-size: 12px; line-height: 1.35; }
@@ -201,10 +193,11 @@ button { -webkit-appearance: none; appearance: none; color: inherit; }
 .connection.folding { animation: line-fold .2s var(--ease-out) forwards; }
 .connection.deleting { animation: line-delete .24s var(--ease-in) both; }
 
-.node { position: absolute; width: 224px; min-height: 110px; padding: 14px 15px; border: 1px solid rgba(255,255,255,.52); border-radius: 15px; background: var(--node-tint, rgba(255, 255, 255, .66)); box-shadow: 0 5px 18px rgba(29, 48, 39, .045); backdrop-filter: blur(9px) saturate(118%); cursor: pointer; transform-origin: 0 0; interpolate-size: allow-keywords; transition: transform .42s var(--ease-out), width .34s var(--ease-out), min-height .34s var(--ease-out), height .34s var(--ease-out), opacity .16s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out), background-color .18s var(--ease-out); user-select: none; }
-/* Match the existing zoom fast path during direct panning too. The card
-   animations and static glass styling are retained. */
-.canvas:is(.viewport-animating, .panning, .dragging-cards) .node { backdrop-filter: none; }
+.node { position: absolute; width: 224px; min-height: 110px; padding: 14px 15px; border: 1px solid rgba(255,255,255,.52); border-radius: 15px; background: var(--node-tint, rgba(255, 255, 255, .66)); box-shadow: 0 5px 18px rgba(29, 48, 39, .045); backdrop-filter: blur(9px) saturate(118%); contain: layout style; cursor: pointer; transform-origin: 0 0; interpolate-size: allow-keywords; transition: transform .42s var(--ease-out), width .34s var(--ease-out), min-height .34s var(--ease-out), height .34s var(--ease-out), opacity .16s var(--ease-out), box-shadow .18s var(--ease-out), border-color .18s var(--ease-out), background-color .18s var(--ease-out); user-select: none; }
+/* Match the existing zoom fast path during direct panning and marquee sweeps too.
+   The card animations and static glass styling are retained outside active gestures. */
+.canvas:is(.viewport-animating, .panning, .dragging-cards, .marquee-active) .node { backdrop-filter: none; }
+.canvas.marquee-active .node { transition: none; }
 .node.medium-answer { width: 290px; --read-height: 210px; }
 .node.long-answer { width: 380px; --read-height: 320px; }
 .node.short-answer { --read-height: 110px; }

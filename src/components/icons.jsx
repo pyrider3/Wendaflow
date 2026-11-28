@@ -13,6 +13,7 @@ const paths = {
   arrange: "M5 4h6v5H5zM13 15h6v5h-6zM5 15h6v5H5zM8 9v3h8v3",
   map: "M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2ZM9 4v14M15 6v14",
   focus: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+  group: "M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM7.5 8h4M7.5 12h4v4h-4ZM13.5 11h3v3h-3Z",
   export: "M12 4v11M8 8l4-4 4 4M5 15v4h14v-4",
 };
 

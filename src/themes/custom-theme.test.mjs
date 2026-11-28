@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { CUSTOM_PRESETS, DEFAULT_CUSTOM_THEME, customThemeVars, normalizeCustomTheme } from './custom-theme.mjs';
 
 test('old five-colour custom themes carry over', () => {
@@ -39,4 +40,16 @@ test('variables reflect shape choices', () => {
   assert.equal(vars['--custom-shadow'], 'none');
   assert.equal(grid, 'lines');
   assert.match(vars['--custom-font'], /monospace/);
+});
+
+test('blueprint theme uses cyanotype crosshairs, square drafting frames, oklab fallback, and forced-colors fallback', () => {
+  const css = fs.readFileSync(new URL('./gallery.css', import.meta.url), 'utf8');
+  assert.match(css, /:root\[data-theme="blueprint"\]\s*\{[^}]*--bp-oklab:/s);
+  assert.match(css, /@supports\s*\(background:\s*linear-gradient\(in oklab, white, black\)\)/);
+  assert.match(css, /:root\[data-theme="blueprint"\]\s+\.canvas\s*\{[^}]*conic-gradient\(from 270deg at 9px 1px/s);
+  assert.match(css, /:root\[data-theme="blueprint"\]\s+\.canvas:not\(\.file-drag-active\)::before/);
+  assert.match(css, /:root\[data-theme="blueprint"\]\s+\.canvas\s+\.node,\s*:root\[data-theme="blueprint"\]\s+\.canvas\s+\.node\.thought\.text-thought:not\(\.inline-editing\)/);
+  assert.match(css, /:root\[data-theme="blueprint"\]\s+\.canvas\s+\.node::before\s*\{[^}]*inset:\s*-7px;/s);
+  assert.match(css, /:root\[data-theme="blueprint"\]\s+\.canvas\s+\.node::after\s*\{[^}]*inset:\s*3px;/s);
+  assert.match(css, /@media \(forced-colors: active\)\s*\{[^}]*:root\[data-theme="blueprint"\]/s);
 });

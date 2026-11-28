@@ -2,6 +2,7 @@
 // Pure functions, no DOM, so they are testable and PNG rendering can reuse the SVG.
 import { parentIdsOf } from './parents.mjs';
 import { tidyLayout } from './tidy-layout.mjs';
+import { isGroupNode, DEFAULT_GROUP_WIDTH, DEFAULT_GROUP_HEIGHT, captureGroupMembers, refitGroupsAfterLayout, collapsedGroupRect, hiddenByCollapsedGroups, containedCardCount } from './groups.mjs';
 
 const CARD_W = 300;
 const PAD = 16;
@@ -106,7 +107,18 @@ function curve(p, q) {
 // keeping where they happen to sit on the canvas.
 export function toSVG(nodes, { theme = 'light', title = '', tidy = true } = {}) {
   const p = PALETTES[theme] || PALETTES.light;
-  const cards = nodes.map(layoutCard);
+  const initialSizes = new Map(nodes.map((node) => [
+    node.id,
+    isGroupNode(node)
+      ? { width: node.manualWidth || DEFAULT_GROUP_WIDTH, height: node.manualHeight || DEFAULT_GROUP_HEIGHT }
+      : { width: node.manualWidth || CARD_W, height: node.manualHeight || 110 },
+  ]));
+  const hiddenIds = hiddenByCollapsedGroups(nodes, initialSizes);
+  const visible = nodes.filter((node) => !hiddenIds.has(node.id));
+  const groupNodes = visible.filter(isGroupNode);
+  const cardNodes = visible.filter((node) => !isGroupNode(node));
+  const groupMembers = tidy && groupNodes.length ? captureGroupMembers(visible, initialSizes) : new Map();
+  const cards = cardNodes.map(layoutCard);
   if (tidy && cards.length) {
     const size = new Map(cards.map((c) => [c.node.id, { width: c.w, height: c.h }]));
     const ids = new Set(cards.map((c) => c.node.id));
@@ -127,12 +139,39 @@ export function toSVG(nodes, { theme = 'light', title = '', tidy = true } = {}) 
       colY += box.h + 60; colW = Math.max(colW, box.w);
     }
   }
-  const byId = new Map(cards.map((c) => [c.node.id, c]));
-  if (!cards.length) cards.push({ node: {}, title: ['Empty canvas'], body: [], w: CARD_W, h: 60, x: 0, y: 0 });
-  const minX = Math.min(...cards.map((c) => c.x)) - MARGIN;
-  const minY = Math.min(...cards.map((c) => c.y)) - MARGIN - (title ? 36 : 0);
-  const maxX = Math.max(...cards.map((c) => c.x + c.w)) + MARGIN;
-  const maxY = Math.max(...cards.map((c) => c.y + c.h)) + MARGIN;
+  const cardById = new Map(cards.map((c) => [c.node.id, c]));
+  const refitUpdates = tidy && groupMembers.size
+    ? refitGroupsAfterLayout(
+        nodes,
+        new Map(cards.map((c) => [c.node.id, { x: c.x, y: c.y }])),
+        (node) => {
+          const placed = cardById.get(node.id);
+          return placed ? { width: placed.w, height: placed.h } : { width: CARD_W, height: 110 };
+        },
+        groupMembers,
+      )
+    : new Map();
+  const groups = groupNodes.map((node) => {
+    const patch = !node.collapsed ? refitUpdates.get(node.id) : null;
+    const base = patch ? { ...node, ...patch } : node;
+    const rect = base.collapsed ? collapsedGroupRect(base) : { x: Number(base.x) || 0, y: Number(base.y) || 0, width: base.manualWidth || DEFAULT_GROUP_WIDTH, height: base.manualHeight || DEFAULT_GROUP_HEIGHT };
+    return {
+      node: base,
+      x: rect.x,
+      y: rect.y,
+      w: rect.width,
+      h: rect.height,
+      cardCount: containedCardCount(node, nodes, initialSizes),
+      label: String(node.title || '').replace(/\s+/g, ' ').trim() || 'Group',
+    };
+  }).sort((a, b) => b.w * b.h - a.w * a.h);
+  const byId = cardById;
+  if (!cards.length && !groups.length) cards.push({ node: {}, title: ['Empty canvas'], body: [], w: CARD_W, h: 60, x: 0, y: 0 });
+  const allBoxes = [...groups, ...cards];
+  const minX = Math.min(...allBoxes.map((c) => c.x)) - MARGIN;
+  const minY = Math.min(...allBoxes.map((c) => c.y)) - MARGIN - (title ? 36 : 0);
+  const maxX = Math.max(...allBoxes.map((c) => c.x + c.w)) + MARGIN;
+  const maxY = Math.max(...allBoxes.map((c) => c.y + c.h)) + MARGIN;
   const width = Math.round(maxX - minX);
   const height = Math.round(maxY - minY);
   const edges = [];
@@ -151,6 +190,22 @@ export function toSVG(nodes, { theme = 'light', title = '', tidy = true } = {}) 
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${width}" height="${height}" font-family="system-ui,-apple-system,'Segoe UI','Noto Sans CJK SC','PingFang SC','Microsoft YaHei',sans-serif">`);
   out.push(`<rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="${p.bg}"/>`);
   if (title) out.push(`<text x="${minX + MARGIN}" y="${minY + 40}" font-size="20" font-weight="700" fill="${p.title}">${escapeXml(title)}</text>`);
+  for (const g of groups) {
+    const stroke = g.node.color || p.border;
+    const fill = g.node.color || p.title;
+    const borderStyle = g.node.borderStyle || 'solid';
+    if (g.node.collapsed) {
+      const badge = g.cardCount > 0 ? ` · ${g.cardCount}` : '';
+      out.push(`<g data-group="${escapeXml(g.node.id)}" data-collapsed="true"><rect x="${g.x - 4}" y="${g.y - 4}" width="${g.w + 8}" height="${g.h + 8}" rx="15" fill="${escapeXml(fill)}" fill-opacity="0.08" stroke="${escapeXml(stroke)}" stroke-opacity="0.72" stroke-width="1.5"/><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="11" fill="${p.card}" stroke="${escapeXml(stroke)}" stroke-opacity="0.88" stroke-width="1.5"/><text x="${g.x + 16}" y="${g.y + 32}" font-size="14" font-weight="650" fill="${p.title}">${escapeXml(`${g.label}${badge}`)}</text></g>`);
+      continue;
+    }
+    const dashAttr = borderStyle === 'dashed' ? ' stroke-dasharray="7 5"' : '';
+    const strokeAttr = borderStyle === 'none' ? ' stroke="none"' : ` stroke="${escapeXml(stroke)}" stroke-opacity="0.72" stroke-width="1.5"${dashAttr}`;
+    const titleOnly = g.node.fillMode === 'title';
+    const bodyFill = titleOnly ? 'fill="none"' : `fill="${escapeXml(fill)}" fill-opacity="0.06"`;
+    const headerBand = titleOnly ? `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="36" rx="12" fill="${escapeXml(fill)}" fill-opacity="0.16"/>` : '';
+    out.push(`<g data-group="${escapeXml(g.node.id)}">${headerBand}<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="12" ${bodyFill}${strokeAttr}/><text x="${g.x + 16}" y="${g.y + 24}" font-size="14" font-weight="650" fill="${p.title}" fill-opacity="0.88">${escapeXml(g.label)}</text></g>`);
+  }
   for (const e of edges) {
     out.push(`<path d="${e.d}" fill="none" stroke="${e.ref ? p.ref : p.line}" stroke-width="1.8" stroke-linecap="round"${e.dash || e.ref ? ' stroke-dasharray="6 5"' : ''}/>`);
   }
@@ -168,10 +223,11 @@ export function toSVG(nodes, { theme = 'light', title = '', tidy = true } = {}) 
 }
 
 export function toMarkdown(nodes, { title = '' } = {}) {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const cardNodes = nodes.filter((node) => !isGroupNode(node));
+  const byId = new Map(cardNodes.map((n) => [n.id, n]));
   const children = new Map();
   const roots = [];
-  for (const n of nodes) {
+  for (const n of cardNodes) {
     const parent = n.parentId && byId.has(n.parentId) ? n.parentId : null;
     if (parent) children.set(parent, [...(children.get(parent) || []), n]); else roots.push(n);
   }
@@ -196,7 +252,7 @@ export function toMarkdown(nodes, { title = '' } = {}) {
     for (const child of children.get(node.id) || []) visit(child, depth + 1);
   };
   for (const root of roots) visit(root, 0);
-  for (const n of nodes) visit(n, 0); // parent cycles or orphans never get dropped
+  for (const n of cardNodes) visit(n, 0); // parent cycles or orphans never get dropped
   return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
 }
 

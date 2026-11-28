@@ -5,7 +5,7 @@ import '../components/polish.css';
 
 // Chords are written "A + B"; "A / B" lists alternatives.  Known key names are
 // drawn as key caps, anything else (mouse gestures) stays plain text.
-const KEY=/^(shift|alt|ctrl|⌘|enter|tab|esc|f2|i|z|s|\?|space|空格)$/i;
+const KEY=/^(shift|alt|ctrl|⌘|enter|tab|esc|f2|i|g|z|s|\?|space|空格)$/i;
 function Keys({value}) {
  return <span className="help-keys">{value.split(' + ').map((part,index)=><React.Fragment key={index}>
   {index>0&&<i aria-hidden="true">+</i>}
@@ -33,7 +33,9 @@ export function ShortcutHelp({quick,say,hints,onToggleHints,onClose}) {
    ['Shift / Ctrl + '+say('点击卡片','click card'),say('切换多选','Toggle card selection')],
    ['Shift / Ctrl + '+say('框选','marquee'),say('追加选择','Add to selection')],
    ['Alt + '+say('框选','marquee'),say('减去选择','Subtract selection')],
-   ['Alt + '+say('拖动卡片','drag card'),say('一起移动子树','Move the subtree')],
+   ['Ctrl / ⌘ + G',say('将选中项建为分组框 / 新建分组框','Group selected cards / New group frame')],
+   ['Ctrl / ⌘ + Shift + G',say('解散选中分组框 / 将卡片移出分组框','Ungroup frame / Detach card from group')],
+   ['Alt + '+say('拖动卡片','drag card'),say('一起移动子树（拖分组框时仅移框）','Move subtree (frame only on groups)')],
    ...(quick?[[say('方向键','Arrow keys'),say('选择相邻想法','Select nearby idea')]]:[]),
   ]],
   ...(quick?[[say('快速思维','Quick thinking'),[

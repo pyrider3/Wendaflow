@@ -1,0 +1,730 @@
+/* Spatial group frames ("Section" / 分组框), inspired by Project Graph.
+ * Renders behind cards with a crisp translucent surface so the canvas grid
+ * and connecting lines stay legible right through the interior; supports
+ * double-bordered collapse with dashed preview, zoom-out big covered title,
+ * locked rigid-container mode, and solid / dashed / borderless styling. */
+
+:root .app-shell .canvas .node.group {
+  --group-border: color-mix(in oklab, var(--sx-text, #1e2a24) 32%, transparent);
+  --group-border-hover: color-mix(in oklab, var(--sx-text, #1e2a24) 56%, transparent);
+  --group-bg: color-mix(in oklab, var(--sx-text, #1e2a24) 3.5%, transparent);
+  --group-header-bg: transparent;
+  --group-title-color: color-mix(in oklab, var(--sx-text, #1e2a24) 90%, transparent);
+  --group-big-bg: var(--canvas-bg, var(--sx-bg, #f4f7f5));
+
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  min-width: 176px;
+  min-height: 54px;
+  padding: 0;
+  border: 1.5px solid var(--group-border);
+  border-radius: 14px;
+  background: var(--group-bg);
+  background-image: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+  overflow: visible;
+  cursor: default;
+  outline: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root .app-shell .canvas .node.group {
+    transition: border-color .18s var(--ease-out), background-color .18s var(--ease-out), box-shadow .18s var(--ease-out);
+  }
+}
+
+:root .app-shell .canvas .node.group::before,
+:root .app-shell .canvas .node.group::after {
+  display: none;
+}
+
+/* Regular cards sit above open group frames cleanly. */
+:root .app-shell .canvas .node:not(.group) {
+  z-index: 2;
+}
+:root .app-shell .canvas .node:not(.group):hover {
+  z-index: 9;
+}
+:root .app-shell .canvas .node:not(.group).selected {
+  z-index: 8;
+}
+
+:root .app-shell .canvas .node.group.group-colored {
+  --group-border: color-mix(in oklab, var(--group-tint) 78%, transparent);
+  --group-border-hover: var(--group-tint);
+  --group-bg: color-mix(in oklab, var(--group-tint) 10%, transparent);
+  --group-title-color: color-mix(in oklab, var(--group-tint) 42%, var(--sx-text, #1e2a24));
+  --group-big-bg: color-mix(in oklab, var(--group-tint) 24%, var(--canvas-bg, var(--sx-bg, #f4f7f5)));
+}
+
+/* Project Graph border styles: solid (default), dashed, none */
+:root .app-shell .canvas .node.group.group-border-dashed {
+  border-style: dashed;
+}
+:root .app-shell .canvas .node.group.group-border-none {
+  border-color: transparent;
+}
+:root .app-shell .canvas .node.group.group-border-none:has(> .group-header:hover),
+:root .app-shell .canvas .node.group.group-border-none:has(> .group-edge:hover) {
+  border-style: dashed;
+  border-color: var(--group-border-hover);
+}
+
+/* Project Graph fill mode: titleOnly tints only the top bar */
+:root .app-shell .canvas .node.group.group-fill-title:not(.group-collapsed):not(.group-big-title) {
+  --group-bg: transparent;
+  --group-header-bg: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 16%, transparent);
+}
+
+:root .app-shell .canvas .node.group:has(> .group-header:hover),
+:root .app-shell .canvas .node.group:has(> .group-edge:hover) {
+  border-color: var(--group-border-hover);
+}
+
+:root .app-shell .canvas .node.group.selected,
+:root .app-shell .canvas .node.group.selected:not(.connection-target):not([data-slice-target]) {
+  z-index: 1;
+  border-color: var(--group-tint, var(--sx-accent, #1b7556));
+  background: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 12%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 18%, transparent);
+  outline: none;
+}
+:root .app-shell .canvas .node.group.group-fill-title.selected:not(.group-collapsed):not(.group-big-title) {
+  background: transparent;
+}
+
+/* Project Graph locked section: entire interior acts as a solid movable block */
+:root .app-shell .canvas .node.group.group-locked {
+  pointer-events: auto;
+  cursor: grab;
+}
+:root .app-shell .canvas .node.group.group-locked.dragging {
+  cursor: grabbing;
+}
+:root .app-shell .canvas .node.group > .group-lock-corner {
+  display: block;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-top-right-radius: 12px;
+  background: linear-gradient(225deg, color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 46%, transparent) 50%, transparent 51%);
+  pointer-events: none;
+}
+
+/* Project Graph collapsed section: compact double-bordered pill */
+:root .app-shell .canvas .node.group.group-collapsed {
+  z-index: 3;
+  pointer-events: auto;
+  cursor: grab;
+  border-style: solid;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 10%, var(--sx-raised, #ffffff));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .14);
+}
+:root .app-shell .canvas .node.group.group-collapsed::before {
+  display: block;
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1.5px solid var(--group-border);
+  border-radius: 16px;
+  pointer-events: none;
+}
+:root .app-shell .canvas .node.group.group-collapsed.selected,
+:root .app-shell .canvas .node.group.group-collapsed.selected:not(.connection-target):not([data-slice-target]) {
+  z-index: 4;
+  background: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 14%, var(--sx-raised, #ffffff));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 20%, transparent), 0 8px 22px rgba(0, 0, 0, .18);
+}
+:root .app-shell .canvas .node.group.group-collapsed.selected::before {
+  border-color: var(--group-tint, var(--sx-accent, #1b7556));
+}
+:root .app-shell .canvas .node.group.group-collapsed > .group-header {
+  min-block-size: 51px;
+  padding: 8px 12px;
+  border-radius: inherit;
+}
+
+/* Dashed outline preview showing expanded area when a collapsed section is selected */
+.node.group > .group-expanded-preview {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px dashed color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 78%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 5%, transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Project Graph zoom-out big covered title: floats above interior cards for macro reading */
+:root .app-shell .canvas .node.group.group-big-title,
+:root .app-shell .canvas .node.group.group-big-title.selected,
+:root .app-shell .canvas .node.group.group-big-title.selected:not(.connection-target):not([data-slice-target]) {
+  z-index: 11;
+  pointer-events: auto;
+}
+.node.group > .group-big-cover {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+  box-sizing: border-box;
+  background: color-mix(in oklab, var(--group-big-bg) 92%, transparent);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+  container-type: size;
+  overflow: hidden;
+}
+.node.group.dragging > .group-big-cover {
+  cursor: grabbing;
+}
+.node.group .group-big-title-text {
+  max-width: 100%;
+  color: var(--group-title-color);
+  font-size: clamp(1.4rem, 3.6vw, 3.4rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@supports (font-size: 1cqi) {
+  .node.group .group-big-title-text {
+    font-size: clamp(1.4rem, min(12cqi, 26cqb), 3.4rem);
+  }
+}
+.node.group .group-big-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 26px;
+  min-block-size: 22px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--group-tint, var(--sx-accent, #1b7556)) 18%, transparent);
+  color: var(--group-title-color);
+  font-size: 0.875rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  opacity: .85;
+}
+
+:root .app-shell .canvas .node.group.dragging,
+:root .app-shell .canvas .node.group.resizing {
+  transition: none;
+}
+
+/* Draggable border strips (open interior remains click-through for marquee, pan, and double-click) */
+.node.group > .group-edge {
+  position: absolute;
+  pointer-events: auto;
+  cursor: grab;
+}
+.node.group.dragging > .group-edge,
+.node.group.dragging > .group-header {
+  cursor: grabbing;
+}
+.node.group > .group-edge.e-left { left: -6px; top: 38px; bottom: 8px; width: 12px; }
+.node.group > .group-edge.e-right { right: -6px; top: 38px; bottom: 8px; width: 12px; }
+.node.group > .group-edge.e-bottom { left: 8px; right: 8px; bottom: -6px; height: 12px; }
+
+/* Header strip with clean top-left title (Section_0 aesthetic) */
+.node.group > .group-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-block-size: 38px;
+  padding: 7px 12px 6px 10px;
+  border-radius: inherit;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: var(--group-header-bg);
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Compact inline fold toggle button */
+.node.group .group-fold-btn,
+.node.group .group-lock-pill {
+  flex: none;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--group-title-color);
+  cursor: pointer;
+}
+.node.group .group-fold-btn {
+  opacity: .38;
+}
+.node.group.selected .group-fold-btn,
+.node.group.group-collapsed .group-fold-btn,
+.node.group:has(> .group-header:hover) .group-fold-btn,
+.node.group .group-fold-btn:focus-visible {
+  opacity: .9;
+}
+.node.group .group-fold-btn svg,
+.node.group .group-lock-pill svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.node.group .group-fold-btn svg {
+  transform: rotate(90deg);
+}
+.node.group .group-fold-btn[aria-pressed="true"] svg {
+  transform: rotate(0deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node.group .group-fold-btn,
+  .node.group .group-fold-btn svg,
+  .node.group .group-lock-pill {
+    transition: opacity .15s var(--ease-out), transform .16s var(--ease-out), background-color .15s var(--ease-out);
+  }
+}
+@media (hover: hover) {
+  .node.group .group-fold-btn:hover,
+  .node.group .group-lock-pill:hover {
+    background: color-mix(in oklab, var(--sx-text, #1e2a24) 10%, transparent);
+  }
+}
+.node.group .group-fold-btn:focus-visible,
+.node.group .group-lock-pill:focus-visible {
+  outline: 2px solid var(--sx-accent, #1b7556);
+  outline-offset: 2px;
+}
+.node.group .group-lock-pill {
+  color: var(--group-tint, var(--sx-accent, #1b7556));
+  opacity: .92;
+}
+
+.node.group .group-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--group-title-color);
+  font-size: 1rem;
+  font-weight: 560;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.node.group .group-count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 20px;
+  min-block-size: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sx-text, #1e2a24) 10%, transparent);
+  color: var(--sx-muted, #66746c);
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  opacity: .72;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node.group .group-count {
+    transition: opacity .16s var(--ease-out), background-color .16s var(--ease-out), color .16s var(--ease-out);
+  }
+}
+.node.group.selected .group-count,
+.node.group.group-collapsed .group-count,
+.node.group:has(> .group-header:hover) .group-count {
+  opacity: 1;
+}
+.node.group.selected .group-count,
+.node.group.group-collapsed .group-count {
+  background: var(--sx-accent-soft, #e2f0e9);
+  color: var(--sx-accent, #1b7556);
+}
+
+.node.group .group-title-input {
+  flex: 1 1 auto;
+  min-width: 80px;
+  max-width: 320px;
+  min-block-size: 28px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--sx-accent, #1b7556);
+  border-radius: 7px;
+  background: var(--sx-raised, #ffffff);
+  color: var(--sx-text, #1e2a24);
+  font: 560 0.9375rem/1.3 inherit;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--sx-accent, #1b7556) 20%, transparent);
+  user-select: text;
+}
+
+/* 8-direction resize handles (appear smoothly on hover or selection) */
+.node.group > .group-resize-handle {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  opacity: 0;
+  z-index: 3;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node.group > .group-resize-handle { transition: opacity .15s var(--ease-out), scale .15s var(--ease-out); }
+}
+.node.group.selected > .group-resize-handle,
+.node.group:has(> .group-header:hover) > .group-resize-handle,
+.node.group:has(> .group-edge:hover) > .group-resize-handle,
+.node.group > .group-resize-handle:hover,
+.node.group > .group-resize-handle:focus-visible {
+  opacity: 1;
+}
+.node.group > .group-resize-handle:focus-visible {
+  outline: 2px solid var(--sx-accent, #1b7556);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Corner dots */
+.node.group > .group-resize-handle:is(.h-nw, .h-ne, .h-se, .h-sw) {
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+}
+.node.group > .group-resize-handle:is(.h-nw, .h-ne, .h-se, .h-sw)::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--sx-accent, #1b7556);
+  border-radius: 3px;
+  background: var(--sx-raised, #ffffff);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
+}
+.node.group > .group-resize-handle.h-nw { left: -7px; top: -7px; cursor: nwse-resize; }
+.node.group > .group-resize-handle.h-ne { right: -7px; top: -7px; cursor: nesw-resize; }
+.node.group > .group-resize-handle.h-se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.node.group > .group-resize-handle.h-sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+
+/* Side mid-edge grips */
+.node.group > .group-resize-handle.h-n { left: 50%; top: -5px; width: 32px; height: 10px; transform: translateX(-50%); cursor: ns-resize; }
+.node.group > .group-resize-handle.h-s { left: 50%; bottom: -5px; width: 32px; height: 10px; transform: translateX(-50%); cursor: ns-resize; }
+.node.group > .group-resize-handle.h-e { right: -5px; top: 50%; width: 10px; height: 32px; transform: translateY(-50%); cursor: ew-resize; }
+.node.group > .group-resize-handle.h-w { left: -5px; top: 50%; width: 10px; height: 32px; transform: translateY(-50%); cursor: ew-resize; }
+.node.group > .group-resize-handle:is(.h-n, .h-s, .h-e, .h-w)::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--sx-accent, #1b7556);
+  opacity: .75;
+}
+.node.group > .group-resize-handle:is(.h-n, .h-s)::after { width: 20px; height: 3px; }
+.node.group > .group-resize-handle:is(.h-e, .h-w)::after { width: 3px; height: 20px; }
+
+/* Floating mini toolbar above selected group frame */
+.node.group > .group-toolbar {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--sx-line, #e1e9e4);
+  border-radius: 12px;
+  background: var(--sx-raised, #ffffff);
+  color: var(--sx-text, #1e2a24);
+  box-shadow: var(--sx-shadow, 0 12px 32px rgba(16, 30, 24, .22));
+  pointer-events: auto;
+  white-space: nowrap;
+  animation: group-bar-in .16s var(--ease-out) both;
+}
+@keyframes group-bar-in {
+  from { opacity: 0; translate: 0 4px; scale: .96; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+.group-toolbar-colors,
+.group-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.group-toolbar-sep {
+  width: 0;
+  height: 18px;
+  border-left: 1px solid var(--sx-line, #e1e9e4);
+}
+.group-swatch {
+  position: relative;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+.group-swatch::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--swatch, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--sx-text, #1e2a24) 24%, transparent);
+}
+.group-swatch.plain::after {
+  background: linear-gradient(135deg, transparent 44%, color-mix(in oklab, var(--sx-muted, #66746c) 70%, transparent) 45% 55%, transparent 56%);
+}
+.group-swatch[aria-pressed="true"] {
+  border-color: var(--sx-accent, #1b7556);
+  box-shadow: inset 0 0 0 1px var(--sx-accent, #1b7556);
+}
+.group-swatch:focus-visible,
+.group-tool-btn:focus-visible {
+  outline: 2px solid var(--sx-accent, #1b7556);
+  outline-offset: 2px;
+}
+.group-tool-btn {
+  min-inline-size: 26px;
+  min-block-size: 26px;
+  padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sx-muted, #66746c);
+  cursor: pointer;
+}
+.group-tool-btn[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--sx-accent, #1b7556) 16%, transparent);
+  border-color: color-mix(in oklab, var(--sx-accent, #1b7556) 55%, transparent);
+  color: var(--sx-accent, #1b7556);
+}
+.group-tool-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .group-swatch,
+  .group-tool-btn { transition: background-color .14s var(--ease-out), color .14s var(--ease-out), border-color .14s var(--ease-out), scale .14s var(--ease-out); }
+}
+@media (hover: hover) {
+  .group-swatch:hover { background: color-mix(in oklab, var(--sx-text, #1e2a24) 8%, transparent); }
+  .group-tool-btn:hover:not([aria-disabled="true"]) {
+    background: color-mix(in oklab, var(--sx-text, #1e2a24) 8%, transparent);
+    color: var(--sx-text, #1e2a24);
+  }
+  .group-tool-btn[aria-pressed="true"]:hover:not([aria-disabled="true"]) {
+    background: color-mix(in oklab, var(--sx-accent, #1b7556) 24%, transparent);
+    color: var(--sx-accent, #1b7556);
+  }
+  .group-tool-btn.danger:hover {
+    background: color-mix(in oklab, var(--sx-danger, #b14d42) 14%, transparent);
+    color: var(--sx-danger, #b14d42);
+  }
+}
+.group-tool-btn:active:not([aria-disabled="true"]) { scale: .94; }
+.group-tool-btn[aria-disabled="true"] { opacity: .38; cursor: not-allowed; }
+
+@media (pointer: coarse) {
+  .group-swatch,
+  .group-tool-btn,
+  .node.group .group-fold-btn,
+  .node.group .group-lock-pill { min-inline-size: 34px; min-block-size: 34px; }
+}
+
+/* Multi-selection bar: inline "Group into section" button */
+.multi-selection-bar {
+  position: absolute;
+  top: 103px;
+  left: 72px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.multi-selection-bar[hidden] { display: none; }
+.multi-selection-bar .multi-selection-count {
+  position: static;
+  pointer-events: none;
+}
+.multi-selection-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-block-size: 30px;
+  padding: 4px 11px;
+  border: 1px solid color-mix(in oklab, var(--sx-accent, #1b7556) 45%, var(--sx-line, #cbd8d0));
+  border-radius: 999px;
+  background: var(--sx-raised, #ffffff);
+  color: var(--sx-accent, #1b7556);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(16, 30, 24, .14);
+  animation: panel-in .18s var(--ease-out) both;
+}
+.multi-selection-action svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .multi-selection-action:hover {
+    background: var(--sx-accent, #1b7556);
+    color: var(--sx-accent-ink, #ffffff);
+    border-color: var(--sx-accent, #1b7556);
+  }
+}
+.multi-selection-action:focus-visible {
+  outline: 2px solid var(--sx-accent, #1b7556);
+  outline-offset: 2px;
+}
+
+/* Minimap: group frames look like translucent outlines behind card dots */
+.minimap-stage i.group {
+  background: color-mix(in oklab, var(--sx-accent, #1b7556) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sx-text, #1e2a24) 36%, transparent);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+.minimap-stage i.group.collapsed {
+  background: color-mix(in oklab, var(--sx-accent, #1b7556) 24%, transparent);
+  border-style: double;
+  border-width: 2px;
+}
+.minimap-stage i.group.selected {
+  border-color: var(--sx-accent, #1b7556);
+  background: color-mix(in oklab, var(--sx-accent, #1b7556) 26%, transparent);
+}
+
+/* Theme harmony overrides */
+:root[data-theme="blueprint"] .app-shell .canvas .node.group {
+  border-radius: 0;
+  border-color: rgba(236, 247, 255, .64);
+  background: rgba(14, 77, 146, .20);
+  --group-big-bg: #0e4d92;
+}
+:root[data-theme="blueprint"] .app-shell .canvas .node.group.group-collapsed::before,
+:root[data-theme="blueprint"] .app-shell .canvas .node.group > .group-expanded-preview {
+  border-radius: 0;
+}
+:root[data-theme="blueprint"] .app-shell .canvas .node.group .group-title,
+:root[data-theme="blueprint"] .app-shell .canvas .node.group .group-big-title-text {
+  font-family: "JetBrains Mono", "Sarasa Mono SC", "Cascadia Code", ui-monospace, monospace;
+  letter-spacing: .04em;
+}
+:root[data-theme="blueprint"] .app-shell .canvas .node.group.selected {
+  border-color: #ffd166;
+  outline: 1px dashed rgba(255, 209, 102, .85);
+  outline-offset: 5px;
+  box-shadow: none;
+}
+:root[data-theme="terminal"] .app-shell .canvas .node.group {
+  border-radius: 4px;
+  border-color: rgba(51, 255, 102, .45);
+  background: rgba(14, 29, 16, .22);
+  --group-big-bg: #071209;
+}
+:root[data-theme="terminal"] .app-shell .canvas .node.group .group-title,
+:root[data-theme="terminal"] .app-shell .canvas .node.group .group-big-title-text {
+  font-family: "JetBrains Mono", "Sarasa Mono SC", "Cascadia Code", ui-monospace, monospace;
+  text-shadow: 0 0 8px rgba(51, 255, 102, .25);
+}
+:root[data-theme="chalkboard"] .app-shell .canvas .node.group {
+  border-radius: 8px 13px 10px 14px / 12px 8px 14px 10px;
+  border-color: rgba(243, 241, 231, .52);
+  background: rgba(255, 255, 255, .025);
+}
+:root[data-theme="bauhaus"] .app-shell .canvas .node.group {
+  border-radius: 0;
+  border-width: 2px;
+  border-color: #111111;
+}
+:root[data-theme="bauhaus"] .app-shell .canvas .node.group.group-collapsed::before,
+:root[data-theme="bauhaus"] .app-shell .canvas .node.group > .group-expanded-preview {
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node.group > .group-toolbar,
+  .multi-selection-action { animation: none; }
+}
+
+@media (forced-colors: active) {
+  :root .app-shell .canvas .node.group {
+    border: 2px solid CanvasText;
+    background: transparent;
+  }
+  :root .app-shell .canvas .node.group.group-collapsed {
+    background: Canvas;
+  }
+  :root .app-shell .canvas .node.group.group-collapsed::before {
+    border-color: CanvasText;
+  }
+  :root .app-shell .canvas .node.group > .group-big-cover {
+    background: Canvas;
+  }
+  :root .app-shell .canvas .node.group.selected {
+    border-color: Highlight;
+    outline: 2px dashed Highlight;
+    outline-offset: 4px;
+  }
+  .group-swatch[aria-pressed="true"],
+  .group-tool-btn[aria-pressed="true"],
+  .group-tool-btn:focus-visible {
+    outline: 2px solid Highlight;
+  }
+  .group-tool-btn,
+  .node.group .group-fold-btn,
+  .node.group .group-lock-pill {
+    border-color: ButtonText;
+    color: ButtonText;
+  }
+}

@@ -81,6 +81,7 @@ function LiveSteps({ events, tr }) {
 // What a running Pi card needs beside its activity log: approvals to answer, the latest
 // thing it said, and a box to steer it while it works.
 export function AgentControls({ node, tr, respondAgentApproval, steerAgent, switchPiModel, piModelChoices = [] }) {
+  const modelChoices = Array.isArray(piModelChoices) ? piModelChoices : [];
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [switcher, setSwitcher] = useState("");
@@ -120,11 +121,11 @@ export function AgentControls({ node, tr, respondAgentApproval, steerAgent, swit
       {latest && !pending.length && latest.type !== "command" && <p className={`live-latest ${latest.type}`}>{latest.text.slice(-240)}</p>}
       {canSteer && node.actionRunner === "pi" && switchPiModel && (
         <div className="live-switch">
-          {piModelChoices.length > 0 && <button type="button" className={switcher === "model" ? "open" : ""} onClick={() => setSwitcher((value) => value === "model" ? "" : "model")}>{tr("切换模型", "Switch model")} <i>⌄</i></button>}
+          {modelChoices.length > 0 && <button type="button" className={switcher === "model" ? "open" : ""} onClick={() => setSwitcher((value) => value === "model" ? "" : "model")}>{tr("切换模型", "Switch model")} <i>⌄</i></button>}
           <button type="button" className={switcher === "thinking" ? "open" : ""} onClick={() => setSwitcher((value) => value === "thinking" ? "" : "thinking")}>{tr("思考强度", "Thinking level")} <i>⌄</i></button>
           {switcher && (
             <div className="live-switch-menu" role="menu" onWheel={(event) => event.stopPropagation()}>
-              {(switcher === "model" ? piModelChoices : [["off", tr("已关闭", "Off")], ["low", tr("低", "Low")], ["medium", tr("中", "Medium")], ["high", tr("高", "High")], ["xhigh", tr("极高", "XHigh")]].map(([value, label]) => ({ value, label }))).map((item) => (
+              {(switcher === "model" ? modelChoices : [["off", tr("已关闭", "Off")], ["low", tr("低", "Low")], ["medium", tr("中", "Medium")], ["high", tr("高", "High")], ["xhigh", tr("极高", "XHigh")]].map(([value, label]) => ({ value, label }))).map((item) => (
                 <button key={item.value} role="menuitem" onClick={() => { setSwitcher(""); void switchPiModel(node, switcher === "model" ? { value: item.value } : { thinking: item.value }); }}>{item.label}</button>
               ))}
             </div>

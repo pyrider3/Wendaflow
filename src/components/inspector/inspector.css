@@ -207,8 +207,10 @@
 .ix-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .ix-editor { animation: sx-rise 0.45s var(--sx-ease) both; }
 
-.ix-danger { display: flex; justify-content: center; padding-top: 4px; }
-.ix-danger .sx-btn { height: 34px; border-color: transparent; font-size: 12px; font-weight: 500; }
+.ix-danger { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 4px; }
+.ix-danger .sx-btn { min-block-size: 34px; height: auto; padding: 6px 12px; border-color: transparent; font-size: 12px; font-weight: 500; }
+.ix-danger.ix-group-actions { flex-direction: column; align-items: stretch; gap: 6px; }
+.ix-danger.ix-group-actions .sx-btn { width: 100%; justify-content: center; border-color: var(--sx-line); }
 
 /* ---------- footer ---------- */
 

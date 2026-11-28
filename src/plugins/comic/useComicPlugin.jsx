@@ -4,6 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LOCAL_PROXY_URL, PUBLIC_WEB } from '../../localProxy.js';
 import { contextMessages, streamCloud, streamOllama } from '../../modelGateway';
+import { resolveModelProfile } from '../../components/modelProfiles.mjs';
 import { Page, Group, Fields, Field, Input, Select, Button, Status } from '../../components/settings/ui.jsx';
 import { syncPluginsToServer } from '../registry.js';
 import { storyboardPrompt, parseStoryboard, applyStoryboard, seriesPanels, panelImage, seriesSeed, normalizeComicSettings, buildComfyWorkflow, panelImagePrompt, COMIC_TEMPLATES } from './comic.mjs';
@@ -31,8 +32,8 @@ export function useComicPlugin(app) {
     const request = draft.trim();
     if (drawBusy) { drawAbortRef.current?.abort(); return; }
     if (!request) return;
-    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : null;
-    const localProfile = model.startsWith('local:') ? localProfiles.find((item) => item.id === model.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(model, cloudProfiles, localProfiles);
+    if (!profile && !localProfile) { notify(tr('请先在设置 → 模型连接中添加并选择一个模型','Add and select a model in Settings → Model connections first')); return; }
     if (profile && !profile.apiKey) { notify(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`)); return; }
     setDrawBusy(true);
     const controller = new AbortController(); drawAbortRef.current = controller;

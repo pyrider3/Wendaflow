@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {parse} from '@babel/parser';
-import {newThought} from './ideas.js';import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor} from './interactions.mjs';
+import {newThought,boxThoughtIds} from './ideas.js';import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor,tabAction,applyMarqueeDomSelection} from './interactions.mjs';
 const a={id:'a',type:'thought',x:0,y:0},b={id:'b',type:'thought',x:200,y:0,parentId:'a'},c={id:'c',type:'thought',x:400,y:0,parentId:'b'};
 test('new idea text anchor matches the creation point rather than old fixed card dimensions',()=>{const n=newThought({x:100,y:80},'idea',null,'n');assert.equal(n.x+14,100);assert.equal(n.y+10,80);});
 test('drag threshold uses screen pixels independent of canvas zoom',()=>{const drag={startX:100,startY:100};assert.equal(crossedDragThreshold(drag,{clientX:102,clientY:102}),false);assert.equal(crossedDragThreshold(drag,{clientX:103,clientY:104}),true);assert.equal(crossedDragThreshold({...drag,started:true},{clientX:100,clientY:100}),true);});
@@ -50,4 +50,78 @@ test('dragging onto a node with an existing parent defaults to adding an extra p
   assert.equal(replaced.intent,'reparent');
   assert.equal(replaced.extra,false);
   assert.equal(replaced.targetId,'b');
+});
+
+test('tabAction toggles mode even when focus stayed on topbar tabs or composer, while sparing overlays and non-composer inputs',()=>{
+  const match=(tags)=>({closest(sel){return tags.some(t=>sel.split(',').map(s=>s.trim()).includes(t))?{}:null;}});
+  assert.equal(tabAction(match(['.topbar','button']),{quickThought:false,selectedIsThought:false}),'toggle');
+  assert.equal(tabAction(match(['.topbar','button']),{quickThought:true,selectedIsThought:true}),'toggle');
+  assert.equal(tabAction(match(['textarea','.composer']),{quickThought:false,selectedIsThought:false}),'toggle');
+  assert.equal(tabAction(match(['.node']),{quickThought:true,selectedIsThought:true}),'child');
+  assert.equal(tabAction(match(['.node']),{quickThought:true,selectedIsThought:false}),'toggle');
+  assert.equal(tabAction(match(['input','.topbar']),{quickThought:false,selectedIsThought:false}),null);
+  assert.equal(tabAction(match(['textarea','.composer','.chip-pop']),{quickThought:false,selectedIsThought:false}),null);
+  assert.equal(tabAction(match(['[role="dialog"]','button']),{quickThought:false,selectedIsThought:false}),null);
+  assert.equal(tabAction(match(['.inspector','button']),{quickThought:false,selectedIsThought:false}),null);
+  assert.equal(tabAction(match(['.node']),{hasBlockingOverlay:true,quickThought:false,selectedIsThought:false}),null);
+});
+
+test('runMarqueeFrame updates card DOM selection directly across many cards without React state churn',()=>{
+  const makeCard=()=>{const set=new Set();return{classList:{add:(...k)=>k.forEach(c=>set.add(c)),remove:(...k)=>k.forEach(c=>set.delete(c)),has:c=>set.has(c)}};};
+  const many=Array.from({length:60},(_,i)=>({id:`n${i}`,type:'thought',x:(i%10)*120,y:Math.floor(i/10)*80}));
+  const els=new Map(many.map(n=>[n.id,makeCard()]));
+  const badge={textContent:'',hidden:true};
+  const marqueeEl={style:{}};
+  let reactUpdates=0;
+  const ctx={
+    marqueeFrameRef:{current:1},
+    marqueeLiveRef:{current:{x:1200,y:500}},
+    marqueeRef:{current:{startX:0,startY:0,x:0,y:0,allCards:true,base:[],mode:'replace'}},
+    marqueeElRef:{current:marqueeEl},
+    marqueeHitsRef:{current:''},
+    marqueePreviewRef:{current:{ids:new Set(),primary:null,els,badge,formatCount:n=>`${n} selected`}},
+    multiCountElRef:{current:badge},
+    canvasRef:{current:{}},
+    quickThought:true,
+    visibleNodes:many,
+    nodeSizes:new Map(),
+    viewportRef:{current:{x:0,y:0,zoom:1}},
+    boxThoughtIds,combineSelection,applyMarqueeDomSelection,
+    setSelectedIds(){reactUpdates++;},
+    setSelectedId(){reactUpdates++;},
+    setSelectedConnections(){reactUpdates++;},
+    setLineSelectionMenu(){reactUpdates++;},
+    setInspectorOpen(){reactUpdates++;},
+    setInspectorClosing(){reactUpdates++;},
+    inspectorPinnedRef:{current:false},
+  };
+  const run=extracted('runMarqueeFrame',ctx);
+  run();
+  assert.equal(reactUpdates,0,'marquee sweep must not trigger React renders per frame');
+  assert.equal(marqueeEl.style.transform,'translate3d(0px, 0px, 0)');
+  assert.equal(ctx.marqueePreviewRef.current.ids.size,60);
+  assert.equal(els.get('n0').classList.has('selected'),true);
+  assert.equal(els.get('n59').classList.has('primary-selected'),true);
+  assert.equal(badge.hidden,false);
+  assert.equal(badge.textContent,'60 selected');
+
+  // Shrinking the box removes classes from cards that left and moves primary-selected cleanly.
+  ctx.marqueeLiveRef.current={x:150,y:90};
+  run();
+  assert.equal(reactUpdates,0);
+  assert.equal(els.get('n59').classList.has('selected'),false);
+  assert.equal(els.get('n59').classList.has('primary-selected'),false);
+  assert.equal(els.get('n0').classList.has('selected'),true);
+});
+
+test('model menu rows enforce grid/flex min-width:0 and marquee disables card transitions',()=>{
+  const polish=fs.readFileSync(new URL('../components/polish.css',import.meta.url),'utf8');
+  const styles=fs.readFileSync(new URL('../styles.css',import.meta.url),'utf8');
+  assert.match(polish,/\.mm\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(polish,/\.mm-list\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(polish,/\.mm-row\s*\{[^}]*min-width:\s*0/);
+  assert.match(polish,/\.mm-pick em\s*\{[^}]*flex:\s*0 1 auto/);
+  assert.match(polish,/\.mm-set-default\s*\{[^}]*max-width:\s*0/);
+  assert.match(styles,/\.canvas\.marquee-active \.node\s*\{\s*transition:\s*none;/);
+  assert.match(styles,/\.canvas:is\([^)]*\.marquee-active[^)]*\)\s*\.node\s*\{\s*backdrop-filter:\s*none;/);
 });

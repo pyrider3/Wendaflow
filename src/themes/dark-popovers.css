@@ -4,32 +4,32 @@
   --pop-border: var(--dark-border); --pop-hover: color-mix(in srgb, var(--dark-accent) 16%, transparent);
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover, .relation-drag-tip) {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover, .relation-drag-tip) {
   background: var(--pop-bg); color: var(--pop-text); border-color: var(--pop-border);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5); backdrop-filter: none;
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover) :is(strong, small, span, label, p) {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover) :is(strong, small, span, label, p) {
   color: var(--pop-muted);
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover) button {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover) button {
   color: var(--pop-text);
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover) button:hover:not(:disabled) {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover) button:hover:not(:disabled) {
   background: var(--pop-hover);
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover) button.danger {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover) button.danger {
   color: #ff9a90;
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .line-selection-menu, .relation-popover, .relation-editor-popover) button.danger:hover:not(:disabled) {
+  :is(.line-selection-menu, .relation-popover, .relation-editor-popover) button.danger:hover:not(:disabled) {
   background: rgba(255, 120, 108, 0.16);
 }
 :root:is([data-theme="contrast-black"], [data-theme="aurora"], [data-theme="dusk"], [data-theme="ocean"], [data-theme="obsidian"], [data-theme="blueprint"], [data-theme="terminal"], [data-theme="chalkboard"], [data-theme="coffee"], [data-theme="neon"], [data-theme="custom"][data-tone="dark"])
-  :is(.canvas-context-menu, .relation-popover, .relation-editor-popover) button:disabled {
+  :is(.relation-popover, .relation-editor-popover) button:disabled {
   color: var(--pop-muted); opacity: 0.55;
 }
 

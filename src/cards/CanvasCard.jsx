@@ -12,7 +12,7 @@ export const CanvasCard=memo(function CanvasCard({node,runtime,renderData,uiLang
     onClick={event=>runtime.current.click(event)}
     onDoubleClick={event=>runtime.current.doubleClick(event,node)}
     onContextMenu={event=>runtime.current.contextMenu(event,node)}>
-    <CardContent node={node} view={view} actions={renderData.actions}
+    <CardContent node={node} view={view} actions={renderData.actions} piModelChoices={renderData.piModelChoices}
       helpers={{...renderData.helpers,shouldShowNodeThinking:()=>showThinking}}
       copy={renderData.copy} tr={renderData.tr} systemText={renderData.systemText} uiLanguage={uiLanguage}/>
   </article>;

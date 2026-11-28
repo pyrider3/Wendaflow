@@ -13,9 +13,18 @@ export function normalizeWdf(payload) {
     for(const a of n.attachments||[])if(!a || ['dataUrl','text','name','type'].some(key=>a[key]!=null && typeof a[key]!=='string'))throw new Error('Invalid attachment');
     if(n.execution!=null && (typeof n.execution!=='object' || (n.execution.events!=null && !Array.isArray(n.execution.events))))throw new Error('Invalid action execution');
 
-    return {...n, type: ['thought','conversation','action'].includes(n.type) ? n.type : 'thought', title: typeof n.title === 'string' ? n.title : '', content: typeof n.content === 'string' ? n.content : '', parentId: n.parentId || null,
+    const type = ['thought','conversation','action','group'].includes(n.type) ? n.type : 'thought';
+    const base = {...n, type, title: typeof n.title === 'string' ? n.title : '', content: typeof n.content === 'string' ? n.content : '', parentId: type === 'group' ? null : (n.parentId || null),
       attachments: Array.isArray(n.attachments) ? n.attachments.filter(a=>a && typeof a.id==='string') : [],
-      relations: Array.isArray(n.relations) ? n.relations.filter(r=>r && typeof r.targetId==='string') : [], links: Array.isArray(n.links) ? n.links.filter(id=>typeof id==='string') : []};
+      relations: type === 'group' ? [] : (Array.isArray(n.relations) ? n.relations.filter(r=>r && typeof r.targetId==='string') : []), links: type === 'group' ? [] : (Array.isArray(n.links) ? n.links.filter(id=>typeof id==='string') : [])};
+    if (type === 'group') {
+      if (!['solid','dashed','none'].includes(base.borderStyle) || base.borderStyle === 'solid') delete base.borderStyle;
+      if (!['full','title'].includes(base.fillMode) || base.fillMode === 'full') delete base.fillMode;
+      if (base.collapsed) base.collapsed = true; else delete base.collapsed;
+      if (base.locked) base.locked = true; else delete base.locked;
+      if (base.autoFit) base.autoFit = true; else delete base.autoFit;
+    }
+    return base;
   });
   const byId = new Map(nodes.map(n=>[n.id,n]));
   for (const n of nodes) {

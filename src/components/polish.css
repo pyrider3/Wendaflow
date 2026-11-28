@@ -690,18 +690,18 @@
 :root .app-shell .composer .pi-pill.fork button { margin-left: 2px; padding: 0 2px; border: 0; background: none; color: inherit; font-size: 13px; cursor: pointer; }
 
 /* ===== Model menu (v4): family marks, staggered rows, glowing selection, starry thinking rail ===== */
-:root .app-shell .composer .chip-pop.pop-model { --w: 380px; padding: 6px; }
-:root .app-shell .composer .mm { display: grid; gap: 6px; }
-:root .app-shell .composer .mm-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px 2px; color: var(--sx-muted); font-size: 12.5px; }
+:root .app-shell .composer .chip-pop.pop-model { --w: 380px; max-width: min(380px, calc(100vw - 24px)); padding: 6px; }
+:root .app-shell .composer .mm { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 6px; }
+:root .app-shell .composer .mm-head { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 10px 2px; color: var(--sx-muted); font-size: 12.5px; }
 :root .app-shell .composer .mm-head input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--sx-line); border-radius: 9px; background: var(--sx-sunken); color: var(--sx-text); font-size: 12.5px; }
-:root .app-shell .composer .mm-list { max-height: 300px; overflow-y: auto; overflow-x: hidden; display: grid; gap: 2px; padding: 2px; scrollbar-width: thin; }
-:root .app-shell .composer .mm-row { position: relative; display: flex; align-items: center; border: 1px solid transparent; border-radius: 12px; animation: mm-row-in .32s var(--ease-out) both; animation-delay: calc(var(--i) * 18ms); transition: background .18s var(--ease-out), border-color .18s var(--ease-out); }
+:root .app-shell .composer .mm-list { max-height: min(300px, max(120px, calc(100vh - 280px))); overflow-y: auto; overflow-x: hidden; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 2px; padding: 2px; scrollbar-width: thin; }
+:root .app-shell .composer .mm-row { position: relative; display: flex; align-items: center; min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; border: 1px solid transparent; border-radius: 12px; animation: mm-row-in .32s var(--ease-out) both; animation-delay: calc(var(--i) * 18ms); transition: background .18s var(--ease-out), border-color .18s var(--ease-out); }
 :root .app-shell .composer .mm-row:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
 :root .app-shell .composer .mm-row.selected { border-color: color-mix(in srgb, var(--sx-accent) 45%, transparent); background: color-mix(in srgb, var(--sx-accent) 10%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--sx-accent) 12%, transparent), 0 6px 22px -10px color-mix(in srgb, var(--sx-accent) 70%, transparent); }
-:root .app-shell .composer .mm-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border: 0; background: transparent; color: var(--sx-text); font-size: 13.5px; text-align: left; cursor: pointer; }
-:root .app-shell .composer .mm-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:root .app-shell .composer .mm-level { flex: none; color: var(--sx-accent); font-weight: 600; animation: mm-pop .3s var(--ease-spring, ease) both; }
-:root .app-shell .composer .mm-pick em { flex: none; max-width: 40%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 7%, transparent); color: var(--sx-muted); font-style: normal; font-size: 11px; }
+:root .app-shell .composer .mm-pick { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px; border: 0; background: transparent; color: var(--sx-text); font-size: 13.5px; text-align: left; cursor: pointer; }
+:root .app-shell .composer .mm-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .mm-level { flex: none; color: var(--sx-accent); font-weight: 600; white-space: nowrap; animation: mm-pop .3s var(--ease-spring, ease) both; }
+:root .app-shell .composer .mm-pick em { flex: 0 1 auto; min-width: 0; max-width: 42%; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sx-text) 7%, transparent); color: var(--sx-muted); font-style: normal; font-size: 11px; }
 :root .app-shell .composer .mm-glyph { flex: none; width: 17px; height: 17px; fill: none; stroke: color-mix(in srgb, var(--sx-text) 55%, transparent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s, transform .35s var(--ease-spring, ease); }
 :root .app-shell .composer .mm-glyph.spark { fill: color-mix(in srgb, var(--sx-text) 45%, transparent); stroke: none; }
 :root .app-shell .composer .mm-row:hover .mm-glyph { transform: rotate(-12deg) scale(1.08); }
@@ -834,9 +834,9 @@
 .artifact-action.quiet { border-color: var(--sx-line, rgba(127,127,127,.3)); background: transparent; color: var(--sx-text); }
 
 /* Model menu: default badge, "set default" on hover, creativity segment; stars stream faster at higher levels. */
-:root .app-shell .composer .mm-default { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-size: 11px; font-weight: 600; }
-:root .app-shell .composer .mm-set-default { flex: none; height: 26px; margin-right: 2px; padding: 0 9px; border: 1px solid var(--sx-line); border-radius: 999px; background: transparent; color: var(--sx-muted); font-size: 11.5px; white-space: nowrap; cursor: pointer; opacity: 0; transition: opacity .14s, color .14s, border-color .14s; }
-:root .app-shell .composer .mm-row:hover .mm-set-default, :root .app-shell .composer .mm-set-default:focus-visible { opacity: 1; }
+:root .app-shell .composer .mm-default { flex: none; padding: 1px 7px; border-radius: 999px; background: var(--sx-accent-soft); color: var(--sx-accent); font-size: 11px; font-weight: 600; white-space: nowrap; }
+:root .app-shell .composer .mm-set-default { flex: none; max-width: 0; height: 26px; margin-right: 0; padding: 0; border: 0 solid var(--sx-line); border-radius: 999px; overflow: hidden; background: transparent; color: var(--sx-muted); font-size: 11.5px; white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .14s, color .14s, border-color .14s, max-width .16s var(--ease-out), padding .16s var(--ease-out); }
+:root .app-shell .composer .mm-row:hover .mm-set-default, :root .app-shell .composer .mm-row:focus-within .mm-set-default, :root .app-shell .composer .mm-set-default:focus-visible { max-width: 96px; margin-right: 2px; padding: 0 9px; border-width: 1px; opacity: 1; pointer-events: auto; }
 :root .app-shell .composer .mm-set-default:hover { color: var(--sx-accent); border-color: var(--sx-accent); }
 :root .app-shell .composer .mm-seg { display: grid; gap: 6px; margin: 2px; padding: 10px 12px; border: 1px solid var(--sx-line); border-radius: 14px; }
 :root .app-shell .composer .mm-seg small { color: var(--sx-muted); font-size: 12px; }
@@ -849,22 +849,202 @@
 :root .app-shell .composer .agent-chip.model-pill.chat .model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root .app-shell .composer .agent-chip.model-pill.chat .model-effort { flex: none; font-weight: 600; color: var(--sx-accent); }
 
-/* Parallel: chosen models live in a popover, so the composer never changes size. */
+/* Parallel: chosen models live in a popover styled to match ModelMenu, with zero horizontal overflow. */
 :root .app-shell .composer .parallel-anchor { position: relative; flex: none; }
-:root .app-shell .composer .parallel-toggle.active { color: var(--sx-accent); border-color: var(--sx-accent); background: var(--sx-accent-soft); }
-:root .app-shell .composer .parallel-pop { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 60; width: 300px; padding: 8px; border: 1px solid var(--sx-line); border-radius: 18px; background: var(--sx-raised); color: var(--sx-text); box-shadow: var(--sx-shadow); transform-origin: bottom right; animation: chip-pop-in .18s var(--ease-out) both; }
-:root .app-shell .composer .parallel-pop header { display: grid; gap: 2px; padding: 6px 8px 8px; }
-:root .app-shell .composer .parallel-pop header strong { font-size: 13.5px; }
-:root .app-shell .composer .parallel-pop header small { color: var(--sx-muted); font-size: 12px; line-height: 1.4; }
-:root .app-shell .composer .parallel-list { display: grid; gap: 2px; max-height: 240px; overflow: auto; }
-:root .app-shell .composer .parallel-list button { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 13px; text-align: left; cursor: pointer; transition: background .14s; }
-:root .app-shell .composer .parallel-list button:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
-:root .app-shell .composer .parallel-list button i { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: 1.5px solid var(--sx-line-strong, var(--sx-line)); border-radius: 6px; font-style: normal; font-size: 11px; color: var(--sx-accent-ink, #fff); transition: background .15s, border-color .15s; }
-:root .app-shell .composer .parallel-list button.on i { background: var(--sx-accent); border-color: var(--sx-accent); }
-:root .app-shell .composer .parallel-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:root .app-shell .composer .parallel-pop footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 8px 4px 2px; border-top: 1px solid var(--sx-line); }
-:root .app-shell .composer .parallel-pop footer button { height: 30px; padding: 0 12px; border: 1px solid var(--sx-line); border-radius: 10px; background: transparent; color: var(--sx-text); font-size: 12.5px; cursor: pointer; }
-:root .app-shell .composer .parallel-pop footer button.primary { border-color: transparent; background: var(--sx-accent); color: var(--sx-accent-ink, #fff); }
+:root .app-shell .composer .composer-bottom .parallel-toggle {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; height: 36px; padding: 0 12px;
+  border: 1px solid var(--sx-line); border-radius: 999px; background: var(--sx-sunken); color: var(--sx-muted);
+  font-size: 12.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  transition: background-color .18s var(--ease-out), border-color .18s var(--ease-out), color .18s var(--ease-out), box-shadow .18s var(--ease-out), scale .15s var(--ease-out);
+}
+:root .app-shell .composer .composer-bottom .parallel-toggle:hover { color: var(--sx-text); border-color: var(--sx-line-strong); background: color-mix(in srgb, var(--sx-text) 5%, var(--sx-sunken)); }
+:root .app-shell .composer .composer-bottom .parallel-toggle:active { scale: .97; }
+:root .app-shell .composer .composer-bottom .parallel-toggle:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+:root .app-shell .composer .composer-bottom .parallel-toggle.active {
+  color: var(--sx-accent); border-color: color-mix(in srgb, var(--sx-accent) 52%, transparent);
+  background: var(--sx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sx-accent) 12%, transparent);
+}
+:root .app-shell .composer .composer-bottom .parallel-toggle.open { border-color: var(--sx-accent); }
+:root .app-shell .composer .parallel-toggle .parallel-icon { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: .88; }
+:root .app-shell .composer .parallel-toggle .parallel-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: color-mix(in srgb, var(--sx-accent) 20%, transparent); color: var(--sx-accent);
+  font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+}
+:root .app-shell .composer .parallel-toggle .parallel-count.ready { background: var(--sx-accent); color: var(--sx-accent-ink, #fff); }
+:root .app-shell .composer .parallel-toggle .parallel-caret { font-style: normal; font-size: 11px; opacity: .68; transition: transform .18s var(--ease-out); }
+:root .app-shell .composer .parallel-toggle[aria-expanded="true"] .parallel-caret { transform: rotate(180deg); }
+
+:root .app-shell .composer .parallel-pop {
+  --parallel-check-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>");
+  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 60;
+  width: min(368px, calc(100vw - 24px)); max-width: calc(100vw - 24px); box-sizing: border-box;
+  padding: 8px; border: 1px solid var(--sx-line); border-radius: 18px;
+  background: var(--sx-raised); color: var(--sx-text);
+  box-shadow: var(--sx-shadow, 0 18px 48px rgba(16, 30, 24, .22), 0 2px 8px rgba(16, 30, 24, .08));
+  overscroll-behavior: contain; transform-origin: bottom right;
+  animation: parallel-fade-in 150ms ease-out both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root .app-shell .composer .parallel-pop {
+    animation: parallel-grow 260ms ease-out both, parallel-fade-in 150ms ease-out both;
+    animation: parallel-grow 260ms linear(0, .45 15%, 1.06 42%, .99 68%, 1) both, parallel-fade-in 150ms ease-out both;
+  }
+}
+@keyframes parallel-grow { from { scale: .94; translate: 0 6px; } }
+@keyframes parallel-fade-in { from { opacity: 0; } }
+:root .app-shell .composer .parallel-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; }
+:root .app-shell .composer .parallel-head { display: grid; gap: 4px; padding: 6px 8px 6px; min-width: 0; }
+:root .app-shell .composer .parallel-head-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+:root .app-shell .composer .parallel-head-top strong { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .app-shell .composer .parallel-badge {
+  flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--sx-text) 8%, transparent); color: var(--sx-muted);
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+:root .app-shell .composer .parallel-badge.ready { background: var(--sx-accent-soft); color: var(--sx-accent); }
+:root .app-shell .composer .parallel-bulk {
+  margin-left: auto; flex: none; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; color: var(--sx-muted); font-size: 11.5px; font-weight: 500; cursor: pointer;
+  transition: background-color .15s var(--ease-out), color .15s var(--ease-out), border-color .15s var(--ease-out), scale .15s var(--ease-out);
+}
+:root .app-shell .composer .parallel-bulk:hover { color: var(--sx-text); background: color-mix(in srgb, var(--sx-text) 7%, transparent); }
+:root .app-shell .composer .parallel-bulk:active { scale: .96; }
+:root .app-shell .composer .parallel-bulk:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+:root .app-shell .composer .parallel-head small { color: var(--sx-muted); font-size: 12px; line-height: 1.45; }
+:root .app-shell .composer .parallel-search {
+  width: 100%; box-sizing: border-box; height: 30px; margin-top: 4px; padding: 0 10px;
+  border: 1px solid var(--sx-line); border-radius: 10px; background: var(--sx-sunken); color: var(--sx-text); font-size: 12.5px;
+}
+:root .app-shell .composer .parallel-search:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 1px; border-color: var(--sx-accent); }
+
+:root .app-shell .composer .parallel-list {
+  --scrollbar-thumb: color-mix(in srgb, var(--sx-text) 34%, transparent);
+  --scrollbar-track: transparent;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 2px;
+  max-height: min(296px, max(132px, calc(100vh - 300px)));
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  container-type: scroll-state;
+}
+@supports not (scrollbar-color: auto) {
+  :root .app-shell .composer .parallel-list { scrollbar-width: auto; }
+  :root .app-shell .composer .parallel-list::-webkit-scrollbar { width: 6px; height: 6px; }
+  :root .app-shell .composer .parallel-list::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--scrollbar-thumb); }
+  :root .app-shell .composer .parallel-list::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+}
+:root .app-shell .composer .parallel-list::before,
+:root .app-shell .composer .parallel-list::after {
+  content: ""; display: block; flex: none; position: sticky; align-self: stretch;
+  block-size: .75rem; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .2s;
+}
+:root .app-shell .composer .parallel-list::before {
+  inset-block-start: 0; margin-block-end: calc(-.75rem - 4px);
+  background: radial-gradient(farthest-side at 50% 0, rgb(0 0 0 / .22), transparent);
+}
+:root .app-shell .composer .parallel-list::after {
+  inset-block-end: 0; margin-block-start: calc(-.75rem - 4px);
+  background: radial-gradient(farthest-side at 50% 100%, rgb(0 0 0 / .22), transparent);
+}
+@container scroll-state(scrollable: block-start) {
+  :root .app-shell .composer .parallel-list::before { opacity: 1; }
+}
+@container scroll-state(scrollable: block-end) {
+  :root .app-shell .composer .parallel-list::after { opacity: 1; }
+}
+@supports not (container-type: scroll-state) {
+  :root .app-shell .composer .parallel-list::before,
+  :root .app-shell .composer .parallel-list::after { animation: parallel-shadow linear both; animation-timeline: scroll(); }
+  :root .app-shell .composer .parallel-list::before { animation-range: 0 2rem; }
+  :root .app-shell .composer .parallel-list::after { animation-direction: reverse; animation-range: calc(100% - 2rem) 100%; }
+}
+@keyframes parallel-shadow { to { opacity: 1; } }
+
+:root .app-shell .composer .parallel-row {
+  flex: none; display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%; max-width: 100%;
+  min-block-size: 44px; padding: 6px 10px; box-sizing: border-box; overflow: hidden;
+  border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--sx-text);
+  cursor: pointer; user-select: none;
+  animation: mm-row-in .28s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 18ms);
+  transition: background-color .16s var(--ease-out), border-color .16s var(--ease-out), box-shadow .18s var(--ease-out), scale .14s var(--ease-out);
+}
+:root .app-shell .composer .parallel-row:hover { background: color-mix(in srgb, var(--sx-text) 6%, transparent); }
+:root .app-shell .composer .parallel-row:active { scale: .99; }
+:root .app-shell .composer .parallel-row.selected {
+  border-color: color-mix(in srgb, var(--sx-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--sx-accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sx-accent) 10%, transparent), 0 6px 18px -12px color-mix(in srgb, var(--sx-accent) 65%, transparent);
+}
+:root .app-shell .composer .parallel-row:hover .mm-mark { transform: scale(1.1); }
+:root .app-shell .composer .parallel-row.selected .mm-mark { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--sx-accent) 50%, transparent)); }
+:root .app-shell .composer .parallel-row.unready:not(.selected) { opacity: .74; }
+
+:root .app-shell .composer .parallel-check {
+  --checkbox-size: 1.25em; --checkbox-icon-size: 0.72em;
+  flex: none; appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center;
+  inline-size: var(--checkbox-size); aspect-ratio: 1; margin: 0; font-size: 14px;
+  border: 1.5px solid var(--sx-line-strong, var(--sx-line)); border-radius: 6px;
+  background: color-mix(in srgb, var(--sx-sunken) 70%, transparent); color: var(--sx-accent-ink, #fff);
+  cursor: pointer; transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+:root .app-shell .composer .parallel-check::before {
+  content: ""; inline-size: var(--checkbox-icon-size); aspect-ratio: 1;
+  background-color: currentColor;
+  -webkit-mask: var(--parallel-check-icon) no-repeat center / contain;
+  mask: var(--parallel-check-icon) no-repeat center / contain;
+  scale: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root .app-shell .composer .parallel-check::before { transition: scale 150ms cubic-bezier(.34, 1.5, .64, 1); }
+}
+@media (forced-colors: active) {
+  :root .app-shell .composer .parallel-check::before { background-color: CanvasText; }
+}
+:root .app-shell .composer .parallel-check:checked {
+  background: var(--sx-accent); border-color: var(--sx-accent);
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--sx-accent) 60%, transparent);
+}
+:root .app-shell .composer .parallel-check:checked::before { scale: 1; }
+:root .app-shell .composer .parallel-check:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+:root .app-shell .composer .parallel-check:disabled { cursor: not-allowed; opacity: .5; }
+
+:root .app-shell .composer .parallel-meta { flex: 1 1 0; min-width: 0; display: grid; gap: 2px; }
+:root .app-shell .composer .parallel-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:root .app-shell .composer .parallel-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; line-height: 1.3; }
+:root .app-shell .composer .parallel-model-id { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sx-muted); font-size: 11.5px; line-height: 1.3; }
+:root .app-shell .composer .parallel-tag {
+  flex: none; padding: 1px 6px; border-radius: 999px; font-style: normal; font-size: 10.5px; font-weight: 600; line-height: 1.35; white-space: nowrap;
+  background: color-mix(in srgb, var(--sx-text) 8%, transparent); color: var(--sx-muted);
+}
+:root .app-shell .composer .parallel-tag.current { background: var(--sx-accent-soft); color: var(--sx-accent); }
+:root .app-shell .composer .parallel-tag.warn { background: color-mix(in srgb, var(--sx-warn, #c18401) 18%, transparent); color: var(--sx-warn, #c18401); }
+:root .app-shell .composer .parallel-empty { margin: 12px 10px; color: var(--sx-muted); font-size: 12px; text-align: center; }
+
+:root .app-shell .composer .parallel-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 2px; padding: 8px 4px 2px; border-top: 1px solid var(--sx-line);
+}
+:root .app-shell .composer .parallel-foot button {
+  height: 32px; padding: 0 13px; border: 1px solid var(--sx-line); border-radius: 10px;
+  background: transparent; color: var(--sx-muted); font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: background-color .15s var(--ease-out), border-color .15s var(--ease-out), color .15s var(--ease-out), filter .15s var(--ease-out), box-shadow .18s var(--ease-out), scale .14s var(--ease-out);
+}
+:root .app-shell .composer .parallel-foot button:hover { color: var(--sx-text); border-color: var(--sx-line-strong); background: color-mix(in srgb, var(--sx-text) 5%, transparent); }
+:root .app-shell .composer .parallel-foot button:active { scale: .97; }
+:root .app-shell .composer .parallel-foot button:focus-visible { outline: 2px solid var(--sx-accent); outline-offset: 2px; }
+:root .app-shell .composer .parallel-foot button.primary {
+  border-color: transparent; background: var(--sx-accent); color: var(--sx-accent-ink, #fff); font-weight: 600;
+}
+:root .app-shell .composer .parallel-foot button.primary:hover {
+  color: var(--sx-accent-ink, #fff); background: var(--sx-accent); filter: brightness(1.08);
+  box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--sx-accent) 45%, transparent);
+}
+@media (max-width: 700px) {
+  :root .app-shell .composer .parallel-pop { right: -48px; width: min(340px, calc(100vw - 24px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root .app-shell .composer :is(.parallel-pop, .parallel-row) { animation: none; }
+}
 
 /* ===== Pi "More" panel (v2): switches on the right, resources as toggle pills ===== */
 :root .app-shell .composer .chip-pop.pop-more { --w: 340px; padding: 10px; }

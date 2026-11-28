@@ -17,6 +17,10 @@ import {removeSliceRecords,sliceBackups} from './quick-thought/slice.js';
 import {useQuickSlice} from './quick-thought/useQuickSlice.js';
 import { LOCAL_PROXY_URL, PUBLIC_WEB } from './localProxy.js';
 import {CanvasCard} from './cards/CanvasCard.jsx';
+import {GroupFrame, groupAccentColor} from './cards/GroupFrame.jsx';
+import {ContextMenu} from './components/ContextMenu.jsx';
+import {resolveContextMenuOpen, resolveMenuTargetNodes, sharedNodeColor, recolorNodes} from './components/contextMenuHelpers.mjs';
+import {isGroupNode, containedNodeIds, containedCardCount, expandDragIdsWithGroups, groupBoundsForNodes, nextGroupTitle, smartGroupTitle, createGroupNode, resizeGroupRect, marqueeHitsScreenRect, sortNodesForRender, captureGroupMembers, refitGroupsAfterLayout, hiddenByCollapsedGroups, visualGroupRect, outermostLockedGroupFor, enclosingGroupsFor, isBigTitleActive, nextBorderStyle, captureAutoFitOwners, applyAutoFitToNodes, refitAutoFitGroupsForDrop, computeDetachPosition, collectSubtreeIds} from './canvas/groups.mjs';
 import {cameraBounds,cardsInView,connectionInView} from './canvas/visibility.mjs';
 import {PiModelOptions, PiThinkingOptions, parsePiSelection, piSelectionValue} from './components/PiOptions.jsx';
 import {SuggestTextarea} from './components/SuggestTextarea.jsx';
@@ -25,12 +29,14 @@ import {EffortSlider, ModelList, piEffortLevels, piModelGroups} from './componen
 import {PiHistory} from './components/PiHistory.jsx';
 import {openJobStream} from './agents/job-stream.js';
 import {ModelMenu} from './components/ModelMenu.jsx';
+import {ParallelModelPicker, buildParallelModelItems, pruneParallelSelection} from './components/ParallelModelPicker.jsx';
 import { DEFAULT_CUSTOM_THEME, customThemeVars, normalizeCustomTheme } from './themes/custom-theme.mjs';
 // Themes that were removed, and the closest one that replaces a saved choice of them.
 const RETIRED_THEMES = { sage: 'fog', paper: 'notebook', midnight: 'obsidian', graphite: 'obsidian', starlight: 'obsidian' };
 import {ExitAnimated} from './components/useExitAnimation.js';
 const POP_EXIT = { inPlace: true, duration: 150, to: 'translateY(6px) scale(.97)' };
 import {ModelConnectionsPanel} from './components/ModelConnectionsPanel.jsx';
+import {DEFAULT_OLLAMA, DEFAULT_CLOUD, loadLocalProfiles, loadCloudProfiles, resolveInitialChatModel, resolveModelProfile} from './components/modelProfiles.mjs';
 import {AGENT_LABELS} from './agents/catalog.mjs';
 import {pinchViewport} from './canvas/pinch.mjs';
 import {QuickThoughtSwitch} from './quick-thought/QuickThoughtSwitch.jsx';
@@ -53,7 +59,7 @@ import {useComicPlugin} from './plugins/comic/useComicPlugin.jsx';
 import {useAgentBridge} from './agent-api/useAgentBridge.js';
 import {applyNodeOps,canvasMeta} from './agent-api/ops.mjs';
 import './agent-api/agent-badge.css';
-import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor} from './quick-thought/interactions.mjs';
+import {crossedDragThreshold,combineSelection,connectionIntent,updateRelationDragState,relativeIdeaPoint,directionalNeighbor,tabAction,applyMarqueeDomSelection} from './quick-thought/interactions.mjs';
 import './quick-thought/interaction.css';
 import './cards/selection.css';
 import './themes/black-readability.css';
@@ -61,6 +67,7 @@ import './themes/gallery.css';
 import './components/export-menu.css';
 import './themes/dark-popovers.css';
 import './components/polish.css';
+import './cards/group-frame.css';
 import './components/mobile.css';
 
 const AppearancePanel = lazy(() => import('./components/AppearancePanel.jsx').then((m) => ({ default: m.AppearancePanel })));
@@ -153,8 +160,6 @@ async function deleteCanvasState(id) {
   });
 }
 
-const DEFAULT_OLLAMA = { id: 'local-default', name: 'Qwen', endpoint: 'http://127.0.0.1:11434', model: 'qwen2.5:7b' };
-const DEFAULT_CLOUD = { id: 'cloud-default', name: 'OpenAI', format: 'responses', endpoint: 'https://api.openai.com/v1', model: 'gpt-5.4', apiKey: '', useLocalProxy: true, chatOptions: { thinking: false, reasoning: 'none', temperature: .7 } };
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
 const CLOUD_FORMAT_PRESETS = {
   responses: { endpoint: 'https://api.openai.com/v1', model: 'gpt-5.4' },
@@ -438,7 +443,7 @@ function App() {
   const quickSpace=useRef(false);
   const quickCopy=quickThoughtCopy(uiLanguage);
   useEffect(()=>{localStorage.setItem('wendaflow-quick-thought',quickThought?'1':'0');},[quickThought]);
-  useEffect(()=>{panFramesRef.current?.clear();dragFramesRef.current?.clear();resizeFramesRef.current?.clear();relationFramesRef.current?.clear();marqueeRectRef.current=null;relationRectRef.current=null;panInputRef.current=null;cameraGestureRef.current=false;if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
+  useEffect(()=>{panFramesRef.current?.clear();dragFramesRef.current?.clear();resizeFramesRef.current?.clear();relationFramesRef.current?.clear();marqueeRectRef.current=null;relationRectRef.current=null;panInputRef.current=null;cameraGestureRef.current=false;if(sizePublishTimerRef.current)clearTimeout(sizePublishTimerRef.current);if(foldTimerRef.current)clearTimeout(foldTimerRef.current);setFoldingId(null);setInspectorOpen(false);setSelectedConnections([]);setLineSelectionMenu(null);setLinkingFrom(null);setDragging(null);setMarquee(null);setRelationDrag(null);relationDragRef.current=null;setEditingNode(null);setEditingGroupId(null);setInlineEditSize(null);setQuickEditor(null);quickBlankClick.current=null;clearQuickSlicePreview();},[activeCanvasId]);
   useEffect(()=>{
     const down=e=>{if(e.key===' '&&!e.target.closest?.('input,textarea,select,button,[contenteditable="true"]')){quickSpace.current=true;canvasRef.current?.classList.add('space-panning');e.preventDefault();}};
     const up=e=>{if(e.key===' '){quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');}};const blur=()=>{quickSpace.current=false;canvasRef.current?.classList.remove('space-panning');};
@@ -529,7 +534,19 @@ function App() {
   const [chatOptionsOpen, setChatOptionsOpen] = useState(false);
   useEffect(() => {
     if (!actionOptionsOpen && !chatOptionsOpen) return undefined;
-    const close = (event) => { if (event.type === 'keydown' ? event.key === 'Escape' : !event.target.closest?.('.inline-agent-config')) { setActionOptionsOpen(false); setChatOptionsOpen(false); } };
+    const close = (event) => {
+      if (event.type === 'keydown') {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        setActionOptionsOpen(false);
+        setChatOptionsOpen(false);
+        return;
+      }
+      if (!event.target.closest?.('.inline-agent-config')) {
+        setActionOptionsOpen(false);
+        setChatOptionsOpen(false);
+      }
+    };
     document.addEventListener('pointerdown', close, true); document.addEventListener('keydown', close);
     return () => { document.removeEventListener('pointerdown', close, true); document.removeEventListener('keydown', close); };
   }, [actionOptionsOpen, chatOptionsOpen]);
@@ -567,26 +584,11 @@ function App() {
   const [notificationDetail, setNotificationDetail] = useState(null);
   const [updateCheckState, setUpdateCheckState] = useState('idle');
   const notificationToastTimerRef = useRef(null);
-  const [localProfiles, setLocalProfiles] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('branchspace-local-profiles'));
-      if (Array.isArray(saved) && saved.length) return saved;
-      return [{ ...DEFAULT_OLLAMA, ...JSON.parse(localStorage.getItem('branchspace-ollama')) }];
-    } catch { return [DEFAULT_OLLAMA]; }
-  });
-  const [activeLocalId, setActiveLocalId] = useState(() => localProfiles[0].id);
+  const [localProfiles, setLocalProfiles] = useState(() => loadLocalProfiles(localStorage));
+  const [activeLocalId, setActiveLocalId] = useState(() => localProfiles[0]?.id || '');
   const [ollamaStatus, setOllamaStatus] = useState('');
-  const [cloudProfiles, setCloudProfiles] = useState(() => {
-    try {
-      // Cloud profiles are user configuration, not a browser-session cache.
-      // Keep the session fallback only as a one-time migration for older builds.
-      const saved = JSON.parse(localStorage.getItem('branchspace-cloud-profiles') || sessionStorage.getItem('branchspace-cloud-profiles') || 'null');
-      if (Array.isArray(saved) && saved.length) return saved;
-      const legacy = JSON.parse(localStorage.getItem('branchspace-cloud') || sessionStorage.getItem('branchspace-cloud') || 'null');
-      return [{ ...DEFAULT_CLOUD, ...legacy }];
-    } catch { return [DEFAULT_CLOUD]; }
-  });
-  const [activeCloudId, setActiveCloudId] = useState(() => cloudProfiles[0].id);
+  const [cloudProfiles, setCloudProfiles] = useState(() => loadCloudProfiles(localStorage, sessionStorage));
+  const [activeCloudId, setActiveCloudId] = useState(() => cloudProfiles[0]?.id || '');
   const [projectStatus, setProjectStatus] = useState('');
   const [collapsedIds, setCollapsedIds] = useState(new Set(initial.collapsedIds || []));
   const [newNodeId, setNewNodeId] = useState(null);
@@ -610,7 +612,10 @@ function App() {
   const composerFileDragDepthRef = useRef(0);
   // The model conversations start with; any model can be made the default from the model menu.
   const [defaultChatModel, setDefaultChatModel] = useState(() => { try { return localStorage.getItem('wendaflow-default-chat-model') || ''; } catch { return ''; } });
-  const [model, setModel] = useState(() => { const saved = (() => { try { return localStorage.getItem('wendaflow-default-chat-model') || ''; } catch { return ''; } })(); const known = saved.startsWith('cloud:') ? cloudProfiles.some((p) => `cloud:${p.id}` === saved) : saved.startsWith('local:') ? localProfiles.some((p) => `local:${p.id}` === saved) : false; return known ? saved : `cloud:${cloudProfiles[0].id}`; });
+  const [model, setModel] = useState(() => {
+    const saved = (() => { try { return localStorage.getItem('wendaflow-default-chat-model') || ''; } catch { return ''; } })();
+    return resolveInitialChatModel(saved, cloudProfiles, localProfiles);
+  });
   const makeDefaultChatModel = (value) => { setDefaultChatModel(value); try { localStorage.setItem('wendaflow-default-chat-model', value); } catch {} };
   // Each Pi model keeps the thinking level last chosen with it.
   const [piThinkingByModel, setPiThinkingByModel] = useState(() => { try { return JSON.parse(localStorage.getItem('wendaflow-pi-thinking-by-model') || '{}') || {}; } catch { return {}; } });
@@ -654,18 +659,24 @@ function App() {
   const [dragging, setDragging] = useState(null);
   const [panning, setPanning] = useState(null);
   const [marquee, setMarquee] = useState(null);
-  // The marquee rectangle and its hit-test run once per animation frame and write
-  // straight to the DOM; React state only changes when the selection does.
+  // The marquee rectangle and card highlights update straight on the DOM once per
+  // animation frame; React selection state only commits once when the pointer releases.
   const marqueeRef = useRef(null);
   marqueeRef.current = marquee;
   const marqueeElRef = useRef(null);
   const marqueeLiveRef = useRef(null);
   const marqueeFrameRef = useRef(0);
   const marqueeHitsRef = useRef('');
+  const marqueePreviewRef = useRef(null);
+  const multiCountElRef = useRef(null);
   useEffect(() => {
     if (marquee) return;
     window.cancelAnimationFrame(marqueeFrameRef.current);
     marqueeFrameRef.current = 0; marqueeLiveRef.current = null; marqueeHitsRef.current = '';
+    if (marqueePreviewRef.current) {
+      applyMarqueeDomSelection(marqueePreviewRef.current, selectedIds, multiCountElRef.current);
+      marqueePreviewRef.current = null;
+    }
   }, [marquee]);
   const [selectedConnections, setSelectedConnections] = useState([]);
   const [lineSelectionMenu, setLineSelectionMenu] = useState(null);
@@ -706,6 +717,25 @@ function App() {
     return () => { window.removeEventListener('pointermove', move); if (frame) cancelAnimationFrame(frame); };
   }, []);
   const [parallelModels, setParallelModels] = useState(new Set());
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  useEffect(() => {
+    if (!parallelMenuOpen) return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown') {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        setParallelMenuOpen(false);
+        return;
+      }
+      if (!event.target.closest?.('.parallel-anchor')) setParallelMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', close, true);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close, true);
+      document.removeEventListener('keydown', close);
+    };
+  }, [parallelMenuOpen]);
   const [minimapOpen, setMinimapOpen] = useState(() => localStorage.getItem('branchspace-minimap') === 'true');
   const canvasRef = useRef(null);
   const viewportRef = useRef(viewport);
@@ -748,14 +778,22 @@ function App() {
   if(!relationFramesRef.current)relationFramesRef.current=new LatestFrame(payload=>relationCommitRef.current(payload));
   useLayoutEffect(()=>{
     panCommitRef.current=commitViewport;
-    dragCommitRef.current=({positions,dx,dy})=>{
-      setNodes((items)=>items.map((node)=>{
-        const origin=positions.get(node.id);
-        return origin?{...node,x:origin.x+dx,y:origin.y+dy}:node;
-      }));
+    dragCommitRef.current=({positions,dx,dy,autoFitOwners})=>{
+      setNodes((items)=>{
+        const moved=items.map((node)=>{
+          const origin=positions.get(node.id);
+          return origin?{...node,x:origin.x+dx,y:origin.y+dy}:node;
+        });
+        return autoFitOwners?.length ? applyAutoFitToNodes(moved, nodeSizesRef.current, autoFitOwners) : moved;
+      });
     };
-    resizeCommitRef.current=({id,width,height})=>{
-      setNodes((items)=>items.map((node)=>node.id===id?{...node,manualWidth:Math.round(width),manualHeight:Math.round(height)}:node));
+    resizeCommitRef.current=({id,width,height,x,y,clearAutoFit})=>{
+      setNodes((items)=>items.map((node)=>{
+        if(node.id!==id)return node;
+        const next={...node,...(x!=null?{x}:{}),...(y!=null?{y}:{}),manualWidth:Math.round(width),manualHeight:Math.round(height)};
+        if(clearAutoFit)delete next.autoFit;
+        return next;
+      }));
     };
     relationCommitRef.current=({clientX,clientY,altKey})=>{
       const current=relationDragRef.current;
@@ -801,20 +839,25 @@ function App() {
   const branchPath = useMemo(() => branchSource ? graph.ancestors(branchSource.id) : [], [graph, branchSource]);
   const includedBranchPath = useMemo(() => branchPath.filter((node) => !excludedContextIds.has(node.id)), [branchPath, excludedContextIds]);
   const activeIds = useMemo(() => graph.ancestorIds(selectedIds), [graph, selectedIds]);
-  const visibleNodes = useMemo(() => graph.visibleNodes(collapsedIds),[graph,collapsedIds]);
-  const renderedNodes = useMemo(() => cardsInView(visibleNodes,nodeSizes,
+  const hiddenGroupChildIds = useMemo(() => hiddenByCollapsedGroups(nodes, nodeSizes), [nodes, nodeSizes]);
+  const visibleNodes = useMemo(() => {
+    const treeVisible = graph.visibleNodes(collapsedIds);
+    return hiddenGroupChildIds.size ? treeVisible.filter((node) => !hiddenGroupChildIds.has(node.id)) : treeVisible;
+  }, [graph, collapsedIds, hiddenGroupChildIds]);
+  const renderedNodes = useMemo(() => sortNodesForRender(cardsInView(visibleNodes,nodeSizes,
     cameraBounds(viewport,viewportSizeRef.current),
-    new Set([...selectedIds,selectedId,branchingFrom,editingNode,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,...restoringIds,...deletingIds,...(dragging?.ids||[]),relationDrag?.sourceId,relationDrag?.targetId,relationDrag?.invalidTargetId].filter(Boolean))),
-    [visibleNodes,nodeSizes,viewport,selectedIds,selectedId,branchingFrom,editingNode,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,restoringIds,deletingIds,dragging,relationDrag]);
+    new Set([...selectedIds,selectedId,branchingFrom,editingNode,editingGroupId,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,...restoringIds,...deletingIds,...(dragging?.ids||[]),relationDrag?.sourceId,relationDrag?.targetId,relationDrag?.invalidTargetId].filter(Boolean))),nodeSizes),
+    [visibleNodes,nodeSizes,viewport,selectedIds,selectedId,branchingFrom,editingNode,editingGroupId,quickEditor?.id,resizing?.id,newNodeId,foldingId,revealingId,mindMapState.nodeId,restoringIds,deletingIds,dragging,relationDrag]);
   const renderedConnections=useMemo(()=>{
     const bounds=cameraBounds(viewport,viewportSizeRef.current),parents=[],relations=[];
+    const visibleIdSet=new Set(visibleNodes.map((node)=>node.id));
     const size=node=>nodeSizes.get(node.id)||{width:node.manualWidth||224,height:node.manualHeight||110};
     for(const node of visibleNodes){
       const parent=graph.byId.get(node.parentId);
-      if(parent&&connectionInView('parent',parent,node,size(parent),size(node),bounds))parents.push({node,parent,extra:false});
-      for(const extraId of node.extraParentIds||[]){const extra=graph.byId.get(extraId);if(extra&&connectionInView('parent',extra,node,size(extra),size(node),bounds))parents.push({node,parent:extra,extra:true});}
+      if(parent&&visibleIdSet.has(parent.id)&&connectionInView('parent',parent,node,size(parent),size(node),bounds))parents.push({node,parent,extra:false});
+      for(const extraId of node.extraParentIds||[]){const extra=graph.byId.get(extraId);if(extra&&visibleIdSet.has(extra.id)&&connectionInView('parent',extra,node,size(extra),size(node),bounds))parents.push({node,parent:extra,extra:true});}
       const links=[...(node.links||[]).map(targetId=>({targetId,type:'reference'})),...(node.relations||[])];
-      links.forEach((link,index)=>{const target=graph.byId.get(link.targetId);if(target&&connectionInView('relation',node,target,size(node),size(target),bounds))relations.push({source:node,target,type:link.type||'reference',relationId:link.id,index});});
+      links.forEach((link,index)=>{const target=graph.byId.get(link.targetId);if(target&&visibleIdSet.has(target.id)&&connectionInView('relation',node,target,size(node),size(target),bounds))relations.push({source:node,target,type:link.type||'reference',relationId:link.id,index});});
     }
     return {parents,relations};
   },[visibleNodes,graph,nodeSizes,viewport]);
@@ -880,8 +923,7 @@ function App() {
   },[]);
 
   const ollama = localProfiles.find((profile) => profile.id === activeLocalId) || localProfiles[0] || DEFAULT_OLLAMA;
-  const selectedCloud = model.startsWith('cloud:') ? cloudProfiles.find((profile) => profile.id === model.slice(6)) : null;
-  const selectedLocal = model.startsWith('local:') ? localProfiles.find((profile) => profile.id === model.slice(6)) : ollama;
+  const { cloud: selectedCloud, local: selectedLocal } = resolveModelProfile(model, cloudProfiles, localProfiles);
   // Pi runs with the model connections set up here, so a new user's action cards work without
   // configuring Pi separately. The backend keeps them in memory only, so send them on every change.
   // Also sent with every Pi run, so a restarted backend has them again without a page reload.
@@ -901,6 +943,8 @@ function App() {
     return () => { window.removeEventListener('focus', again); document.removeEventListener('visibilitychange', again); };
   }, []);
   const modelOptions = useMemo(() => [...cloudProfiles.map((profile) => ({ value: `cloud:${profile.id}`, label: `${profile.name} · ${profile.model}` })), ...localProfiles.map((profile) => ({ value: `local:${profile.id}`, label: `${profile.name} · ${profile.model}` }))], [cloudProfiles, localProfiles]);
+  const parallelModelItems = useMemo(() => buildParallelModelItems(cloudProfiles, localProfiles, tr), [cloudProfiles, localProfiles, uiLanguage]);
+  const activeParallelCount = useMemo(() => pruneParallelSelection(parallelModels, parallelModelItems).size, [parallelModels, parallelModelItems]);
   const unreadNotificationCount = useMemo(() => notifications.reduce((count, item) => count + (item.read ? 0 : 1), 0), [notifications]);
   const searchResults = useMemo(() => {
     if (!searchOpen) return EMPTY_LIST;
@@ -924,12 +968,11 @@ function App() {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (let i = 0; i < visibleNodes.length; i++) {
       const node = visibleNodes[i];
-      const size = nodeSizes.get(node.id);
-      const w = size?.width || 224, h = size?.height || 110;
-      if (node.x < minX) minX = node.x;
-      if (node.y < minY) minY = node.y;
-      if (node.x + w > maxX) maxX = node.x + w;
-      if (node.y + h > maxY) maxY = node.y + h;
+      const box = visualGroupRect(node, nodeSizes);
+      if (box.x < minX) minX = box.x;
+      if (box.y < minY) minY = box.y;
+      if (box.right > maxX) maxX = box.right;
+      if (box.bottom > maxY) maxY = box.bottom;
     }
     return { minX, minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
   }, [minimapOpen, visibleNodes, nodeSizes]);
@@ -1280,7 +1323,7 @@ function App() {
     const observer=new ResizeObserver(entries=>{
       if(activeCanvasIdRef.current!==canvasId)return;
       const changed=[];
-      for(const entry of entries){const id=entry.target.dataset.nodeId;if(!id || !entry.target.isConnected)continue;
+      for(const entry of entries){const id=entry.target.dataset.nodeId;if(!id || !entry.target.isConnected || entry.target.dataset.nodeType==='group')continue;
         const width=entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
         const height=entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
         const old=nodeSizesRef.current.get(id);
@@ -1360,26 +1403,38 @@ function App() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
   }, [activeCanvasId]);
 
-  // With a composer open the main shortcut handler is off; Tab still switches to quick thinking (the draft is kept).
-  const toggleQuickRef = useRef(null);
+  // Plain Tab switches between normal mode and quick thinking (or creates a child idea in quick thinking
+  // when a thought card is selected), even if focus lingered on a topbar button or inside a composer.
+  const tabContextRef = useRef(null);
+  useLayoutEffect(() => {
+    tabContextRef.current = {
+      hasBlockingOverlay: Boolean(settingsOpen || canvasMenuOpen || shortcutHelp || contextMenu || piImportOpen || piHistoryNode || compareGroupOpen || canvasManagementOpen || exportMenuOpen || toolsOpen || notificationsOpen || actionOptionsOpen || chatOptionsOpen || parallelMenuOpen || searchOpen || libraryOpen || confirmDialog || editingGroupId),
+      quickThought,
+      selectedIsThought: selected?.type === 'thought',
+      toggle: () => toggleQuickThought(),
+      createChild: () => createRelativeIdea('child'),
+    };
+  });
   useEffect(() => {
-    if (!branchingFrom && !rootComposerOpen) return undefined;
     const onTab = (event) => {
-      if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (target && target !== document.body && !target.closest('.composer')) return;
-      if (target?.closest('[role="dialog"]')) return;
+      if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented || event.isComposing) return;
+      const ctx = tabContextRef.current;
+      if (!ctx) return;
+      const action = tabAction(event.target, ctx);
+      if (!action) return;
       event.preventDefault();
-      toggleQuickRef.current?.();
+      if (action === 'child') ctx.createChild();
+      else ctx.toggle();
     };
     window.addEventListener('keydown', onTab);
     return () => window.removeEventListener('keydown', onTab);
-  }, [branchingFrom, rootComposerOpen]);
+  }, []);
 
   useEffect(() => {
     if (branchingFrom) return undefined;
     const clearOnEscape = (event) => {
       if (event.key === 'Escape') {
+        if(editingGroupId){setEditingGroupId(null);return;}
         if(contextMenu){setContextMenu(null);return;}
         if(canvasMenuOpen){if(activeCanvasId&&!workspaceMetaRef.current.cards[activeCanvasId]?.trashedAt)setCanvasMenuOpen(false);else closeCanvasHome();return;}
         if(shortcutHelp){setShortcutHelp(false);return;}
@@ -1389,13 +1444,20 @@ function App() {
       if(canvasMenuOpen)return;
       const isEditing = event.target instanceof Element && event.target.closest('textarea, input, select, [contenteditable="true"]');
       const onCanvas=!event.target.closest?.('button,a,.inspector,.ix,.settings-panel,.canvas-overview,.canvas-context-menu,[role="dialog"]');
+      if(!isEditing && (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase()==='g'){event.preventDefault();createGroupFrame();return;}
+      if(!isEditing && (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase()==='g'){
+        event.preventDefault();
+        if(selected?.type==='group')deleteSelection(new Set([selected.id]));
+        else if(selected)detachFromGroup(selected.id);
+        return;
+      }
+      if(!isEditing && onCanvas && selected?.type==='group' && (event.key==='F2' || event.key==='Enter')){event.preventDefault();setEditingGroupId(selected.id);return;}
       if(!isEditing && event.key==='?'){event.preventDefault();setShortcutHelp(value=>!value);return;}
       if(!isEditing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase()==='f' && onCanvas){event.preventDefault();fitView();return;}
-      if(!isEditing && !event.ctrlKey && !event.metaKey && !event.altKey && event.key==='Tab' && !event.shiftKey && onCanvas && !(quickThought && selected?.type==='thought')){event.preventDefault();toggleQuickThought();return;}
       if(!isEditing && !quickThought && !event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase()==='i' && selected && selectedIds.size===1){event.preventDefault();if(inspectorOpenRef.current)closeInspector();else openInspector();return;}
       if(!isEditing && quickThought && onCanvas && selected?.type==='thought') {
         if(event.key==='F2'){event.preventDefault();editQuickIdea(selected);return;}
-        if(event.key==='Enter' || (event.key==='Tab' && !event.shiftKey)){event.preventDefault();createRelativeIdea(event.key==='Tab'?'child':'sibling');return;}
+        if(event.key==='Enter'){event.preventDefault();createRelativeIdea('sibling');return;}
         if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)){
           event.preventDefault();const next=directionalNeighbor(selected,event.key,visibleNodes.filter(n=>n.type==='thought'),nodeSizes);
           if(next){selectNode(next.id);setInspectorOpen(false);requestAnimationFrame(()=>worldRef.current?.querySelector(`[data-node-id="${CSS.escape(next.id)}"]`)?.focus({preventScroll:true}));}return;
@@ -1422,7 +1484,7 @@ function App() {
     };
     window.addEventListener('keydown', clearOnEscape);
     return () => window.removeEventListener('keydown', clearOnEscape);
-  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought,shortcutHelp,contextMenu,visibleNodes,nodeSizes,canvasMenuOpen]);
+  }, [selectedId, branchingFrom, selectedConnections, nodes, selectedIds, quickThought,shortcutHelp,contextMenu,visibleNodes,nodeSizes,canvasMenuOpen,editingGroupId]);
 
   function selectNode(id, options = {}) {
     if (inspectorTimerRef.current) clearTimeout(inspectorTimerRef.current);
@@ -1484,8 +1546,236 @@ function App() {
     }, 190);
   }
 
-  async function copySelectedNodes() {
-    const copied = nodes.filter((node) => selectedIds.has(node.id)).map((node) => JSON.parse(JSON.stringify(node)));
+  function createGroupFrame({ explicitIds = null, point = null } = {}) {
+    const pickSet = explicitIds instanceof Set ? explicitIds : selectedIds;
+    const targets = pickSet?.size ? nodes.filter((node) => pickSet.has(node.id)) : [];
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const view = viewportRef.current;
+    const fallbackCenter = point || (rect
+      ? { x: (rect.width * 0.5 - view.x) / view.zoom, y: (rect.height * 0.48 - view.y) / view.zoom }
+      : { x: 280, y: 220 });
+    const bounds = groupBoundsForNodes(targets, nodeSizes, { fallbackCenter });
+    const title = targets.length
+      ? smartGroupTitle(targets, nodes, tr('分组', 'Group'))
+      : nextGroupTitle(nodes, tr('分组', 'Group'));
+    const group = createGroupNode({
+      id: `group-${Date.now()}`,
+      title,
+      autoFit: targets.length > 0,
+      ...bounds,
+    });
+    setNodes((items) => [...items, group]);
+    setNewNodeId(group.id);
+    if (nodeAnimationTimerRef.current) clearTimeout(nodeAnimationTimerRef.current);
+    nodeAnimationTimerRef.current = window.setTimeout(() => setNewNodeId(null), 520);
+    setSelectedIds(new Set([group.id]));
+    setSelectedId(group.id);
+    setInspectorOpen(false);
+    setEditingGroupId(group.id);
+    return group;
+  }
+
+  function fitGroupToCards(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group || group.collapsed) return;
+    const insideIds = new Set(containedNodeIds(group, nodes, nodeSizes));
+    const insideCards = nodes.filter((item) => insideIds.has(item.id) && !isGroupNode(item));
+    if (!insideCards.length) return;
+    const bounds = groupBoundsForNodes(insideCards, nodeSizes);
+    setNodes((items) => items.map((item) => (item.id === groupId ? { ...item, ...bounds } : item)));
+  }
+
+  function selectGroupContents(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group || group.collapsed) return;
+    const insideIds = containedNodeIds(group, nodes, nodeSizes);
+    const cardOnly = insideIds.filter((id) => !isGroupNode(graph.byId.get(id)));
+    if (!cardOnly.length) return;
+    setSelectedIds(new Set(cardOnly));
+    setSelectedId(cardOnly.at(-1) || null);
+    setInspectorOpen(false);
+  }
+
+  function deleteGroupWithCards(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group) return;
+    const allIds = new Set([groupId, ...containedNodeIds(group, nodes, nodeSizes)]);
+    deleteSelection(allIds);
+  }
+
+  function commitGroupRename(groupId, nextTitle) {
+    const trimmed = String(nextTitle || '').trim();
+    setNodes((items) => items.map((item) => (
+      item.id === groupId && isGroupNode(item)
+        ? { ...item, title: trimmed || item.title || tr('未命名分组', 'Untitled group') }
+        : item
+    )));
+    setEditingGroupId(null);
+  }
+
+  function recolorGroup(groupId, color) {
+    setNodes((items) => items.map((item) => (item.id === groupId ? { ...item, color } : item)));
+  }
+
+  function toggleGroupCollapse(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group) return;
+    const nextCollapsed = !group.collapsed;
+    if (nextCollapsed) {
+      const hidden = new Set(containedNodeIds(group, nodes, nodeSizes));
+      if (branchingFrom && hidden.has(branchingFrom)) closeBranch();
+      if (editingNode && hidden.has(editingNode)) setEditingNode(null);
+      if (quickEditor && hidden.has(quickEditor.id)) setQuickEditor(null);
+      setSelectedIds((current) => {
+        const next = new Set([...current].filter((id) => !hidden.has(id)));
+        next.add(groupId);
+        return next;
+      });
+      setSelectedId(groupId);
+    }
+    setNodes((items) => items.map((item) => {
+      if (item.id !== groupId) return item;
+      const next = { ...item };
+      if (nextCollapsed) next.collapsed = true;
+      else delete next.collapsed;
+      return next;
+    }));
+  }
+
+  function toggleGroupLock(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group) return;
+    const nextLocked = !group.locked;
+    setNodes((items) => items.map((item) => {
+      if (item.id !== groupId) return item;
+      const next = { ...item };
+      if (nextLocked) next.locked = true;
+      else delete next.locked;
+      return next;
+    }));
+    notify(nextLocked
+      ? tr('分组框已锁定，内部卡片已受保护。', 'Group frame locked; contained cards are protected.')
+      : tr('分组框已解锁。', 'Group frame unlocked.'));
+  }
+
+  function toggleGroupAutoFit(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group) return;
+    const nextAutoFit = !group.autoFit;
+    const inside = nextAutoFit && !group.collapsed
+      ? containedNodeIds(group, nodes, nodeSizes).map((id) => graph.byId.get(id)).filter((item) => item && !isGroupNode(item))
+      : [];
+    const bounds = inside.length ? groupBoundsForNodes(inside, nodeSizes) : null;
+    setNodes((items) => items.map((item) => {
+      if (item.id !== groupId) return item;
+      const next = { ...item, ...(bounds || {}) };
+      if (nextAutoFit) next.autoFit = true;
+      else delete next.autoFit;
+      return next;
+    }));
+  }
+
+  function cycleGroupBorderStyle(groupId) {
+    setNodes((items) => items.map((item) => {
+      if (item.id !== groupId || !isGroupNode(item)) return item;
+      const style = nextBorderStyle(item.borderStyle || 'solid');
+      const next = { ...item };
+      if (style === 'solid') delete next.borderStyle;
+      else next.borderStyle = style;
+      return next;
+    }));
+  }
+
+  function zoomToGroup(group) {
+    if (!group || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const w = group.manualWidth || 360;
+    const h = group.manualHeight || 240;
+    const zoom = Math.min(1.05, Math.max(0.58, Math.min((rect.width - 140) / Math.max(1, w), (rect.height - 140) / Math.max(1, h))));
+    const next = {
+      x: rect.width / 2 - (group.x + w / 2) * zoom,
+      y: rect.height / 2 - (group.y + h / 2) * zoom,
+      zoom,
+    };
+    targetViewportRef.current = next;
+    if (!zoomFrameRef.current) zoomFrameRef.current = requestAnimationFrame(animateViewport);
+  }
+
+  function detachFromGroup(cardIdOrIds) {
+    const rawList = cardIdOrIds instanceof Set || Array.isArray(cardIdOrIds) ? [...cardIdOrIds] : [cardIdOrIds];
+    const cards = rawList
+      .map((id) => nodes.find((item) => item.id === id && !isGroupNode(item)))
+      .filter(Boolean);
+    if (!cards.length) return;
+    const movable = [];
+    let lockedSkipped = 0;
+    for (const card of cards) {
+      const owners = enclosingGroupsFor(card.id, nodes, nodeSizes);
+      if (!owners.length) continue;
+      const lockedOwner = outermostLockedGroupFor(card.id, nodes, nodeSizes);
+      if (lockedOwner) { lockedSkipped += 1; continue; }
+      movable.push({ card, group: owners[0] });
+    }
+    if (!movable.length) {
+      if (lockedSkipped) notify(tr('请先解锁分组框，再移出内部卡片。', 'Unlock this group before removing cards from it.'));
+      return;
+    }
+    const offsetByGroup = new Map();
+    const moveMap = new Map();
+    const affectedGroups = new Map();
+    for (const { card, group } of movable) {
+      const basePos = computeDetachPosition(card, group, nodeSizes);
+      const stackIndex = offsetByGroup.get(group.id) || 0;
+      offsetByGroup.set(group.id, stackIndex + 1);
+      const size = nodeSizes.get(card.id) || { width: card.manualWidth || 224, height: card.manualHeight || 110 };
+      moveMap.set(card.id, { x: basePos.x, y: basePos.y + stackIndex * (size.height + 18) });
+      affectedGroups.set(group.id, group);
+    }
+    setNodes((items) => {
+      let moved = items.map((item) => (moveMap.has(item.id) ? { ...item, ...moveMap.get(item.id) } : item));
+      for (const group of affectedGroups.values()) {
+        if (!group.autoFit) continue;
+        const remaining = containedNodeIds(group, moved, nodeSizes)
+          .map((id) => moved.find((node) => node.id === id))
+          .filter(Boolean);
+        if (!remaining.length) continue;
+        const bounds = groupBoundsForNodes(remaining, nodeSizes);
+        moved = moved.map((item) => (item.id === group.id ? { ...item, ...bounds } : item));
+      }
+      return moved;
+    });
+    if (lockedSkipped) notify(tr('请先解锁分组框，再移出内部卡片。', 'Unlock this group before removing cards from it.'));
+  }
+
+  function packSubtreeAsGroup(rootId) {
+    const ids = collectSubtreeIds(rootId, nodes);
+    if (!ids.length) return;
+    createGroupFrame({ explicitIds: new Set(ids) });
+  }
+
+  function unpackGroupToCard(groupId) {
+    const group = nodes.find((item) => item.id === groupId && isGroupNode(item));
+    if (!group) return;
+    const title = group.title || tr('未命名分组', 'Untitled group');
+    const card = {
+      ...newThought({ x: group.x + 26, y: group.y + 18 }, title, null, `node-${Date.now()}`),
+      content: title,
+      author: tr('你', 'You'),
+      ...(group.color ? { color: group.color } : {}),
+    };
+    setNodes((items) => items.flatMap((item) => (item.id === groupId ? [card] : [item])));
+    setSelectedIds(new Set([card.id]));
+    setSelectedId(card.id);
+    setEditingGroupId(null);
+    setInspectorOpen(false);
+  }
+
+  async function copySelectedNodes(explicitIds) {
+    const sourceIds = explicitIds instanceof Set ? explicitIds : selectedIds;
+    const expanded = typeof expandDragIdsWithGroups === 'function'
+      ? new Set(expandDragIdsWithGroups([...sourceIds], nodes, nodeSizes))
+      : sourceIds;
+    const copied = nodes.filter((node) => expanded.has(node.id)).map((node) => JSON.parse(JSON.stringify(node)));
     if (!copied.length) return;
     nodeClipboardRef.current = copied;
     const payload = JSON.stringify({ type: 'wonderful-nodes', nodes: copied });
@@ -1516,8 +1806,15 @@ function App() {
 
   function deleteSelection(explicitIds) {
     const candidates=explicitIds instanceof Set?explicitIds:new Set(deletionIds);
-    const ids=quickThought?cardIds(nodes,candidates):candidates;
-    if(!ids.size)return;
+    const rawIds=quickThought?cardIds(nodes,candidates):candidates;
+    const ids=new Set([...rawIds].filter((id)=>{
+      const lockedOwner=typeof outermostLockedGroupFor==='function'?outermostLockedGroupFor(id,nodes,nodeSizes):null;
+      return !lockedOwner || rawIds.has(lockedOwner.id);
+    }));
+    if(!ids.size){
+      if(rawIds.size)notify(tr('已锁定的分组框内容无法直接删除，请先解锁。','Locked group contents cannot be deleted. Unlock the group first.'));
+      return;
+    }
     const removed=nodes.filter(n=>ids.has(n.id));
     ids.forEach(id=>generationRef.current.get(id)?.abort());
     animateSlice(worldRef.current,connectionsRef.current,ids,[]);
@@ -1573,13 +1870,10 @@ function App() {
   }
 
   function dismissContextMenu(after) {
-    if (!contextMenu || contextMenuClosing) return;
-    setContextMenuClosing(true);
-    window.setTimeout(() => {
-      setContextMenu(null);
-      setContextMenuClosing(false);
-      after?.();
-    }, 150);
+    if (!contextMenu) return;
+    setContextMenu(null);
+    setContextMenuClosing(false);
+    after?.();
   }
 
   function syncConnectionGeometry() { geometryRef.current?.invalidate(resizingRef.current?[resizingRef.current]:undefined); }
@@ -1651,15 +1945,20 @@ function App() {
     const rect=canvasRef.current.getBoundingClientRect(),v=viewportRef.current;
     return {x:(event.clientX-rect.left-v.x)/v.zoom,y:(event.clientY-rect.top-v.y)/v.zoom};
   }
-  toggleQuickRef.current = () => toggleQuickThought();
+  function blurTopbarFocus() {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement && document.activeElement.closest('.topbar button, .node button')) {
+      document.activeElement.blur();
+    }
+  }
   function toggleQuickThought() {
+    if (typeof blurTopbarFocus === 'function') blurTopbarFocus();
     panFramesRef.current.flush();panInputRef.current=null;
     cameraGestureRef.current=false;
     if(editingNode && saveNodeEdit()===false)return;
     if(quickEditor){saveQuickIdea();}
     if(!quickThought){previousNodeType.current=nodeType;setNodeType('thought');}else setNodeType(previousNodeType.current);
     setQuickThought(!quickThought);setRootComposerOpen(false);setBranchingFrom(null);setComposerClosing(false);
-    setSelectedId(null);setSelectedIds(new Set());setInspectorOpen(false);setContextMenu(null);setEditingNode(null);
+    setSelectedId(null);setSelectedIds(new Set());setInspectorOpen(false);setContextMenu(null);setEditingNode(null);setEditingGroupId(null);
     setDragging(null);setPanning(null);setMarquee(null);relationDragRef.current=null;setRelationDrag(null);quickBlankClick.current=null;clearQuickSlicePreview();
   }
   function editQuickIdea(node,created=false) {
@@ -1705,12 +2004,13 @@ function App() {
   function openQuickMenu(event,nodeId) {
     const ids=nodeId&&!selectedIds.has(nodeId)?cardIds(nodes,new Set([nodeId])):cardIds(nodes,selectedIds);
     if(nodeId&&!selectedIds.has(nodeId)){setSelectedIds(ids);setSelectedId([...ids][0]||null);}
-    setContextMenuClosing(false);setContextMenu({kind:'quick',ids:[...ids],x:Math.min(event.clientX,window.innerWidth-255),y:Math.min(event.clientY,window.innerHeight-145),point:clientWorld(event)});
+    setContextMenuClosing(false);setContextMenu({kind:'quick',ids:[...ids],x:event.clientX,y:event.clientY,point:clientWorld(event),openedAt:Date.now()});
   }
 
   function beginNodeDrag(event, node) {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(quickThought && event.button===2 && !event.target.closest('input,textarea,select')) {
+      if (node.type === 'group') return;
       event.preventDefault();event.stopPropagation();capturePointer(event.currentTarget,event.pointerId);
       relationRectRef.current=canvasRef.current?.getBoundingClientRect()||null;
       const ids=selectedIds.has(node.id)?[...cardIds(nodes,selectedIds)]:[node.id];
@@ -1721,12 +2021,16 @@ function App() {
     if (event.button !== 0) return;
     if (event.target.closest('.markdown-content, button, input, textarea, select, a')) return;
     event.stopPropagation();
+    const lockedOwner = typeof outermostLockedGroupFor === 'function' ? outermostLockedGroupFor(node.id, nodes, nodeSizes) : null;
+    if (lockedOwner) node = lockedOwner;
     setSelectedConnections([]);
     setLineSelectionMenu(null);
     let dragIds;
     if (event.altKey) {
       const roots = selectedIds.has(node.id) ? [...selectedIds] : [node.id];
-      dragIds = nodes.filter((item) => roots.includes(item.id) || roots.some((rootId) => isDescendant(nodes, item.id, rootId))).map((item) => item.id);
+      dragIds = node.type === 'group'
+        ? roots
+        : nodes.filter((item) => roots.includes(item.id) || roots.some((rootId) => isDescendant(nodes, item.id, rootId))).map((item) => item.id);
       if (!selectedIds.has(node.id)) selectNode(node.id);
     } else if (event.shiftKey || event.ctrlKey || event.metaKey) {
       const nextSelection = new Set(selectedIds);
@@ -1741,11 +2045,15 @@ function App() {
       dragIds = [node.id];
       selectNode(node.id);
     }
+    if (typeof expandDragIdsWithGroups === 'function') {
+      dragIds = expandDragIdsWithGroups(dragIds, nodes, nodeSizes, { moveFrameOnly: event.altKey });
+    }
+    const autoFitOwners = typeof captureAutoFitOwners === 'function' ? captureAutoFitOwners(dragIds, nodes, nodeSizes) : [];
     if(quickThought){setInspectorOpen(false);capturePointer(event.currentTarget,event.pointerId);}
     const positions = new Map(nodes.filter((item) => dragIds.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]));
     beginHistory();
     capturePointer(event.currentTarget,event.pointerId);
-    setDragging({ started:false, ids: dragIds, startX: event.clientX, startY: event.clientY, positions });
+    setDragging({ started:false, ids: dragIds, startX: event.clientX, startY: event.clientY, positions, autoFitOwners });
   }
 
   function beginRelationDrag(event, node) {
@@ -1786,14 +2094,19 @@ function App() {
 
   function beginResize(event, node, axis = 'both') {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
+    const isGroup = node.type === 'group';
+    if (isGroup && (node.locked || node.collapsed)) return;
+    if (!isGroup && typeof outermostLockedGroupFor === 'function' && outermostLockedGroupFor(node.id, nodes, nodeSizes)) return;
     beginHistory();
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    const size = nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 };
+    const size = isGroup
+      ? { width: node.manualWidth || 360, height: node.manualHeight || 240 }
+      : (nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 });
     capturePointer(event.currentTarget,event.pointerId);
     resizingRef.current = node.id;
-    setResizing({ axis, id: node.id, startX: event.clientX, startY: event.clientY, width: size.width, height: size.height, compact:node.type==='thought'&&!node.attachments?.length });
+    setResizing({ axis, id: node.id, x: node.x, y: node.y, isGroup, startX: event.clientX, startY: event.clientY, width: size.width, height: size.height, compact:node.type==='thought'&&!node.attachments?.length });
   }
 
   function removeConnections(connections = selectedConnections) {
@@ -1828,16 +2141,31 @@ function App() {
   function cancelCanvasGesture() {
     if (panInputRef.current) { panFramesRef.current.flush(); panInputRef.current = null; }
     dragFramesRef.current?.clear(); resizeFramesRef.current?.clear(); relationFramesRef.current?.clear();
+    if (marqueeFrameRef.current) { window.cancelAnimationFrame(marqueeFrameRef.current); marqueeFrameRef.current = 0; }
+    if (marqueePreviewRef.current) { applyMarqueeDomSelection(marqueePreviewRef.current, selectedIds, multiCountElRef.current); marqueePreviewRef.current = null; }
     marqueeRectRef.current = null; relationRectRef.current = null;
     setPanning(null); setDragging(null); setMarquee(null);
     marqueeLiveRef.current = null;
     endHistory();
   }
 
+  function startMarqueePreview(baseIds) {
+    const els = new Map();
+    for (const card of worldRef.current?.querySelectorAll('.node[data-node-id]') || []) els.set(card.dataset.nodeId, card);
+    marqueePreviewRef.current = {
+      ids: new Set(baseIds),
+      primary: baseIds.size > 1 ? selectedId : null,
+      els,
+      badge: multiCountElRef.current,
+      formatCount: (count) => tr(`已选择 ${count} 个节点 · 可一起拖动或删除`, `${count} nodes selected · Drag or delete them together`),
+    };
+  }
+
   function beginPan(event,fromNode=false) {
     if(zoomFrameRef.current){stopZoomAnimation();commitViewport(viewportRef.current,true);}
     if(editingNode && !event.target.closest('.inline-node-editor,.inspector,.ix') && saveNodeEdit()===false)return;
     if(quickThought&&quickEditor&&!event.target.closest('.quick-thought-editor')){saveQuickIdea();}
+    if(!event.target.closest('button,textarea,input,select,.composer,.inspector,.ix,.inline-node-editor,.quick-thought-editor') && typeof blurTopbarFocus === 'function') blurTopbarFocus();
     if(quickThought && event.button===2 && !event.target.closest('.node,button,textarea,select,.composer')) {
       event.preventDefault();capturePointer(event.currentTarget,event.pointerId);
       stopZoomAnimation();
@@ -1848,7 +2176,9 @@ function App() {
       stopZoomAnimation();
       const rect=canvasRef.current.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
       marqueeRectRef.current=rect;
-      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';setMarquee({startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'});setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
+      marqueeLiveRef.current={x,y};marqueeHitsRef.current='';
+      const nextMarquee={startX:x,startY:y,x,y,bounds:marqueeBounds(worldRef.current,rect),allCards:true,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'};
+      marqueeRef.current=nextMarquee;startMarqueePreview(selectedIds);setMarquee(nextMarquee);setSelectedConnections([]);setLineSelectionMenu(null);setContextMenu(null);return;
     }
     if (contextMenu) dismissContextMenu();
     if (editingRelation) closeRelationEditor();
@@ -1865,7 +2195,8 @@ function App() {
       setSelectedConnections([]);
       setLineSelectionMenu(null);
       marqueeLiveRef.current={x,y};marqueeHitsRef.current='';
-      setMarquee({startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'});
+      const nextMarquee={startX:x,startY:y,x,y,base:[...selectedIds],mode:event.altKey?'subtract':(event.shiftKey||event.ctrlKey||event.metaKey)?'add':'replace'};
+      marqueeRef.current=nextMarquee;startMarqueePreview(selectedIds);setMarquee(nextMarquee);
       return;
     }
     if (!(event.button===1 || (event.button===0 && (quickSpace.current || !quickThought || event.pointerType==='touch'))) || (!fromNode&&event.target.closest('.node, button, textarea, input, select, .composer'))) return;
@@ -1900,17 +2231,27 @@ function App() {
     const left = Math.min(next.startX, next.x), right = Math.max(next.startX, next.x);
     const top = Math.min(next.startY, next.y), bottom = Math.max(next.startY, next.y);
     const box = marqueeElRef.current;
-    if (box) { box.style.left = `${left}px`; box.style.top = `${top}px`; box.style.width = `${right - left}px`; box.style.height = `${bottom - top}px`; }
+    if (box) { box.style.transform = `translate3d(${left}px, ${top}px, 0)`; box.style.width = `${right - left}px`; box.style.height = `${bottom - top}px`; }
     const hits = quickThought ? boxThoughtIds(visibleNodes,nodeSizes,viewportRef.current,next) : visibleNodes.filter((node) => {
-      const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
-      const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
-      return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
+      const box = typeof visualGroupRect === 'function'
+        ? visualGroupRect(node, nodeSizes)
+        : { x: node.x, y: node.y, width: (nodeSizes.get(node.id)?.width || node.manualWidth || 224), height: (nodeSizes.get(node.id)?.height || node.manualHeight || 110) };
+      const nodeLeft = viewportRef.current.x + box.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + box.y * viewportRef.current.zoom;
+      const rect = { left: nodeLeft, top: nodeTop, right: nodeLeft + box.width * viewportRef.current.zoom, bottom: nodeTop + box.height * viewportRef.current.zoom };
+      if (typeof marqueeHitsScreenRect === 'function') return marqueeHitsScreenRect(node, rect, next, viewportRef.current.zoom);
+      return rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
     }).map((node) => node.id);
-    // Most frames hit the same cards as the last one; skip the state updates then.
+    // Most frames hit the same cards as the last one; skip DOM updates then.
     const key = `${next.mode}|${[...hits].join(',')}`;
     if (key === marqueeHitsRef.current) return;
     marqueeHitsRef.current = key;
     const selection = combineSelection(next.base, hits, next.mode);
+    // Mirror the live selection straight onto card classes so sweeping across dozens
+    // of cards stays off React's render path until the pointer is released.
+    if (typeof marqueePreviewRef !== 'undefined' && marqueePreviewRef.current) {
+      applyMarqueeDomSelection(marqueePreviewRef.current, selection, typeof multiCountElRef !== 'undefined' ? multiCountElRef.current : null);
+      return;
+    }
     setSelectedIds(selection);
     setSelectedId([...selection].at(-1) || null);
     if (hits.length) { setSelectedConnections([]); setLineSelectionMenu(null); setInspectorOpen(!quickThought && inspectorPinnedRef.current); setInspectorClosing(false); }
@@ -1928,13 +2269,29 @@ function App() {
         setRelationDrag(next);
       }
     } else if (resizing) {
-      const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (resizing.axis==='y'?0:event.clientX - resizing.startX) / viewportRef.current.zoom));
-      const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (resizing.axis==='x'?0:event.clientY - resizing.startY) / viewportRef.current.zoom));
-      if (typeof resizeFramesRef !== 'undefined' && resizeFramesRef.current) {
-        resizeFramesRef.current.enqueue({ id: resizing.id, width, height });
+      if (resizing.isGroup && typeof resizeGroupRect === 'function') {
+        const dx = (event.clientX - resizing.startX) / viewportRef.current.zoom;
+        const dy = (event.clientY - resizing.startY) / viewportRef.current.zoom;
+        const next = resizeGroupRect(resizing, resizing.axis, dx, dy);
+        if (typeof resizeFramesRef !== 'undefined' && resizeFramesRef.current) {
+          resizeFramesRef.current.enqueue({ id: resizing.id, x: next.x, y: next.y, width: next.manualWidth, height: next.manualHeight, clearAutoFit: true });
+        } else {
+          setNodes((items) => items.map((node) => {
+            if (node.id !== resizing.id) return node;
+            const updated = { ...node, ...next };
+            delete updated.autoFit;
+            return updated;
+          }));
+        }
       } else {
-        setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
-        window.requestAnimationFrame(syncConnectionGeometry);
+        const width = Math.max(resizing.compact?48:210, Math.min(720, resizing.width + (resizing.axis==='y'?0:event.clientX - resizing.startX) / viewportRef.current.zoom));
+        const height = Math.max(resizing.compact?44:110, Math.min(720, resizing.height + (resizing.axis==='x'?0:event.clientY - resizing.startY) / viewportRef.current.zoom));
+        if (typeof resizeFramesRef !== 'undefined' && resizeFramesRef.current) {
+          resizeFramesRef.current.enqueue({ id: resizing.id, width, height });
+        } else {
+          setNodes((items) => items.map((node) => node.id === resizing.id ? { ...node, manualWidth: Math.round(width), manualHeight: Math.round(height) } : node));
+          window.requestAnimationFrame(syncConnectionGeometry);
+        }
       }
     } else if (marquee) {
       const rect = (typeof marqueeRectRef !== 'undefined' && marqueeRectRef.current) || canvasRef.current.getBoundingClientRect();
@@ -1946,12 +2303,17 @@ function App() {
       const dx = (event.clientX - dragging.startX) / viewportRef.current.zoom;
       const dy = (event.clientY - dragging.startY) / viewportRef.current.zoom;
       if (typeof dragFramesRef !== 'undefined' && dragFramesRef.current) {
-        dragFramesRef.current.enqueue({ positions: dragging.positions, dx, dy });
+        dragFramesRef.current.enqueue({ positions: dragging.positions, dx, dy, autoFitOwners: dragging.autoFitOwners });
       } else {
-        setNodes((items) => items.map((node) => {
-          const origin = dragging.positions.get(node.id);
-          return origin ? { ...node, x: origin.x + dx, y: origin.y + dy } : node;
-        }));
+        setNodes((items) => {
+          const moved = items.map((node) => {
+            const origin = dragging.positions.get(node.id);
+            return origin ? { ...node, x: origin.x + dx, y: origin.y + dy } : node;
+          });
+          return dragging.autoFitOwners?.length && typeof applyAutoFitToNodes === 'function'
+            ? applyAutoFitToNodes(moved, nodeSizesRef.current, dragging.autoFitOwners)
+            : moved;
+        });
       }
     } else if (panInputRef.current) {
       const pan=panInputRef.current;
@@ -1964,10 +2326,16 @@ function App() {
 
   function endPointer(event) {
     if (typeof dragFramesRef !== 'undefined') { if (event.type === 'pointerup') dragFramesRef.current?.flush(); else dragFramesRef.current?.clear(); }
+    if (event.type === 'pointerup' && typeof dragging !== 'undefined' && dragging?.started && typeof refitAutoFitGroupsForDrop === 'function' && typeof nodeSizesRef !== 'undefined') {
+      const movedIds = dragging.ids;
+      setNodes((items) => refitAutoFitGroupsForDrop(items, nodeSizesRef.current, movedIds));
+    }
     if (typeof resizeFramesRef !== 'undefined') { if (event.type === 'pointerup') resizeFramesRef.current?.flush(); else resizeFramesRef.current?.clear(); }
     if (typeof relationFramesRef !== 'undefined') relationFramesRef.current?.clear();
     if (typeof relationRectRef !== 'undefined') relationRectRef.current = null;
+    const cachedMarqueeRect = typeof marqueeRectRef !== 'undefined' ? marqueeRectRef.current : null;
     if (typeof marqueeRectRef !== 'undefined') marqueeRectRef.current = null;
+    if (typeof marqueeFrameRef !== 'undefined' && marqueeFrameRef.current) { window.cancelAnimationFrame?.(marqueeFrameRef.current); marqueeFrameRef.current = 0; }
     endHistory();
     let finalRelationDrag = relationDragRef.current;
     if (quickBlankClick.current) {
@@ -2010,36 +2378,50 @@ function App() {
       commitViewport(viewportRef.current, true);
       if (!pan.moved) { clearSelection(); closeRootComposer(); }
     }
-    if (marquee && quickThought) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const box = {...marquee, x:event.clientX-rect.left, y:event.clientY-rect.top};
-      const hits = event.type === 'pointerup' ? [...combineSelection(box.base,completeThoughtMarquee(visibleNodes,nodeSizes,viewportRef.current,box),box.mode)] : [...(box.base||[])];
-      if (!hits.length) clearSelection();
-      else { setSelectedIds(new Set(hits)); setSelectedId(hits.at(-1)); setInspectorOpen(false); }
-    }
     if (marquee) {
-      const selectionRect=canvasRef.current.getBoundingClientRect();
-      const finalMarquee={...marquee,x:event.clientX-selectionRect.left,y:event.clientY-selectionRect.top};
+      const selectionRect = cachedMarqueeRect || canvasRef.current.getBoundingClientRect();
+      const finalMarquee = { ...marquee, x: event.clientX - selectionRect.left, y: event.clientY - selectionRect.top };
       suppressContextMenuUntilRef.current = Date.now() + 260;
-      const left = Math.min(finalMarquee.startX, finalMarquee.x), right = Math.max(finalMarquee.startX, finalMarquee.x);
-      const top = Math.min(finalMarquee.startY, finalMarquee.y), bottom = Math.max(finalMarquee.startY, finalMarquee.y);
-      const nodeHits = visibleNodes.filter((node) => {
-        const nodeLeft = viewportRef.current.x + node.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + node.y * viewportRef.current.zoom;
-        const size = nodeSizes.get(node.id) || { width: 224, height: 110 };
-        return nodeLeft + size.width * viewportRef.current.zoom >= left && nodeLeft <= right && nodeTop + size.height * viewportRef.current.zoom >= top && nodeTop <= bottom;
-      });
-      if(!quickThought){const hits=event.type==='pointercancel'?new Set(marquee.base||[]):combineSelection(marquee.base,nodeHits.map(n=>n.id),marquee.mode);setSelectedIds(hits);setSelectedId([...hits].at(-1)||null);}
-      if (!quickThought && (!marquee.mode||marquee.mode==='replace') && !nodeHits.length && connectionsRef.current && canvasRef.current) {
-        const canvasRect = canvasRef.current.getBoundingClientRect();
-        const picked = [...connectionsRef.current.querySelectorAll('.connection[data-connection-key]')].flatMap((path) => {
-          const box = path.getBoundingClientRect();
-          const intersects = box.right >= canvasRect.left + left && box.left <= canvasRect.left + right && box.bottom >= canvasRect.top + top && box.top <= canvasRect.top + bottom;
-          if (!intersects) return [];
-          const kind = path.dataset.connectionKind;
-          return [{ key: path.dataset.connectionKey, kind, sourceId: path.dataset.sourceId, targetId: path.dataset.targetId, childId: path.dataset.childId, parentId: path.dataset.parentId, type: path.dataset.connectionType }];
+      const syncPreview = (finalSet) => {
+        if (typeof marqueePreviewRef !== 'undefined' && marqueePreviewRef.current && typeof applyMarqueeDomSelection !== 'undefined') {
+          applyMarqueeDomSelection(marqueePreviewRef.current, finalSet, typeof multiCountElRef !== 'undefined' ? multiCountElRef.current : null);
+          marqueePreviewRef.current = null;
+        }
+      };
+      if (quickThought) {
+        const hits = event.type === 'pointerup' ? [...combineSelection(finalMarquee.base, completeThoughtMarquee(visibleNodes, nodeSizes, viewportRef.current, finalMarquee), finalMarquee.mode)] : [...(finalMarquee.base || [])];
+        const finalSet = new Set(hits);
+        syncPreview(finalSet);
+        if (!hits.length) clearSelection();
+        else { setSelectedIds(finalSet); setSelectedId(hits.at(-1)); setInspectorOpen(false); }
+      } else {
+        const left = Math.min(finalMarquee.startX, finalMarquee.x), right = Math.max(finalMarquee.startX, finalMarquee.x);
+        const top = Math.min(finalMarquee.startY, finalMarquee.y), bottom = Math.max(finalMarquee.startY, finalMarquee.y);
+        const nodeHits = visibleNodes.filter((node) => {
+          const box = typeof visualGroupRect === 'function'
+            ? visualGroupRect(node, nodeSizes)
+            : { x: node.x, y: node.y, width: (nodeSizes.get(node.id)?.width || node.manualWidth || 224), height: (nodeSizes.get(node.id)?.height || node.manualHeight || 110) };
+          const nodeLeft = viewportRef.current.x + box.x * viewportRef.current.zoom, nodeTop = viewportRef.current.y + box.y * viewportRef.current.zoom;
+          const rect = { left: nodeLeft, top: nodeTop, right: nodeLeft + box.width * viewportRef.current.zoom, bottom: nodeTop + box.height * viewportRef.current.zoom };
+          if (typeof marqueeHitsScreenRect === 'function') return marqueeHitsScreenRect(node, rect, finalMarquee, viewportRef.current.zoom);
+          return rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
         });
-        setSelectedConnections(picked);
-        if (picked.length) setLineSelectionMenu({ open: true });
+        const hits = event.type === 'pointercancel' ? new Set(marquee.base || []) : combineSelection(marquee.base, nodeHits.map((n) => n.id), marquee.mode);
+        syncPreview(hits);
+        setSelectedIds(hits);
+        setSelectedId([...hits].at(-1) || null);
+        if (hits.size) { setSelectedConnections([]); setLineSelectionMenu(null); setInspectorOpen(inspectorPinnedRef.current); setInspectorClosing(false); }
+        if ((!marquee.mode || marquee.mode === 'replace') && !nodeHits.length && connectionsRef.current && canvasRef.current) {
+          const picked = [...connectionsRef.current.querySelectorAll('.connection[data-connection-key]')].flatMap((path) => {
+            const box = path.getBoundingClientRect();
+            const intersects = box.right >= selectionRect.left + left && box.left <= selectionRect.left + right && box.bottom >= selectionRect.top + top && box.top <= selectionRect.top + bottom;
+            if (!intersects) return [];
+            const kind = path.dataset.connectionKind;
+            return [{ key: path.dataset.connectionKey, kind, sourceId: path.dataset.sourceId, targetId: path.dataset.targetId, childId: path.dataset.childId, parentId: path.dataset.parentId, type: path.dataset.connectionType }];
+          });
+          setSelectedConnections(picked);
+          if (picked.length) setLineSelectionMenu({ open: true });
+        }
       }
     }
     setDragging(null);
@@ -2069,8 +2451,8 @@ function App() {
     const rect = canvasRef.current.getBoundingClientRect();
     const minX = Math.min(...visibleNodes.map((node) => node.x));
     const minY = Math.min(...visibleNodes.map((node) => node.y));
-    const maxX = Math.max(...visibleNodes.map((node) => node.x + (nodeSizes.get(node.id)?.width || 224)));
-    const maxY = Math.max(...visibleNodes.map((node) => node.y + (nodeSizes.get(node.id)?.height || 110)));
+    const maxX = Math.max(...visibleNodes.map((node) => node.x + (nodeSizes.get(node.id)?.width || node.manualWidth || 224)));
+    const maxY = Math.max(...visibleNodes.map((node) => node.y + (nodeSizes.get(node.id)?.height || node.manualHeight || 110)));
     const graphWidth = Math.max(224, maxX - minX);
     const graphHeight = Math.max(110, maxY - minY);
     // On a phone the navigation is a bar along the bottom, not a rail on the left.
@@ -2094,18 +2476,30 @@ function App() {
 
   function autoLayout() {
     // A tidy tree: each card next to its own children, parents centred on them, trees stacked.
+    // Group frames stay wrapped snugly around the cards they contained before arranging.
     const sizeFor = (node) => {
       const measured = nodeSizes.get(node.id);
       return { width: measured?.width || node.manualWidth || 224, height: measured?.height || node.manualHeight || 110 };
     };
-    const visibleIds = new Set(visibleNodes.map((node) => node.id));
-    const positions = tidyLayout(visibleNodes.map((node) => ({ ...node, parentId: visibleIds.has(node.parentId) ? node.parentId : null })), sizeFor);
-    setNodes((items) => items.map((node) => positions.has(node.id) ? { ...node, ...positions.get(node.id) } : node));
-    if (canvasRef.current && positions.size) {
-      const laidOut = visibleNodes.map((node) => ({ ...node, ...positions.get(node.id) }));
+    const groupMembers = captureGroupMembers(visibleNodes, nodeSizes);
+    const regularNodes = visibleNodes.filter((node) => !isGroupNode(node));
+    const visibleIds = new Set(regularNodes.map((node) => node.id));
+    const positions = tidyLayout(regularNodes.map((node) => ({ ...node, parentId: visibleIds.has(node.parentId) ? node.parentId : null })), sizeFor);
+    const groupUpdates = refitGroupsAfterLayout(visibleNodes, positions, sizeFor, groupMembers);
+    setNodes((items) => items.map((node) => {
+      if (positions.has(node.id)) return { ...node, ...positions.get(node.id) };
+      if (groupUpdates.has(node.id)) return { ...node, ...groupUpdates.get(node.id) };
+      return node;
+    }));
+    if (canvasRef.current && (positions.size || groupUpdates.size)) {
+      const laidOut = visibleNodes.map((node) => (
+        positions.has(node.id) ? { ...node, ...positions.get(node.id) }
+          : groupUpdates.has(node.id) ? { ...node, ...groupUpdates.get(node.id) }
+          : node
+      ));
       const minX = Math.min(...laidOut.map((node) => node.x)), minY = Math.min(...laidOut.map((node) => node.y));
-      const maxX = Math.max(...laidOut.map((node) => node.x + sizeFor(node).width));
-      const maxY = Math.max(...laidOut.map((node) => node.y + sizeFor(node).height));
+      const maxX = Math.max(...laidOut.map((node) => node.x + (groupUpdates.get(node.id)?.manualWidth || sizeFor(node).width)));
+      const maxY = Math.max(...laidOut.map((node) => node.y + (groupUpdates.get(node.id)?.manualHeight || sizeFor(node).height)));
       const rect = canvasRef.current.getBoundingClientRect();
       const zoom = Math.min(1.08, Math.max(.02, Math.min((rect.width - (selected && inspectorOpen && !quickThought ? 416 : 172)) / Math.max(1, maxX - minX), (rect.height - 160) / Math.max(1, maxY - minY))));
       targetViewportRef.current = { x: 76 + (rect.width - 370 - (maxX - minX) * zoom) / 2 - minX * zoom, y: 90 + (rect.height - 130 - (maxY - minY) * zoom) / 2 - minY * zoom, zoom };
@@ -2176,6 +2570,7 @@ function App() {
 
   async function switchCanvas(id) {
     if(workspaceBusyRef.current)return false;
+    if (typeof blurTopbarFocus === 'function') blurTopbarFocus();
     if(window.innerWidth<700)changeWorkspace(meta=>({...meta,sidebar:false}));
     if (id === activeCanvasId) { if(!changeWorkspace(meta=>openLibraryTab(meta,id)))return false;setCanvasMenuOpen(false); return true; }
     const token=++transitionRequestRef.current;
@@ -2600,8 +2995,7 @@ function App() {
     // cards without a record, fall back to the model's current setting.
     if (node.requestRecord?.options) return normalizeChatOptions(node.requestRecord.options).reasoning !== 'none';
     const nodeModelValue = String(node.modelValue || model || '');
-    const profile = nodeModelValue.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === nodeModelValue.slice(6)) : null;
-    const localProfile = nodeModelValue.startsWith('local:') ? localProfiles.find((item) => item.id === nodeModelValue.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(nodeModelValue, cloudProfiles, localProfiles);
     return normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {}).reasoning !== 'none';
   }
 
@@ -2610,8 +3004,8 @@ function App() {
     const request = draft.trim();
     if (drawBusy) { drawAbortRef.current?.abort(); return; }
     if (!request) return;
-    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : null;
-    const localProfile = model.startsWith('local:') ? localProfiles.find((item) => item.id === model.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(model, cloudProfiles, localProfiles);
+    if (!profile && !localProfile) { notify(tr('请先在设置 → 模型连接中添加并选择一个模型','Add and select a model in Settings → Model connections first')); return; }
     if (profile && !profile.apiKey) { notify(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`)); return; }
     setDrawBusy(true);
     const controller = new AbortController(); drawAbortRef.current = controller;
@@ -2670,8 +3064,7 @@ function App() {
     const text = draft.trim();
     if (!text && !attachments.length) return;
     const requestText = text || tr('请理解并描述我上传的图片或文件。',"Please interpret the uploaded images or files.");
-    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : null;
-    const localProfile = model.startsWith('local:') ? localProfiles.find((item) => item.id === model.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(model, cloudProfiles, localProfiles);
     const root = {
       id: `root-${Date.now()}`, parentId: null, type: creationType,
       author: creationType === 'thought' ? tr('你',"You") : creationType === 'action' ? tr('执行代理',"Agent") : 'AI',
@@ -2812,13 +3205,14 @@ function App() {
     const text = draft.trim();
     if ((!text && !attachments.length) || !selected) return;
     if (parallelMode && creationType === 'conversation') {
-      const choices = [...parallelModels].length ? [...parallelModels] : [model];
+      const validIds = new Set(modelOptions.map((item) => item.value));
+      const activeParallel = [...parallelModels].filter((id) => validIds.has(id));
+      const choices = activeParallel.length ? activeParallel : [model];
       const extraRelations = [...pendingContextRelations];
       const baseId = Date.now();
       const parentSize = nodeSizes.get(selected.id) || { width: selected.manualWidth || 224, height: selected.manualHeight || 110 };
       const created = choices.map((modelValue, index) => {
-        const profile = modelValue.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === modelValue.slice(6)) : null;
-        const localProfile = modelValue.startsWith('local:') ? localProfiles.find((item) => item.id === modelValue.slice(6)) : ollama;
+        const { cloud: profile, local: localProfile } = resolveModelProfile(modelValue, cloudProfiles, localProfiles);
         return { id: `node-${baseId}-${index}`, parentId: selected.id, type: 'conversation', author: 'AI', model: profile?.model || localProfile?.model, title: questionTitle(text, tr('图片问题',"Image question")), content: text, prompt: text, attachments, x: selected.x + parentSize.width + 86, y: selected.y + (index - (choices.length - 1) / 2) * 190, status: 'queued', generationPhase: tr('请求已排队，正在准备上下文…',"Request queued…"), modelValue, contextExclusions: [...excludedContextIds], contextRelations: extraRelations };
       });
       setNodes((items) => [...items, ...created]);
@@ -2899,8 +3293,7 @@ function App() {
   }
 
   async function generateResponse(id, modelValue, sourceNodes, parentId, text, requestAttachments = [], contextExclusions = [], taskCanvasId = activeCanvasIdRef.current, extraRelations = []) {
-    const profile = modelValue.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === modelValue.slice(6)) : null;
-    const localProfile = modelValue.startsWith('local:') ? localProfiles.find((item) => item.id === modelValue.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(modelValue, cloudProfiles, localProfiles);
     let heartbeat = null;
     let timeout = null;
     let timedOut = false;
@@ -2916,7 +3309,7 @@ function App() {
       const actualAttachments = contextAttachments(sourceNodes, parentId, requestAttachments, contextExclusions, extraRelations);
       const inheritedCount = requestContext.length;
       const startedAt = Date.now();
-      const record = { id: `request-${startedAt}`, status: 'thinking', startedAt: new Date(startedAt).toISOString(), model: profile?.model || localProfile?.model, modelValue, provider: profile?.name || 'Ollama', options: normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {}), prompt: text, attachments: actualAttachments.map((item) => ({ id: item.id, name: item.name, type: item.type, size: item.size })), context: requestContext.map(({ node, relation }) => ({ id: node.id, title: node.title, relation, type: node.type })), excludedIds: [...contextExclusions] };
+      const record = { id: `request-${startedAt}`, status: 'thinking', startedAt: new Date(startedAt).toISOString(), model: profile?.model || localProfile?.model || '', modelValue, provider: profile?.name || localProfile?.name || '', options: normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {}), prompt: text, attachments: actualAttachments.map((item) => ({ id: item.id, name: item.name, type: item.type, size: item.size })), context: requestContext.map(({ node, relation }) => ({ id: node.id, title: node.title, relation, type: node.type })), excludedIds: [...contextExclusions] };
       updateTaskNode(taskCanvasId, id, (item) => ({ ...item, status: 'thinking', generationPhase: tr(`正在整理 ${inheritedCount} 条上下文并连接模型…`,`Preparing ${inheritedCount} context nodes and connecting…`), error: null, requestRecord: record, requestHistory: [...(item.requestHistory?.length ? item.requestHistory : item.requestRecord ? [item.requestRecord] : []), record] }));
       heartbeat = window.setInterval(() => updateTaskNode(taskCanvasId, id, (item) => item.status === 'thinking' ? { ...item, generationPhase: tr(`模型正在思考，等待首个输出（${Math.max(1, Math.floor((Date.now() - startedAt) / 1000))} 秒）…`,`Waiting for first output (${Math.max(1, Math.floor((Date.now() - startedAt) / 1000))} seconds)…`) } : item), 1000);
       // Do not kill a model just because it is still reasoning. The visible
@@ -2952,6 +3345,7 @@ function App() {
       const onToken = (partial) => { pendingToken = partial; scheduleStream(); };
       const onThinking = (partial) => { pendingThinking += partial; scheduleStream(); };
       const messages = contextMessages(sourceNodes, parentId, text, requestAttachments, contextExclusions, extraRelations);
+      if (!profile && !localProfile) throw new Error(tr('请先在设置 → 模型连接中添加并选择一个模型','Add and select a model in Settings → Model connections first'));
       if (profile && !profile.apiKey) throw new Error(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`));
       const chatOptions = normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {});
       let content;
@@ -2960,7 +3354,7 @@ function App() {
       } finally { flushStream(); }
       generationRef.current.delete(id);
       window.clearInterval(heartbeat); window.clearTimeout(timeout);
-      updateTaskNode(taskCanvasId, id, (item) => ({ ...patchLatestRequest(item, { status: 'done', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, outputChars: content.length }), content, status: 'done', generationPhase: null, model: profile?.model || localProfile.model, error: null }));
+      updateTaskNode(taskCanvasId, id, (item) => ({ ...patchLatestRequest(item, { status: 'done', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, outputChars: content.length }), content, status: 'done', generationPhase: null, model: profile?.model || localProfile?.model || '', error: null }));
     } catch (error) {
       generationRef.current.delete(id);
       window.clearInterval(heartbeat); window.clearTimeout(timeout);
@@ -3297,7 +3691,7 @@ function App() {
   function saveNodeEdit() {
     if (!canEditCard(selected)) return false;
     if(!editDraft.title.trim() && !editDraft.content.trim() && !selected.attachments?.length){setStorageWarning(say('请填写文字或添加附件。','Add text or an attachment.'));return false;}
-    setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, title: editDraft.title.trim() || questionTitle(editDraft.content), prompt: editDraft.type === 'conversation' ? editDraft.prompt.trim() || null : null, content: editDraft.content.trim(), type: editDraft.type, author: editDraft.type === 'thought' ? tr('你',"You") : editDraft.type === 'action' ? tr('执行代理',"Agent") : 'AI', model: editDraft.type === 'thought' ? null : editDraft.type === 'action' ? tr('本地 Codex',"Local Codex") : node.model || selectedLocal?.model, status: editDraft.type === 'action' && node.type !== 'action' ? 'approval' : editDraft.type === 'thought' ? 'done' : node.status, tags: editDraft.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean), note: editDraft.note.trim(), color: editDraft.color || '' } : node));
+    setNodes((items) => items.map((node) => node.id === selected.id ? { ...node, title: editDraft.title.trim() || questionTitle(editDraft.content), prompt: editDraft.type === 'conversation' ? editDraft.prompt.trim() || null : null, content: editDraft.content.trim(), type: editDraft.type, author: editDraft.type === 'thought' ? tr('你',"You") : editDraft.type === 'action' ? tr('执行代理',"Agent") : 'AI', model: editDraft.type === 'thought' ? null : editDraft.type === 'action' ? tr('本地 Codex',"Local Codex") : node.model || selectedCloud?.model || selectedLocal?.model || '', status: editDraft.type === 'action' && node.type !== 'action' ? 'approval' : editDraft.type === 'thought' ? 'done' : node.status, tags: editDraft.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean), note: editDraft.note.trim(), color: editDraft.color || '' } : node));
     setEditingNode(null);
     setInlineEditSize(null);
     return true;
@@ -3417,13 +3811,13 @@ function App() {
 
   async function generateMindMapSuggestions(node = selected, mode = mindMapState.mode || 'questions') {
     if (!node) return;
-    const profile = model.startsWith('cloud:') ? cloudProfiles.find((item) => item.id === model.slice(6)) : null;
-    const localProfile = model.startsWith('local:') ? localProfiles.find((item) => item.id === model.slice(6)) : ollama;
+    const { cloud: profile, local: localProfile } = resolveModelProfile(model, cloudProfiles, localProfiles);
     const modes = { questions: '值得继续追问的问题', ideas: '可行的新想法或发散方向', counterpoints: '需要反驳、验证或警惕的角度', actions: '下一步可执行的行动' };
     const prompt = `围绕节点「${node.title}」扩展思维导图，类型是「${modes[mode] || modes.questions}」。只返回 3 到 6 条简洁的子节点标题，每行一条，不要编号、解释或 Markdown。`;
     setMindMapState({ nodeId: node.id, status: tr('AI 正在生成候选分支…',"AI is generating candidate branches…"), suggestions: [], selected: [], mode });
     let buffer = '';
     try {
+      if (!profile && !localProfile) throw new Error(tr('请先在设置 → 模型连接中添加并选择一个模型','Add and select a model in Settings → Model connections first'));
       if (profile && !profile.apiKey) throw new Error(tr(`尚未填写 ${profile.name} 的 API 密钥`,`Missing API key for ${profile.name}`));
       const messages = contextMessages(nodes, node.id, prompt, [], []);
       const chatOptions = normalizeChatOptions(profile?.chatOptions || localProfile?.chatOptions || {});
@@ -3498,16 +3892,18 @@ function App() {
       while (result.status === 'running') {
         if (result.pending?.[0]?.id && result.pending[0].id !== announcedApproval) { announcedApproval = result.pending[0].id; notify(tr(`${runnerName} 正在等待你的批准。`, `${runnerName} is waiting for your approval.`)); desktopNotify(tr('需要你的批准', 'Approval needed'), `${runnerName} · ${result.pending[0].tool}`, actionId); }
         const lastEv = result.events?.[result.events.length - 1];
-        const fingerprint = JSON.stringify([
-          result.status, result.canSteer === true,
-          (result.pending || []).map((p) => p.id),
-          result.events?.length || 0, lastEv?.id || '', lastEv?.text?.length || 0, lastEv?.output?.length || 0,
-          result.terminal?.length || 0, result.artifacts?.length || 0,
-          result.before?.status || '', result.after?.status || '',
-          result.changes?.files?.length || 0, result.changes?.applied || false, result.changes?.rolledBack || false,
-          result.usage?.input || 0, result.usage?.output || 0, result.usage?.cost || 0,
-          JSON.stringify(result.extensionStatus || null), JSON.stringify(result.extensionWidgets || null),
-        ]);
+        const fingerprint = typeof result.rev === 'number'
+          ? `${result.rev}:${result.status}`
+          : JSON.stringify([
+              result.status, result.canSteer === true,
+              (result.pending || []).map((p) => p.id),
+              result.events?.length || 0, lastEv?.id || '', lastEv?.text?.length || 0, lastEv?.output?.length || 0,
+              result.terminal?.length || 0, result.artifacts?.length || 0,
+              result.before?.status || '', result.after?.status || '',
+              result.changes?.files?.length || 0, result.changes?.applied || false, result.changes?.rolledBack || false,
+              result.usage?.input || 0, result.usage?.output || 0, result.usage?.cost || 0, result.usage?.context?.percent ?? '',
+              JSON.stringify(result.extensionStatus || null), JSON.stringify(result.extensionWidgets || null),
+            ]);
         if (fingerprint !== lastFingerprint) {
           lastFingerprint = fingerprint;
           updateTaskNode(canvasId, actionId, (node) => ({ ...node, execution: { ...(node.execution || {}), jobId, runner, pending: result.pending || [], extensionStatus: result.extensionStatus || null, extensionWidgets: result.extensionWidgets || null, canSteer: result.canSteer === true, events: result.events || [], terminal: result.terminal || '', before: result.before, after: result.after, artifacts: result.artifacts || [], changes: result.changes || null, usage: result.usage || null, startedAt: result.startedAt, inheritedNodeIds: inheritedIds, forkedFrom, workspace } }));
@@ -3743,7 +4139,14 @@ function App() {
 
   function placePanel(event, width) {
     const button = event.currentTarget; const host = button.closest('.inline-agent-config');
-    setPopLeft(Math.max(0, Math.min(button.offsetLeft, (host?.offsetWidth || 0) - width)));
+    const hostWidth = host?.offsetWidth || 0;
+    const panelWidth = Math.min(width, hostWidth || width, Math.max(0, window.innerWidth - 24));
+    let left = Math.max(0, Math.min(button.offsetLeft, Math.max(0, hostWidth - panelWidth)));
+    if (host) {
+      const rect = host.getBoundingClientRect();
+      left = Math.max(12 - rect.left, Math.min(left, window.innerWidth - 12 - panelWidth - rect.left));
+    }
+    setPopLeft(Math.round(left));
   }
 
   function renderActionRunnerControls() {
@@ -3830,13 +4233,12 @@ function App() {
     const workspace = actionWorkspace || activeCanvas?.workspace || '';
     const effectiveDirectory = workspace || workspaceConfig?.defaultWorkspace || '';
     const chipDirectory = effectiveDirectory ? effectiveDirectory.split(/[\\/]/).filter(Boolean).pop() || effectiveDirectory : tr('默认目录','Default folder');
-    const popWidths = { runner: 230, dir: 340, perm: 280, model: 320, more: 320, add: 260 };
+    const popWidths = { runner: 230, dir: 340, perm: 280, model: 380, more: 340, add: 260 };
     const piLevel = runnerNow === 'pi' ? options.thinking || (options.model ? '' : piInfo?.current?.thinkingLevel || '') : '';
     const piEffort = piLevel ? piEffortLevels(null, tr).find((item) => item.value === piLevel)?.label || piLevel : '';
     const piModelName = runnerNow === 'pi' ? (options.model || (piInfo?.current?.id ? piInfo.current.id : defaultModel)) : '';
     const toggleOptions = (section, event) => {
-      const button = event.currentTarget; const host = button.closest('.inline-agent-config');
-      setPopLeft(Math.max(0, Math.min(button.offsetLeft, (host?.offsetWidth || 0) - popWidths[section])));
+      placePanel(event, popWidths[section]);
       setActionOptionsOpen((value) => value === section ? false : section);
     };
     const panel = actionOptionsOpen || closingPop;
@@ -3963,8 +4365,8 @@ function App() {
     const effortSummary = support.toggle ? `${reasoningDisabled || !options.thinking ? tr('直接回答','Direct answer') : tr('思考开启','Thinking on')}${support.levels ? ` · ${levelLabels[options.reasoning] || options.reasoning}` : ''}` : tr('创造性','Creativity');
     const hasEffort = support.toggle || support.temperature;
     const panel = chatOptionsOpen;
-    const widths = { model: 320, effort: 300 };
-    const toggle = (section, event) => { placePanel(event, widths[section]); setChatOptionsOpen((value) => value === section ? false : section); };
+    const widths = { model: 380, effort: 300 };
+    const toggle = (section, event) => { setParallelMenuOpen(false); placePanel(event, widths[section]); setChatOptionsOpen((value) => value === section ? false : section); };
     const cloudItems = cloudProfiles.map((item) => ({ value: `cloud:${item.id}`, label: item.name, hint: item.model }));
     const localItems = localProfiles.map((item) => ({ value: `local:${item.id}`, label: item.name, hint: item.model }));
     const groups = cloudItems.length && localItems.length ? [{ title: tr('云端模型','Cloud models'), items: cloudItems }, { title: tr('本地模型','Local models'), items: localItems }] : [{ title: '', items: [...cloudItems, ...localItems] }];
@@ -4040,16 +4442,17 @@ function App() {
     setPendingPiFork({ sourceId: node.id, entryId, text });
     window.setTimeout(() => document.querySelector('.composer textarea')?.focus(), 60);
   }
-  const cardActions={handleCardWheel,openPiHistory,compactPiSession,switchPiModel,piModelChoices:(piInfo?.models||[]).map((m)=>({value:`${m.provider}::${m.id}`,label:`${m.provider} / ${m.name||m.id}`})),...comicPlugin.cardActions,executePlan,openCompare:setCompareGroupOpen,applyAgentChanges,respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
+  const piModelChoices = useMemo(() => (piInfo?.models || []).map((m) => ({ value: `${m.provider}::${m.id}`, label: `${m.provider} / ${m.name || m.id}` })), [piInfo]);
+  const cardActions={handleCardWheel,openPiHistory,compactPiSession,switchPiModel,...comicPlugin.cardActions,executePlan,openCompare:setCompareGroupOpen,applyAgentChanges,respondAgentApproval,steerAgent,setEditDraft,setEditingNode,setInlineEditSize,saveNodeEdit,handleContentWheel,openActionArtifact,downloadActionArtifact,openLibraryItem,stopAgentJob,stopGeneration,beginResize,beginRelationDrag,toggleCollapse,startBranch,
     toggleActivity:node=>setNodes(items=>items.map(item=>item.id===node.id?{...item,execution:{...(item.execution||{}),activityCollapsed:!(item.execution?.activityCollapsed!==false)}}:item))};
   if(!liveCardActions.current)liveCardActions.current=Object.fromEntries(Object.keys(cardActions).map(key=>[key,(...args)=>cardRuntime.current.actions[key](...args)]));
   useLayoutEffect(()=>{cardRuntime.current={actions:cardActions,
     pointerDown:beginNodeDrag,click:event=>{event.stopPropagation();closeBranch();},
-    doubleClick:(event,node)=>{event.stopPropagation();if(!canEditCard(node)){selectNode(node.id);setInspectorOpen(true);setInspectorTab('overview');return;}event.preventDefault();if(quickThought){editQuickIdea(node);return;}selectNode(node.id);startEditingNode(node);},
-    contextMenu:(event,node)=>{event.preventDefault();event.stopPropagation();if(Date.now()<suppressContextMenuUntilRef.current)return;if(quickThought){if(!relationDragRef.current)openQuickMenu(event,node.id);return;}selectNode(node.id);setContextMenu({kind:'node',nodeId:node.id,x:event.clientX,y:event.clientY});}
+    doubleClick:(event,node)=>{event.stopPropagation();const lockedOwner=outermostLockedGroupFor(node.id,nodes,nodeSizes);if(lockedOwner){selectNode(lockedOwner.id);notify(tr('此卡片位于已锁定的分组框中，请先解锁分组框。','This card is inside a locked group frame. Unlock the group first.'));return;}if(!canEditCard(node)){selectNode(node.id);setInspectorOpen(true);setInspectorTab('overview');return;}event.preventDefault();if(quickThought){editQuickIdea(node);return;}selectNode(node.id);startEditingNode(node);},
+    contextMenu:(event,node)=>{event.preventDefault();event.stopPropagation();if(Date.now()<suppressContextMenuUntilRef.current)return;if(quickThought){if(!relationDragRef.current)openQuickMenu(event,node.id);return;}const nextMenu=resolveContextMenuOpen(node.id,selectedIds);if(nextMenu.keepSelection){setSelectedId(node.id);setSelectedConnections([]);setLineSelectionMenu(null);}else{selectNode(node.id);}setContextMenuClosing(false);setContextMenu({kind:'node',nodeId:node.id,ids:nextMenu.ids,x:event.clientX,y:event.clientY,openedAt:Date.now()});}
   };});
   // Render-time data is read only when a card's explicit visual props change.
-  const cardRenderData=useMemo(()=>({helpers:{statusLabel,outputAssets,actionArtifacts},copy,tr,systemText,actions:liveCardActions.current}),[uiLanguage]);
+  const cardRenderData=useMemo(()=>({helpers:{statusLabel,outputAssets,actionArtifacts},copy,tr,systemText,actions:liveCardActions.current,piModelChoices}),[uiLanguage,piModelChoices]);
 
 
   return (
@@ -4098,6 +4501,7 @@ function App() {
           <button className="quiet-button history-button" disabled={!canUndo} onClick={undoDelete} aria-label={say('撤销','Undo')} title="Ctrl+Z"><AppIcon name="undo" /></button>
         <button className="quiet-button history-button" disabled={!canRedo} onClick={()=>applyCanvasHistory(true)} aria-label={say('重做','Redo')} title="Ctrl+Shift+Z"><AppIcon name="redo" /></button>
         <button className="quiet-button icon-only" aria-label={text('fitCanvas')} title={text('fitCanvas')} onClick={fitView}><AppIcon name="fit" /></button>
+          <button className="quiet-button icon-only" aria-label={tr('新建分组框','New group frame')} title={`${tr('新建分组框','New group frame')} (Ctrl+G)`} onClick={() => createGroupFrame()}><AppIcon name="group" /></button>
           <button className="quiet-button icon-only" aria-label={text('autoLayout')} title={text('autoLayout')} onClick={autoLayout}><AppIcon name="arrange" /></button>
           <button className={minimapOpen ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('minimap')} aria-pressed={minimapOpen} title={text('minimap')} onClick={() => setMinimapOpen((value) => !value)}><AppIcon name="map" /></button>
           <button className={focusMode ? 'quiet-button icon-only active' : 'quiet-button icon-only'} aria-label={text('focusPath')} aria-pressed={focusMode} title={text('focusPath')} onClick={() => setFocusMode((value) => !value)}><AppIcon name="focus" /></button></div>
@@ -4136,7 +4540,17 @@ function App() {
       >
         {PUBLIC_WEB && <aside className="public-web-note">{say('本地画布保存在此浏览器 · 登录后可主动上传并同步 · AI 需自备密钥。','Local canvases stay in this browser · Sign in to upload and sync · Bring your own API key.')} <a href="/source.tar.gz">{say('源码','Source')}</a></aside>}
         {(canvasHints||marquee)&&<div className="canvas-hint">{marquee?say(marquee.mode==='add'?'追加选择':marquee.mode==='subtract'?'减去选择':'替换选择',marquee.mode==='add'?'Add to selection':marquee.mode==='subtract'?'Subtract selection':'Replace selection'):quickThought ? quickCopy.sliceHint + say(' · Shift+右键拖动引用',' · Shift+right-drag to reference') : copy.canvasHint}</div>}
-        {selectedIds.size > 1 && <div className="multi-selection-count">{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>}
+        {(selectedIds.size > 1 || marquee) && (
+          <div className="multi-selection-bar" onPointerDown={(event) => event.stopPropagation()}>
+            <div ref={multiCountElRef} className="multi-selection-count" hidden={selectedIds.size <= 1}>{tr(`已选择 ${selectedIds.size} 个节点 · 可一起拖动或删除`,`${selectedIds.size} nodes selected · Drag or delete them together`)}</div>
+            {selectedIds.size > 1 && !marquee && (
+              <button type="button" className="multi-selection-action" title="Ctrl+G" onClick={() => createGroupFrame()}>
+                <AppIcon name="group" />
+                <span>{tr('建分组框','Create group frame')}</span>
+              </button>
+            )}
+          </div>
+        )}
         {!nodes.length && <div className="empty-welcome"><strong>{quickThought?quickCopy.newIdea:copy.empty}</strong><span>{quickThought?quickCopy.sliceHint:copy.emptyHint}</span>
           {!quickThought && <div className="empty-starters">{[
             ['conversation', tr('拆解一个目标','Break down a goal'), tr('帮我把这个目标拆成几个可执行的阶段：','Help me break this goal into a few doable stages:')],
@@ -4145,12 +4559,12 @@ function App() {
             ...(PUBLIC_WEB ? [] : [['action', tr('让 Pi 整理文件夹','Have Pi tidy a folder'), tr('看看工作目录里有什么，给出整理建议，先不要改动文件。','Look through the working folder and suggest how to organize it; do not change any files yet.')]]),
           ].map(([type, label, prompt]) => <button key={type} onClick={() => { setNodeType(type); setDraft(prompt); setRootComposerOpen(true); window.setTimeout(() => document.querySelector('.composer textarea')?.focus(), 0); }}>{label}</button>)}</div>}
         </div>}
-        {marquee && (() => { const m = marqueeLiveRef.current ? { ...marquee, ...marqueeLiveRef.current } : marquee; return <div ref={marqueeElRef} className="selection-marquee" style={{ left: Math.min(m.startX, m.x), top: Math.min(m.startY, m.y), width: Math.abs(m.x - m.startX), height: Math.abs(m.y - m.startY) }} />; })()}
+        {marquee && (() => { const m = marqueeLiveRef.current ? { ...marquee, ...marqueeLiveRef.current } : marquee; return <div ref={marqueeElRef} className="selection-marquee" style={{ transform: `translate3d(${Math.min(m.startX, m.x)}px, ${Math.min(m.startY, m.y)}px, 0)`, width: Math.abs(m.x - m.startX), height: Math.abs(m.y - m.startY) }} />; })()}
         <svg ref={quickSliceTrailRef} className="quick-slice-trail" style={{display:'none'}} aria-hidden="true"><polyline /></svg>
         <svg ref={connectionsRef} className="connections" style={{ transform: `translate3d(${viewport.x}px, ${viewport.y}px, 0) scale(${viewport.zoom})` }}>
           <defs>
-            <marker id="connection-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 1 L 9 5 L 0 9 z" className="connection-arrowhead" />
+            <marker id="connection-arrow" viewBox="0 0 12 12" refX="10.8" refY="6" markerWidth="11.5" markerHeight="11.5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M 0.6 1.5 L 11.2 6 L 0.6 10.5 L 3 6 z" className="connection-arrowhead" />
             </marker>
           </defs>
           {relationDrag?.quick && (() => {
@@ -4166,18 +4580,15 @@ function App() {
           })()}
           {renderedConnections.relations.map(({source,target,type,relationId,index}) => {
             if (!target) return null;
-            const sourceSize = nodeSizes.get(source.id) || { width: 224, height: 110 };
-            const targetSize = nodeSizes.get(target.id) || { width: 224, height: 110 };
-            const x1 = source.x + sourceSize.width / 2, y1 = source.y + sourceSize.height;
-            const x2 = target.x + targetSize.width / 2, y2 = target.y;
-            const bend = Math.max(46, Math.abs(y2 - y1) * .36);
+            const sourceSize = nodeSizesRef.current.get(source.id) || nodeSizes.get(source.id) || { width: source.manualWidth || 224, height: source.manualHeight || 110 };
+            const targetSize = nodeSizesRef.current.get(target.id) || nodeSizes.get(target.id) || { width: target.manualWidth || 224, height: target.manualHeight || 110 };
             const deletingRelation = removingRelation && removingRelation.sourceId === source.id && removingRelation.targetId === target.id;
             const connectionKey = `relation:${source.id}:${target.id}:${type}`;
-            return <path key={relationId || `link-${source.id}-${target.id}-${type}-${index}`} data-connection-key={connectionKey} data-connection-kind="relation" data-source-id={source.id} data-target-id={target.id} data-connection-type={type} markerEnd="url(#connection-arrow)" className={`connection relation-connection ${type} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${deletingRelation ? 'deleting' : ''}`} d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`} onClick={(event) => { event.stopPropagation(); setRelationEditorClosing(false); setEditingRelation({ sourceId: source.id, targetId: target.id, type }); }} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'relation', sourceId: source.id, targetId: target.id, type, x: event.clientX, y: event.clientY }); }} />;
+            return <path key={relationId || `link-${source.id}-${target.id}-${type}-${index}`} data-connection-key={connectionKey} data-connection-kind="relation" data-source-id={source.id} data-target-id={target.id} data-connection-type={type} markerEnd="url(#connection-arrow)" className={`connection relation-connection ${type} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${deletingRelation ? 'deleting' : ''}`} d={connectionPath('relation', source, target, sourceSize, targetSize)} onClick={(event) => { event.stopPropagation(); setRelationEditorClosing(false); setEditingRelation({ sourceId: source.id, targetId: target.id, type }); }} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'relation', sourceId: source.id, targetId: target.id, type, x: event.clientX, y: event.clientY, openedAt: Date.now() }); }} />;
           })}
           {renderedConnections.parents.map(({node,parent,extra}) => {
-            const parentSize = nodeSizes.get(parent.id) || { width: 224, height: 110 };
-            const nodeSize = nodeSizes.get(node.id) || { width: 224, height: 110 };
+            const parentSize = nodeSizesRef.current.get(parent.id) || nodeSizes.get(parent.id) || { width: parent.manualWidth || 224, height: parent.manualHeight || 110 };
+            const nodeSize = nodeSizesRef.current.get(node.id) || nodeSizes.get(node.id) || { width: node.manualWidth || 224, height: node.manualHeight || 110 };
             const active = activeIds.has(parent.id) && activeIds.has(node.id);
             const folding = foldingId && graph.isDescendant(node.id,foldingId);
             const revealing = (revealingId && graph.isDescendant(node.id,revealingId)) || restoringIds.has(node.id);
@@ -4185,7 +4596,7 @@ function App() {
             const connectionKey = `parent:${parent.id}:${node.id}`;
             // A Pi card that is still running gets a light travelling along the line into it.
             const flowing = node.type === 'action' && node.status === 'running';
-            const line = <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && !relationDrag.extra && !extra && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={connectionPath('parent', parent, node, parentSize, nodeSize)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY }); }} />;
+            const line = <path key={extra ? `${parent.id}>${node.id}` : node.id} data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" markerEnd="url(#connection-arrow)" className={`${active ? 'connection active' : 'connection'} ${extra ? 'extra-parent' : ''} ${selectedConnections.some((item) => item.key === connectionKey) ? 'line-selected' : ''} ${relationDrag?.intent==='reparent' && !relationDrag.extra && !extra && relationDrag.targetId===node.id ? 'reparent-preview' : ''} ${node.id === newNodeId ? 'newborn' : ''} ${folding ? 'folding' : ''} ${revealing ? 'revealing' : ''} ${deleting ? 'deleting' : ''}`} d={connectionPath('parent', parent, node, parentSize, nodeSize)} onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); if(quickThought&&(quickBlankClick.current||Date.now()<suppressContextMenuUntilRef.current))return; setContextMenu({ kind: 'parent', childId: node.id, parentId: parent.id, x: event.clientX, y: event.clientY, openedAt: Date.now() }); }} />;
             return flowing ? <React.Fragment key={extra ? `${parent.id}>${node.id}` : node.id}>{line}<path className="connection-flow" data-parent-id={parent.id} data-child-id={node.id} data-connection-key={connectionKey} data-connection-kind="parent" pathLength="1" aria-hidden="true" d={connectionPath('parent', parent, node, parentSize, nodeSize)} /></React.Fragment> : line;
           })}
         </svg>
@@ -4194,6 +4605,59 @@ function App() {
           {quickThought && quickEditor && graph.byId.get(quickEditor.id) && <ThoughtEditor hints={editorHints} say={say} editor={quickEditor} node={graph.byId.get(quickEditor.id)} labels={quickCopy} onChange={value=>setQuickEditor(e=>({...e,value}))} onDone={saveQuickIdea} onCancel={cancelQuickIdea} />}
           {renderedNodes.map((node) => {
             const selectedNode = selectedIds.has(node.id) && !inspectorClosing;
+            if (isGroupNode(node)) {
+              const insideIds = containedNodeIds(node, nodes, nodeSizes);
+              const cardCount = insideIds.filter((id) => !isGroupNode(graph.byId.get(id))).length;
+              const groupMuted = focusMode && !selectedNode && !insideIds.some((id) => activeIds.has(id));
+              const bigTitle = isBigTitleActive(node, viewport, viewportSizeRef.current);
+              return (
+                <GroupFrame
+                  key={node.id}
+                  node={node}
+                  selected={selectedNode}
+                  soleSelected={selectedNode && selectedIds.size === 1}
+                  dragging={Boolean(dragging?.started && dragging.ids.includes(node.id))}
+                  resizing={resizing?.id === node.id}
+                  muted={groupMuted}
+                  newborn={node.id === newNodeId}
+                  deleting={deletingIds.has(node.id)}
+                  editing={editingGroupId === node.id}
+                  bigTitle={bigTitle}
+                  cardCount={cardCount}
+                  colors={NODE_COLORS}
+                  colorLabel={colorLabel}
+                  onDragStart={beginNodeDrag}
+                  onResizeStart={beginResize}
+                  onContextMenu={(event, target) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const nextMenu = resolveContextMenuOpen(target.id, selectedIds);
+                    if (nextMenu.keepSelection) {
+                      setSelectedId(target.id);
+                      setSelectedConnections([]);
+                      setLineSelectionMenu(null);
+                    } else {
+                      selectNode(target.id);
+                    }
+                    setContextMenuClosing(false);
+                    setContextMenu({ kind: 'node', nodeId: target.id, ids: nextMenu.ids, x: event.clientX, y: event.clientY, openedAt: Date.now() });
+                  }}
+                  onStartRename={(target) => { selectNode(target.id); setInspectorOpen(false); setEditingGroupId(target.id); }}
+                  onCommitRename={commitGroupRename}
+                  onCancelRename={() => setEditingGroupId(null)}
+                  onRecolor={recolorGroup}
+                  onToggleCollapse={toggleGroupCollapse}
+                  onToggleLock={toggleGroupLock}
+                  onToggleAutoFit={toggleGroupAutoFit}
+                  onCycleBorderStyle={cycleGroupBorderStyle}
+                  onZoomToGroup={zoomToGroup}
+                  onFit={fitGroupToCards}
+                  onSelectInside={selectGroupContents}
+                  onUngroup={(id) => deleteSelection(new Set([id]))}
+                  tr={tr}
+                />
+              );
+            }
             const muted = focusMode && !activeIds.has(node.id);
             // There is one semantic preview layout. Going further out scales
             // the canvas itself, but never switches cards into a second,
@@ -4255,11 +4719,50 @@ function App() {
               {(nodeType === 'conversation' || nodeType === 'draw' || comicPlugin.active) && renderConversationControls()}
               {nodeType === 'action' && renderActionRunnerControls()}
               {nodeType === 'conversation' && <span className="parallel-anchor">
-                <button className={`parallel-toggle ${parallelMode ? 'active' : ''}`} aria-expanded={parallelMenuOpen} onClick={() => { if (!parallelMode) setParallelMode(true); setParallelMenuOpen((value) => !value); }}>{parallelMode ? tr(`并行 · ${parallelModels.size}`, `Parallel · ${parallelModels.size}`) : tr('并行','Parallel')}</button>
+                <button
+                  type="button"
+                  className={`parallel-toggle ${parallelMode ? 'active' : ''} ${parallelMenuOpen ? 'open' : ''}`}
+                  aria-expanded={parallelMenuOpen}
+                  aria-haspopup="dialog"
+                  onClick={() => {
+                    setChatOptionsOpen(false);
+                    setActionOptionsOpen(false);
+                    if (!parallelMode) {
+                      setParallelMode(true);
+                      setParallelModels((current) => {
+                        const valid = pruneParallelSelection(current, parallelModelItems);
+                        if (valid.size === 0 && model && parallelModelItems.some((item) => item.value === model)) valid.add(model);
+                        return valid;
+                      });
+                      setParallelMenuOpen(true);
+                      return;
+                    }
+                    setParallelMenuOpen((value) => !value);
+                  }}
+                >
+                  <svg className="parallel-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2.5 8h3M5.5 8c1.5 0 1.5-3.5 3.5-3.5h4.5M5.5 8c1.5 0 1.5 3.5 3.5 3.5h4.5M11.5 2.5 13.5 4.5 11.5 6.5M11.5 9.5 13.5 11.5 11.5 13.5" />
+                  </svg>
+                  <span>{tr('并行','Parallel')}</span>
+                  {parallelMode && <b className={`parallel-count ${activeParallelCount >= 2 ? 'ready' : ''}`}>{activeParallelCount}</b>}
+                  <i className="parallel-caret" aria-hidden="true">⌄</i>
+                </button>
                 {parallelMenuOpen && <ExitAnimated as="div" exit={POP_EXIT} className="parallel-pop" role="dialog" aria-label={tr('同时问几个模型','Ask several models at once')} onWheel={handleContentWheel}>
-                  <header><strong>{tr('同时问几个模型','Ask several models at once')}</strong><small>{tr('每个选中的模型各回答一张卡片，方便对比。','Each chosen model answers on its own card, side by side.')}</small></header>
-                  <div className="parallel-list">{modelOptions.map((item) => { const on = parallelModels.has(item.value); return <button key={item.value} role="checkbox" aria-checked={on} className={on ? 'on' : ''} onClick={() => setParallelModels((current) => { const next = new Set(current); if (next.has(item.value)) next.delete(item.value); else next.add(item.value); return next; })}><i aria-hidden="true">{on ? '✓' : ''}</i><span>{item.label}</span></button>; })}</div>
-                  <footer><button onClick={() => { setParallelMode(false); setParallelMenuOpen(false); }}>{tr('关闭并行','Turn off parallel')}</button><button className="primary" onClick={() => setParallelMenuOpen(false)}>{tr('完成','Done')}</button></footer>
+                  <ParallelModelPicker
+                    items={parallelModelItems}
+                    selected={parallelModels}
+                    currentModel={model}
+                    onToggle={(value) => setParallelModels((current) => {
+                      const next = pruneParallelSelection(current, parallelModelItems);
+                      if (next.has(value)) next.delete(value);
+                      else next.add(value);
+                      return next;
+                    })}
+                    onReplaceSelection={(nextSet) => setParallelModels(nextSet)}
+                    onTurnOff={() => { setParallelMode(false); setParallelMenuOpen(false); }}
+                    onDone={() => setParallelMenuOpen(false)}
+                    tr={tr}
+                  />
                 </ExitAnimated>}
               </span>}
               
@@ -4273,11 +4776,483 @@ function App() {
 
       {relationDrag && <div className="relation-drag-tip" style={{ left: relationDrag.x + 14, top: relationDrag.y + 14 }}>{relationDrag.quick ? (relationDrag.intent==='cycle'?say('会形成循环，不能连接','Would create a cycle'):relationDrag.intent==='self'?say('不能连接到自己','Cannot connect to itself'):relationDrag.intent==='invalid'?say('请选择想法卡片','Choose an idea card'):relationDrag.intent==='reparent'?(relationDrag.extra?say('松开添加为另一个父节点（原父节点保留；按住 Alt 改为移动分支）','Release to add another parent (keeps current; hold Alt to move branch)'):say('松开将移动分支（替换原父节点）','Release to move branch (replaces current parent)')):relationDrag.intent==='connected'?say('这两个想法已连接','Already connected'):relationDrag.targetId?say('松开建立母子关系','Release to connect parent and child'):quickCopy.connect) : relationDrag.targetId ? tr('松开以选择关系','Release to choose relation') : tr('拖到另一个节点','Drag to another node')}</div>}
       {relationMenu && <div className="relation-popover" style={{ left: relationMenu.x + 12, top: relationMenu.y + 12 }}><small>{tr('建立到目标节点的关系','Create a relation to the target node')}</small><div>{[['inherit',tr('继承','Inherit')],['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} onClick={() => { commitRelation(relationMenu.sourceId, relationMenu.targetId, type); setRelationMenu(null); }}>{label}</button>)}</div><button className="relation-cancel" onClick={() => setRelationMenu(null)}>{tr('取消','Cancel')}</button></div>}
-      {contextMenu?.kind==='quick' && <div className="canvas-context-menu quick-thought-context" style={{left:contextMenu.x,top:contextMenu.y}} onPointerDown={e=>e.stopPropagation()}><strong>{quickCopy.mode} · {contextMenu.ids.length}</strong><small>{quickCopy.deleteHint}</small><button className="danger" disabled={!contextMenu.ids.length} onClick={()=>{const ids=new Set(contextMenu.ids);setContextMenu(null);deleteSelection(ids);}}>{quickCopy.delete}</button><button onClick={()=>{const point=contextMenu.point;setContextMenu(null);createQuickIdea(point);}}>{quickCopy.create}</button></div>}
+      {contextMenu && (() => {
+        const closeMenu = () => setContextMenu(null);
+        const openKey = `${contextMenu.kind}:${contextMenu.nodeId || contextMenu.sourceId || contextMenu.childId || ''}:${contextMenu.x}:${contextMenu.y}:${contextMenu.openedAt || 0}`;
+
+        if (contextMenu.kind === 'quick') {
+          const quickTargetNodes = resolveMenuTargetNodes(null, contextMenu.ids, nodes);
+          const quickTargetIds = quickTargetNodes.map((node) => node.id);
+          const quickGroupedIds = quickTargetNodes
+            .filter((node) => !isGroupNode(node) && enclosingGroupsFor(node.id, nodes, nodeSizes).length > 0)
+            .map((node) => node.id);
+          return (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              openKey={openKey}
+              className="quick-thought-context"
+              ariaLabel={quickCopy.mode}
+              header={{
+                badgeTone: 'quick',
+                title: quickCopy.mode,
+                pill: quickTargetIds.length ? tr(`已选 ${quickTargetIds.length} 项`, `${quickTargetIds.length} selected`) : undefined,
+                subtitle: quickCopy.deleteHint,
+              }}
+              swatches={quickTargetNodes.length > 0 ? {
+                colors: NODE_COLORS,
+                activeValue: sharedNodeColor(quickTargetNodes),
+                labelFor: colorLabel,
+                accentFor: groupAccentColor,
+                ariaLabel: tr('卡片颜色', 'Card color'),
+                onPick: (color) => setNodes((items) => recolorNodes(items, quickTargetIds, color)),
+              } : undefined}
+              sections={[
+                [
+                  {
+                    id: 'quick-create',
+                    icon: 'plus',
+                    label: quickCopy.create,
+                    shortcut: tr('双击', '2×Click'),
+                    onSelect: () => createQuickIdea(contextMenu.point),
+                  },
+                  {
+                    id: 'quick-group',
+                    icon: 'group',
+                    label: quickTargetIds.length ? tr('框选为分组框', 'Group into frame') : tr('新建分组框', 'New group frame'),
+                    shortcut: 'Ctrl+G',
+                    onSelect: () => createGroupFrame({ explicitIds: quickTargetIds.length ? new Set(quickTargetIds) : null, point: contextMenu.point }),
+                  },
+                  quickGroupedIds.length > 0 && {
+                    id: 'quick-detach',
+                    icon: 'detach',
+                    label: tr('移出分组框', 'Remove from group frame'),
+                    shortcut: 'Ctrl+⇧+G',
+                    onSelect: () => detachFromGroup(quickGroupedIds),
+                  },
+                ],
+                [
+                  {
+                    id: 'quick-delete',
+                    icon: 'trash',
+                    label: quickCopy.delete,
+                    shortcut: 'Del',
+                    danger: true,
+                    disabled: !quickTargetIds.length,
+                    onSelect: () => deleteSelection(new Set(quickTargetIds)),
+                  },
+                ],
+              ]}
+              onClose={closeMenu}
+            />
+          );
+        }
+
+        if (contextMenu.kind === 'relation') {
+          const srcTitle = graph.byId.get(contextMenu.sourceId)?.title || '';
+          const tgtTitle = graph.byId.get(contextMenu.targetId)?.title || '';
+          const liveSource = nodes.find((node) => node.id === contextMenu.sourceId);
+          const liveType = liveSource?.relations?.find((item) => item.targetId === contextMenu.targetId)?.type || contextMenu.type || 'reference';
+          return (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              openKey={openKey}
+              ariaLabel={tr('关系连线', 'Relation link')}
+              header={{
+                badgeTone: 'link',
+                title: tr('关系连线', 'Relation link'),
+                pill: liveType === 'merge' ? tr('合并', 'Merge') : tr('引用', 'Reference'),
+                subtitle: srcTitle && tgtTitle ? `${srcTitle} → ${tgtTitle}` : undefined,
+              }}
+              sections={[
+                [
+                  {
+                    id: 'rel-reference',
+                    role: 'menuitemradio',
+                    groupLabel: tr('关联方式', 'Link type'),
+                    label: tr('设为引用关系', 'Set as reference link'),
+                    checked: liveType !== 'merge',
+                    onSelect: () => commitRelation(contextMenu.sourceId, contextMenu.targetId, 'reference'),
+                  },
+                  {
+                    id: 'rel-merge',
+                    role: 'menuitemradio',
+                    groupLabel: tr('关联方式', 'Link type'),
+                    label: tr('设为合并关系', 'Set as merge link'),
+                    checked: liveType === 'merge',
+                    onSelect: () => commitRelation(contextMenu.sourceId, contextMenu.targetId, 'merge'),
+                  },
+                ],
+                [
+                  {
+                    id: 'rel-delete',
+                    icon: 'trash',
+                    label: tr('删除连线', 'Delete link'),
+                    shortcut: 'Del',
+                    danger: true,
+                    onSelect: () => {
+                      const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId };
+                      setRemovingRelation(relation);
+                      window.setTimeout(() => {
+                        setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node));
+                        setRemovingRelation(null);
+                      }, 210);
+                    },
+                  },
+                ],
+              ]}
+              onClose={closeMenu}
+            />
+          );
+        }
+
+        if (contextMenu.kind === 'parent') {
+          const parentTitle = graph.byId.get(contextMenu.parentId)?.title || '';
+          const childTitle = graph.byId.get(contextMenu.childId)?.title || '';
+          return (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              openKey={openKey}
+              ariaLabel={tr('分支连线', 'Branch link')}
+              header={{
+                badgeTone: 'link',
+                title: tr('分支连线', 'Branch link'),
+                subtitle: parentTitle && childTitle ? `${parentTitle} → ${childTitle}` : undefined,
+              }}
+              sections={[
+                [
+                  {
+                    id: 'parent-detach',
+                    icon: 'unlink',
+                    label: tr('解除父子关系', 'Detach parent and child'),
+                    danger: true,
+                    onSelect: () => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? detachParent(node, contextMenu.parentId) : node)),
+                  },
+                ],
+              ]}
+              onClose={closeMenu}
+            />
+          );
+        }
+
+        const menuNode = nodes.find((node) => node.id === contextMenu.nodeId);
+        if (!menuNode) return null;
+
+        const targetNodes = resolveMenuTargetNodes(menuNode.id, contextMenu.ids, nodes);
+        const targetIds = targetNodes.map((node) => node.id);
+
+        if (targetNodes.length > 1) {
+          const nonGroupTargets = targetNodes.filter((node) => !isGroupNode(node));
+          const groupedCardIds = nonGroupTargets
+            .filter((node) => enclosingGroupsFor(node.id, nodes, nodeSizes).length > 0)
+            .map((node) => node.id);
+          const allFavorited = nonGroupTargets.length > 0 && nonGroupTargets.every((node) => node.favorite);
+          const nonGroupSet = new Set(nonGroupTargets.map((node) => node.id));
+          return (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              openKey={openKey}
+              ariaLabel={tr(`已选 ${targetNodes.length} 项`, `${targetNodes.length} selected`)}
+              header={{
+                badgeTone: nonGroupTargets.length === 0 ? 'group' : (menuNode.type || 'thought'),
+                title: tr(`已选 ${targetNodes.length} 项`, `${targetNodes.length} selected`),
+                pill: nonGroupTargets.length === targetNodes.length ? tr(`${targetNodes.length} 张卡片`, `${targetNodes.length} cards`) : undefined,
+              }}
+              swatches={{
+                colors: NODE_COLORS,
+                activeValue: sharedNodeColor(targetNodes),
+                labelFor: colorLabel,
+                accentFor: groupAccentColor,
+                ariaLabel: tr('卡片颜色', 'Card color'),
+                onPick: (color) => setNodes((items) => recolorNodes(items, targetIds, color)),
+              }}
+              sections={[
+                [
+                  nonGroupTargets.length > 0 && {
+                    id: 'batch-group',
+                    icon: 'group',
+                    label: tr('放入分组框', 'Wrap in group frame'),
+                    shortcut: 'Ctrl+G',
+                    onSelect: () => createGroupFrame({ explicitIds: new Set(targetIds) }),
+                  },
+                  groupedCardIds.length > 0 && {
+                    id: 'batch-detach-group',
+                    icon: 'detach',
+                    label: tr('移出分组框', 'Remove from group frame'),
+                    shortcut: 'Ctrl+⇧+G',
+                    onSelect: () => detachFromGroup(groupedCardIds),
+                  },
+                  nonGroupTargets.length > 1 && {
+                    id: 'batch-merge',
+                    icon: 'branch',
+                    label: tr('合并工作台', 'Merge workspace'),
+                    onSelect: () => setMergeWorkbench(true),
+                  },
+                ],
+                [
+                  nonGroupTargets.length > 0 && {
+                    id: 'batch-favorite',
+                    icon: allFavorited ? 'starFilled' : 'star',
+                    label: allFavorited ? tr('取消收藏', 'Remove favorite') : tr('收藏', 'Favorite'),
+                    accent: allFavorited,
+                    onSelect: () => setNodes((items) => items.map((node) => (nonGroupSet.has(node.id) ? { ...node, favorite: !allFavorited } : node))),
+                  },
+                  {
+                    id: 'batch-copy',
+                    icon: 'copy',
+                    label: tr('复制卡片', 'Copy card'),
+                    shortcut: 'Ctrl+C',
+                    onSelect: () => { void copySelectedNodes(new Set(targetIds)); },
+                  },
+                ],
+                [
+                  {
+                    id: 'batch-delete',
+                    icon: 'trash',
+                    label: tr(`删除选中的 ${targetIds.length} 个节点`, `Delete ${targetIds.length} selected nodes`),
+                    shortcut: 'Del',
+                    danger: true,
+                    onSelect: () => deleteSelection(new Set(targetIds)),
+                  },
+                ],
+              ]}
+              onClose={closeMenu}
+            />
+          );
+        }
+
+        if (isGroupNode(menuNode)) {
+          const count = containedCardCount(menuNode, nodes, nodeSizes);
+          const borderBadge = menuNode.borderStyle === 'dashed'
+            ? tr('虚线', 'Dashed')
+            : menuNode.borderStyle === 'none'
+              ? tr('无边框', 'None')
+              : tr('实线', 'Solid');
+          return (
+            <ContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              openKey={openKey}
+              ariaLabel={menuNode.title || tr('未命名分组', 'Untitled group')}
+              header={{
+                badgeTone: 'group',
+                title: menuNode.title || tr('未命名分组', 'Untitled group'),
+                pill: count > 0 ? tr(`${count} 张卡片`, `${count} cards`) : tr('空分组', 'Empty group'),
+              }}
+              swatches={{
+                colors: NODE_COLORS,
+                activeValue: menuNode.color || '',
+                labelFor: colorLabel,
+                accentFor: groupAccentColor,
+                ariaLabel: tr('分组框颜色', 'Group frame color'),
+                onPick: (color) => recolorGroup(menuNode.id, color),
+              }}
+              sections={[
+                [
+                  {
+                    id: 'group-collapse',
+                    icon: menuNode.collapsed ? 'expand' : 'collapse',
+                    label: menuNode.collapsed ? tr('展开分组', 'Expand group') : tr('折叠分组', 'Collapse group'),
+                    onSelect: () => toggleGroupCollapse(menuNode.id),
+                  },
+                  {
+                    id: 'group-lock',
+                    icon: menuNode.locked ? 'unlock' : 'lock',
+                    label: menuNode.locked ? tr('解锁分组', 'Unlock group') : tr('锁定分组', 'Lock group'),
+                    onSelect: () => toggleGroupLock(menuNode.id),
+                  },
+                  {
+                    id: 'group-autofit',
+                    role: 'menuitemcheckbox',
+                    label: tr('自动贴合内部卡片', 'Auto-fit to cards'),
+                    checked: Boolean(menuNode.autoFit),
+                    onSelect: () => toggleGroupAutoFit(menuNode.id),
+                  },
+                  {
+                    id: 'group-border',
+                    icon: 'border',
+                    label: tr('切换边框样式', 'Cycle border style'),
+                    badge: borderBadge,
+                    keepOpen: true,
+                    onSelect: () => cycleGroupBorderStyle(menuNode.id),
+                  },
+                ],
+                [
+                  {
+                    id: 'group-rename',
+                    icon: 'edit',
+                    label: tr('重命名分组', 'Rename group'),
+                    shortcut: 'F2',
+                    onSelect: () => { selectNode(menuNode.id); setInspectorOpen(false); setEditingGroupId(menuNode.id); },
+                  },
+                  {
+                    id: 'group-fit',
+                    icon: 'fit',
+                    label: tr('适配内部卡片', 'Fit to contained cards'),
+                    disabled: !count || Boolean(menuNode.collapsed),
+                    onSelect: () => fitGroupToCards(menuNode.id),
+                  },
+                  {
+                    id: 'group-select-inside',
+                    icon: 'selectInside',
+                    label: tr('选中内部卡片', 'Select contained cards'),
+                    disabled: !count || Boolean(menuNode.collapsed),
+                    onSelect: () => selectGroupContents(menuNode.id),
+                  },
+                  {
+                    id: 'group-inspector',
+                    icon: 'inspector',
+                    label: tr('打开分组详情', 'Open group details'),
+                    shortcut: 'I',
+                    onSelect: () => { selectNode(menuNode.id); openInspector(); },
+                  },
+                ],
+                [
+                  {
+                    id: 'group-unpack',
+                    icon: 'unpack',
+                    label: tr('拆包为想法卡片', 'Unpack to idea card'),
+                    onSelect: () => unpackGroupToCard(menuNode.id),
+                  },
+                  {
+                    id: 'group-ungroup',
+                    icon: 'ungroup',
+                    label: tr('解散分组框（保留卡片）', 'Ungroup (keep cards)'),
+                    shortcut: 'Ctrl+⇧+G',
+                    onSelect: () => deleteSelection(new Set([menuNode.id])),
+                  },
+                  count > 0 && {
+                    id: 'group-delete-all',
+                    icon: 'trash',
+                    label: tr('删除分组及内部卡片', 'Delete group and cards'),
+                    danger: true,
+                    onSelect: () => deleteGroupWithCards(menuNode.id),
+                  },
+                ],
+              ]}
+              onClose={closeMenu}
+            />
+          );
+        }
+
+        const hasSubtree = (graph.descendantCount.get(menuNode.id) || 0) > 0;
+        const inGroup = enclosingGroupsFor(menuNode.id, nodes, nodeSizes).length > 0;
+        const typePill = menuNode.type === 'conversation' ? copy.chat : menuNode.type === 'action' ? copy.action : copy.idea;
+        return (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            openKey={openKey}
+            ariaLabel={menuNode.title || tr('未命名节点', 'Untitled node')}
+            header={{
+              badgeTone: menuNode.type || 'thought',
+              title: menuNode.title || tr('未命名节点', 'Untitled node'),
+              pill: typePill,
+            }}
+            swatches={{
+              colors: NODE_COLORS,
+              activeValue: menuNode.color || '',
+              labelFor: colorLabel,
+              accentFor: groupAccentColor,
+              ariaLabel: tr('卡片颜色', 'Card color'),
+              onPick: (color) => setNodes((items) => items.map((node) => (node.id === menuNode.id ? { ...node, color } : node))),
+            }}
+            sections={[
+              [
+                {
+                  id: 'node-branch',
+                  icon: 'branch',
+                  label: tr('从这里创建分支', 'Create branch from here'),
+                  onSelect: () => startBranch(menuNode),
+                },
+                {
+                  id: 'node-edit',
+                  icon: 'edit',
+                  label: tr('编辑节点', 'Edit node'),
+                  disabled: !canEditCard(menuNode),
+                  onSelect: () => startEditingNode(menuNode),
+                },
+                {
+                  id: 'node-inspector',
+                  icon: 'inspector',
+                  label: tr('打开卡片详情', 'Open card details'),
+                  shortcut: 'I',
+                  onSelect: () => { selectNode(menuNode.id); openInspector(); },
+                },
+              ],
+              [
+                {
+                  id: 'node-group',
+                  icon: 'group',
+                  label: tr('放入分组框', 'Wrap in group frame'),
+                  shortcut: 'Ctrl+G',
+                  onSelect: () => createGroupFrame({ explicitIds: selectedIds.has(menuNode.id) ? new Set(selectedIds) : new Set([menuNode.id]) }),
+                },
+                hasSubtree && {
+                  id: 'node-pack-subtree',
+                  icon: 'subtree',
+                  label: tr('将子树转为分组框', 'Wrap subtree in group frame'),
+                  onSelect: () => packSubtreeAsGroup(menuNode.id),
+                },
+                inGroup && {
+                  id: 'node-detach-group',
+                  icon: 'detach',
+                  label: tr('移出分组框', 'Remove from group frame'),
+                  shortcut: 'Ctrl+⇧+G',
+                  onSelect: () => detachFromGroup(menuNode.id),
+                },
+                (hasSubtree || collapsedIds.has(menuNode.id)) && {
+                  id: 'node-collapse',
+                  icon: collapsedIds.has(menuNode.id) ? 'expand' : 'collapse',
+                  label: collapsedIds.has(menuNode.id) ? tr('展开子节点', 'Expand children') : tr('折叠子节点', 'Collapse children'),
+                  onSelect: () => toggleCollapse(menuNode.id),
+                },
+                {
+                  id: 'node-favorite',
+                  icon: menuNode.favorite ? 'starFilled' : 'star',
+                  label: menuNode.favorite ? tr('取消收藏', 'Remove favorite') : tr('收藏', 'Favorite'),
+                  accent: Boolean(menuNode.favorite),
+                  onSelect: () => setNodes((items) => items.map((node) => (node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node))),
+                },
+                {
+                  id: 'node-copy',
+                  icon: 'copy',
+                  label: tr('复制卡片', 'Copy card'),
+                  shortcut: 'Ctrl+C',
+                  onSelect: () => {
+                    if (!selectedIds.has(menuNode.id)) {
+                      setSelectedIds(new Set([menuNode.id]));
+                      setSelectedId(menuNode.id);
+                    }
+                    void copySelectedNodes(new Set([menuNode.id]));
+                  },
+                },
+              ],
+              [
+                {
+                  id: 'node-delete',
+                  icon: 'trash',
+                  label: tr('删除节点', 'Delete node'),
+                  shortcut: 'Del',
+                  danger: true,
+                  onSelect: () => {
+                    setSelectedIds(new Set([menuNode.id]));
+                    setSelectedId(menuNode.id);
+                    deleteSelection(new Set([menuNode.id]));
+                  },
+                },
+              ],
+            ]}
+            onClose={closeMenu}
+          />
+        );
+      })()}
       {piHistoryNode && <PiHistory node={piHistoryNode} workspace={piHistoryNode.actionWorkspace || piHistoryNode.execution?.workspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} command={agentSettings.pi?.command || ''} tr={tr} onFork={(entryId, text) => forkPiAt(piHistoryNode, entryId, text)} onClose={() => setPiHistoryNode(null)} />}
       {piImportOpen && <Suspense fallback={null}><PiSessionImport tr={tr} workspace={actionWorkspace || activeCanvas?.workspace || workspaceConfig?.defaultWorkspace || ''} onImport={importPiSession} onClose={() => setPiImportOpen(false)} /></Suspense>}
       {compareGroupOpen && <Suspense fallback={null}><CompareView cards={nodes.filter((node) => node.compareGroup === compareGroupOpen).sort((x, y) => String(x.variant).localeCompare(String(y.variant)))} tr={tr} runnerLabels={AGENT_LABELS} applyAgentChanges={applyAgentChanges} onClose={() => setCompareGroupOpen(null)} notify={notify} /></Suspense>}
-      {contextMenu && contextMenu.kind!=='quick' && <div className={`canvas-context-menu ${contextMenuClosing ? 'closing' : ''}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>{contextMenu.kind === 'relation' ? <><strong>{tr('关系连线','Relation link')}</strong><button className="danger" onClick={() => { const relation = { sourceId: contextMenu.sourceId, targetId: contextMenu.targetId }; dismissContextMenu(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除连线','Delete link')}</button></> : contextMenu.kind === 'parent' ? <><strong>{tr('分支连线','Branch link')}</strong><button className="danger" onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === contextMenu.childId ? detachParent(node, contextMenu.parentId) : node)))}>{tr('解除父子关系','Detach parent and child')}</button></> : (() => { const menuNode = nodes.find((node) => node.id === contextMenu.nodeId); return menuNode ? <><strong>{menuNode.title}</strong><button onClick={() => dismissContextMenu(() => startBranch(menuNode))}>{tr('从这里创建分支','Create branch from here')}</button><button onClick={() => dismissContextMenu(() => startEditingNode(menuNode))}>{tr('编辑节点','Edit node')}</button><button onClick={() => dismissContextMenu(() => toggleCollapse(menuNode.id))}>{collapsedIds.has(menuNode.id) ? tr('展开子节点','Expand children') : tr('折叠子节点','Collapse children')}</button><button onClick={() => dismissContextMenu(() => setNodes((items) => items.map((node) => node.id === menuNode.id ? { ...node, favorite: !node.favorite } : node)))}>{menuNode.favorite ? tr('取消收藏','Remove favorite') : tr('收藏','Favorite')}</button><button className="danger" onClick={() => dismissContextMenu(() => { setSelectedIds(new Set([menuNode.id])); setSelectedId(menuNode.id); deleteSelection(new Set([menuNode.id])); })}>{tr('删除节点','Delete node')}</button></> : null; })()}</div>}
       {editingRelation && <div className={`relation-editor-popover ${relationEditorClosing ? 'closing' : ''}`}><span>{tr('正在编辑','Editing ')}{editingRelation.type === 'merge' ? tr('合并','merge') : tr('引用','reference')}{tr('连线',' link')}</span><div>{[['reference',tr('引用','Reference')],['merge',tr('合并','Merge')]].map(([type,label]) => <button key={type} className={editingRelation.type === type ? 'active' : ''} onClick={() => { commitRelation(editingRelation.sourceId, editingRelation.targetId, type); setEditingRelation({ ...editingRelation, type }); }}>{label}</button>)}<button className="remove" onClick={() => { const relation = { ...editingRelation }; closeRelationEditor(() => { setRemovingRelation(relation); window.setTimeout(() => { setNodes((items) => items.map((node) => node.id === relation.sourceId ? { ...node, relations: (node.relations || []).filter((item) => item.targetId !== relation.targetId) } : node)); setRemovingRelation(null); }, 210); }); }}>{tr('删除','Delete')}</button></div><button className="relation-cancel" onClick={() => closeRelationEditor()}>{tr('完成','Done')}</button></div>}
       {mergeWorkbench && selectedIds.size > 1 && <section className="merge-workbench"><header><div><small>{tr("合并工作台","Merge workspace")}</small><strong>{tr(`${selectedIds.size} 个节点将作为显式上下文`,`${selectedIds.size} nodes will be explicit context`)}</strong></div><button onClick={() => setMergeWorkbench(false)}>×</button></header><div className="merge-goals">{['综合结论','并列比较','找出冲突','制定行动'].map((goal) => <button key={goal} className={mergeGoal === goal ? 'active' : ''} onClick={() => setMergeGoal(goal)}>{mergeGoalLabel(goal)}</button>)}</div><div className="merge-items">{[...selectedIds].map((id, index) => { const node = nodes.find((item) => item.id === id); return node && <span key={id}><i>{index + 1}</i>{node.title}</span>; })}</div><footer><small>{tr("第一个选中节点为起点；其余节点只会附加到这一次新分支的上下文，不会改写原节点关系。","The first node is the starting point. Other nodes add context to this branch only; existing links stay unchanged.")}</small><button onClick={() => { const ids = [...selectedIds]; const sourceId = selectedId && ids.includes(selectedId) ? selectedId : ids[0]; const source = nodes.find((node) => node.id === sourceId); const mergeRelations = ids.filter((id) => id !== sourceId).map((targetId, index) => ({ id: `merge-${Date.now()}-${index}`, targetId, type: 'merge' })); setPendingContextRelations(mergeRelations); setMergeWorkbench(false); setNodeType('conversation'); setDraft(tr(`请基于已合并的 ${ids.length} 个节点，${mergeGoal}。`,`Based on the ${ids.length} merged nodes: ${mergeGoalLabel(mergeGoal)}.`)); if (source) startBranch(source, { preservePendingContext: true }); }}>{tr("创建合并分支","Create merged branch")}</button></footer></section>}
 
@@ -4295,12 +5270,15 @@ function App() {
           deletionIds, deletingIds, deleteSelection: () => deleteSelection(), onClose: closeInspector,
           onOpenSettings: () => { setSettingsSection('models'); openSettings(); },
           titleExpanded: inspectorTitleExpanded, setTitleExpanded: setInspectorTitleExpanded, applyAgentChanges,
+          groupCardCount: isGroupNode(selected) ? containedCardCount(selected, nodes, nodeSizes) : 0,
+          fitGroupToCards, selectGroupContents, deleteGroupWithCards,
+          toggleGroupCollapse, toggleGroupLock, toggleGroupAutoFit, unpackGroupToCard,
         }} />
       ) : selected && selectedIds.size === 1 ? <button className="open-inspector" aria-label={tr('打开卡片详情','Open card details')} title={`${tr('打开卡片详情','Open card details')} (I)`} onClick={openInspector}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></button> : null}
       {deleteUndo && deleteUndo.atNodes===nodes && <div className="undo-toast"><span>{deleteUndo.sliced?quickCopy.sliced:tr(`已删除 ${deleteUndo.nodes.length} 个节点`,`${deleteUndo.nodes.length} nodes deleted`)}</span><button onClick={undoDelete}>{tr('撤销','Undo')} <small>Ctrl Z</small></button></div>}
       {searchOpen && <section className="search-panel"><div className="search-input"><span>⌕</span><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={text('searchPlaceholder')} /><small>Esc</small></div><div className="search-results">{searchResults.length ? searchResults.map((node) => <button key={node.id} onClick={() => focusSearchResult(node)}><span className={`result-dot ${node.type}`} /><div><strong>{node.title}</strong><small>{node.prompt || node.content}</small></div><em>{node.model || copy.idea}</em></button>) : <p>{text('noResults')}</p>}</div><footer>{searchResults.length} {text('results')} · Ctrl K</footer></section>}
       {libraryOpen && <section className="library-panel"><header><div><span>{text('currentCanvas')}</span><h2>{text('library')}</h2></div><button aria-label={text('close')} onClick={() => closeFloatingPanel('library', setLibraryOpen)}>×</button></header><div className="library-upload"><button onClick={() => libraryUploadRef.current?.click()}>{text('uploadCurrent')}</button><input ref={libraryUploadRef} type="file" multiple hidden onChange={(event) => { addAttachments(event); if (nodes.length && !branchSource) setRootComposerOpen(true); }} /><span>{tr('图片、PDF、文本、代码及常见文件','Images, PDFs, text, code, and common files')}</span></div><div className="library-list">{libraryItems.length ? libraryItems.map((item) => <article key={`${item.nodeId || 'draft'}-${item.id}`}><button className="library-preview" onClick={() => openLibraryItem(item)}>{item.dataUrl?.startsWith('data:image/') ? <img src={item.dataUrl} alt="" /> : <span>{item.name.split('.').pop()?.slice(0, 5).toUpperCase() || 'FILE'}</span>}</button><div><strong>{item.name}</strong><small>{item.nodeTitle} · {Math.max(1, Math.ceil((item.size || item.text?.length || 0) / 1024))} KB</small></div><div className="library-actions">{item.nodeId && <button onClick={() => { focusSearchResult(nodes.find((node) => node.id === item.nodeId)); closeFloatingPanel('library', setLibraryOpen); }}>{tr('定位','Locate')}</button>}<button onClick={() => addLibraryItemToInput(item)}>{tr('使用','Use')}</button><button className="remove" onClick={() => removeLibraryItem(item)}>{tr('移除','Remove')}</button></div></article>) : <p>{text('libraryEmpty')}</p>}</div><footer>{libraryItems.length} {tr('项资料','items')} · {tr('文件随当前画布保存','Files are saved with the current canvas')}</footer></section>}
-      {minimapOpen && <section className={`minimap ${inspectorOpen && selected ? 'with-inspector' : ''}`} onPointerDown={navigateMiniMap} aria-label={text('minimap')}><div className="minimap-stage">{visibleNodes.map((node) => <i key={node.id} className={selectedIds.has(node.id) ? 'selected' : ''} style={{ left: `${((node.x - miniBounds.minX) / miniBounds.width) * 100}%`, top: `${((node.y - miniBounds.minY) / miniBounds.height) * 100}%`, width: `${Math.max(3, ((nodeSizes.get(node.id)?.width || 224) / miniBounds.width) * 100)}%`, height: `${Math.max(3, ((nodeSizes.get(node.id)?.height || 110) / miniBounds.height) * 100)}%` }} />)}</div><span>{text('navigate')}</span></section>}
+      {minimapOpen && <section className={`minimap ${inspectorOpen && selected ? 'with-inspector' : ''}`} onPointerDown={navigateMiniMap} aria-label={text('minimap')}><div className="minimap-stage">{sortNodesForRender(visibleNodes, nodeSizes).map((node) => { const box = visualGroupRect(node, nodeSizes); return <i key={node.id} className={`${isGroupNode(node) ? 'group' : ''} ${node.collapsed ? 'collapsed' : ''} ${selectedIds.has(node.id) ? 'selected' : ''}`} style={{ left: `${((box.x - miniBounds.minX) / miniBounds.width) * 100}%`, top: `${((box.y - miniBounds.minY) / miniBounds.height) * 100}%`, width: `${Math.max(3, (box.width / miniBounds.width) * 100)}%`, height: `${Math.max(3, (box.height / miniBounds.height) * 100)}%` }} />; })}</div><span>{text('navigate')}</span></section>}
       {confirmDialog && <ConfirmDialog title={confirmDialog.title} message={confirmDialog.message} actions={confirmDialog.actions} onAnswer={answerConfirm} />}
       {settingsOpen && (
         <SettingsDialog

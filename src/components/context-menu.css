@@ -1,0 +1,489 @@
+/* Studio-grade unified context menu system across canvas, groups, links,
+ * quick-thinking mode, and canvas picker. Built on native Popover API,
+ * CSS Anchor Positioning with viewport flip fallbacks, and focusgroup="menu". */
+
+.wf-menu-anchor {
+  position: fixed;
+  inline-size: 0;
+  block-size: 0;
+  pointer-events: none;
+}
+
+.wf-context-menu {
+  --cm-bg: color-mix(in oklab, var(--sx-raised, #ffffff) 94%, transparent);
+  --cm-border: color-mix(in oklab, var(--sx-line-strong, #cbd8d0) 76%, transparent);
+  --cm-highlight: color-mix(in oklab, #ffffff 65%, transparent);
+  --cm-text: var(--sx-text, #1e2a24);
+  --cm-muted: var(--sx-muted, #66746c);
+  --cm-accent: var(--sx-accent, #1b7556);
+  --cm-hover: color-mix(in oklab, var(--sx-accent, #1b7556) 11%, transparent);
+  --cm-danger: var(--sx-danger, #b84239);
+  --cm-danger-hover: color-mix(in oklab, var(--sx-danger, #b84239) 13%, transparent);
+  --cm-sep: color-mix(in oklab, var(--sx-line, #e1e9e4) 90%, transparent);
+  --cm-shadow: 0 18px 44px rgba(15, 28, 22, 0.18), 0 4px 12px rgba(15, 28, 22, 0.08), inset 0 1px 0 var(--cm-highlight);
+
+  position: fixed;
+  z-index: 130;
+  box-sizing: border-box;
+  min-inline-size: 224px;
+  max-inline-size: min(296px, calc(100vw - 20px));
+  max-block-size: calc(100dvh - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 6px;
+  margin: 0;
+  border: 1px solid var(--cm-border);
+  border-radius: 14px;
+  background: var(--cm-bg);
+  color: var(--cm-text);
+  box-shadow: var(--cm-shadow);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  outline: none;
+}
+
+.wf-context-menu[popover] {
+  inset: auto;
+  margin: 0;
+}
+
+@supports (position-area: block-end) {
+  .wf-context-menu[popover]:not([data-manual-pos="true"]) {
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  }
+}
+
+@supports not selector(:popover-open) {
+  .wf-context-menu[popover]:not(.\:popover-open) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wf-context-menu[popover] {
+    opacity: 0;
+    transition: opacity, translate, display, overlay;
+    transition-duration: 0.12s;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    transition-behavior: allow-discrete;
+  }
+  @supports selector(:popover-open) {
+    .wf-context-menu[popover] {
+      translate: 0 -4px;
+    }
+    .wf-context-menu[popover]:popover-open {
+      opacity: 1;
+      translate: 0 0;
+      transition-duration: 0.1s;
+      @starting-style {
+        opacity: 0;
+        translate: 0 -4px;
+      }
+    }
+  }
+  .wf-context-menu[popover].\:popover-open {
+    opacity: 1;
+  }
+}
+
+/* Header */
+.wf-menu-head {
+  padding: 6px 8px 5px;
+  display: grid;
+  gap: 3px;
+}
+
+.wf-menu-head-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-inline-size: 0;
+}
+
+.wf-menu-dot {
+  flex: none;
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--cm-accent);
+}
+.wf-menu-dot.tone-thought { background: var(--sx-warn, #d38d2e); }
+.wf-menu-dot.tone-conversation { background: var(--cm-accent); }
+.wf-menu-dot.tone-action { background: #6f7bf7; }
+.wf-menu-dot.tone-group { background: #3b82f6; border-radius: 2px; }
+.wf-menu-dot.tone-link { background: #8f6ed5; }
+.wf-menu-dot.tone-quick { background: var(--cm-accent); }
+.wf-menu-dot.tone-canvas { background: var(--cm-accent); border-radius: 2px; }
+
+:root .wf-context-menu .wf-menu-title {
+  min-inline-size: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cm-text);
+  font-size: 0.8125rem;
+  font-weight: 630;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.wf-menu-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 18px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--cm-text) 8%, transparent);
+  color: var(--cm-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+:root .wf-context-menu .wf-menu-subtitle {
+  margin: 0;
+  color: var(--cm-muted);
+  font-size: 0.71875rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Inline quick color swatches row */
+.wf-menu-swatches {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 8px 6px;
+}
+
+.wf-menu-swatch {
+  position: relative;
+  min-inline-size: 26px;
+  min-block-size: 26px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wf-menu-swatch::after {
+  content: "";
+  inline-size: 15px;
+  block-size: 15px;
+  border-radius: 50%;
+  background: var(--swatch, transparent);
+  border: 1.5px solid color-mix(in oklab, var(--cm-text) 22%, transparent);
+}
+
+.wf-menu-swatch.plain::after {
+  background: linear-gradient(
+    135deg,
+    transparent 44%,
+    color-mix(in oklab, var(--cm-muted) 72%, transparent) 45% 55%,
+    transparent 56%
+  );
+}
+
+.wf-menu-swatch[aria-pressed="true"] {
+  border-color: var(--cm-accent);
+  box-shadow: inset 0 0 0 1px var(--cm-accent);
+}
+
+.wf-menu-swatch:focus-visible {
+  outline: 2px solid var(--cm-accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .wf-menu-swatch:hover {
+    background: color-mix(in oklab, var(--cm-text) 8%, transparent);
+  }
+}
+
+/* Native <hr> separator */
+.wf-menu-sep {
+  border: 0;
+  border-top: 1px solid var(--cm-sep);
+  margin: 5px 4px;
+}
+
+/* Menu items list */
+.wf-menu-list {
+  --menu-icon-size: 1rem;
+  display: grid;
+  gap: 1px;
+}
+
+.wf-menu-section,
+.wf-menu-group {
+  display: grid;
+  gap: 1px;
+}
+
+.wf-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  inline-size: 100%;
+  min-block-size: 32px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cm-text);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 480;
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wf-menu-item {
+    transition: background-color 0.1s ease, color 0.1s ease;
+  }
+}
+
+/* Fixed leading icon slot keeps every label aligned across rows */
+.wf-menu-ico {
+  flex: none;
+  inline-size: var(--menu-icon-size);
+  block-size: var(--menu-icon-size);
+  display: inline-grid;
+  place-items: center;
+  color: var(--cm-muted);
+}
+
+.wf-menu-ico svg {
+  inline-size: 15px;
+  block-size: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Checkable menuitemcheckbox / menuitemradio render check via ::before per menu guidance */
+.wf-menu-item.is-checkable::before {
+  content: "";
+  flex: none;
+  inline-size: var(--menu-icon-size);
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--cm-accent);
+}
+
+.wf-menu-item.is-checkable[aria-checked="true"]::before {
+  content: "✓";
+}
+
+.wf-menu-label {
+  min-inline-size: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-menu-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 18px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--cm-text) 7%, transparent);
+  color: var(--cm-muted);
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 1.2;
+}
+
+.wf-menu-list .hint {
+  margin-inline-start: auto;
+  flex: none;
+}
+
+.wf-menu-shortcut {
+  color: var(--cm-muted);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  opacity: 0.85;
+}
+
+.wf-menu-chevron {
+  color: var(--cm-muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Hover & focus states */
+@media (hover: hover) {
+  .wf-menu-item:hover:not([aria-disabled="true"]) {
+    background: var(--cm-hover);
+  }
+  .wf-menu-item:hover:not([aria-disabled="true"]) .wf-menu-ico {
+    color: var(--cm-accent);
+  }
+}
+
+.wf-menu-item:focus-visible:not([aria-disabled="true"]) {
+  background: var(--cm-hover);
+  outline: 2px solid var(--cm-accent);
+  outline-offset: -2px;
+}
+
+.wf-menu-item:focus-visible:not([aria-disabled="true"]) .wf-menu-ico {
+  color: var(--cm-accent);
+}
+
+.wf-menu-item.accent .wf-menu-ico {
+  color: var(--sx-warn, #d38d2e);
+}
+
+.wf-menu-item.danger {
+  color: var(--cm-danger);
+}
+.wf-menu-item.danger .wf-menu-ico {
+  color: var(--cm-danger);
+}
+@media (hover: hover) {
+  .wf-menu-item.danger:hover:not([aria-disabled="true"]) {
+    background: var(--cm-danger-hover);
+    color: var(--cm-danger);
+  }
+  .wf-menu-item.danger:hover:not([aria-disabled="true"]) .wf-menu-ico {
+    color: var(--cm-danger);
+  }
+}
+.wf-menu-item.danger:focus-visible:not([aria-disabled="true"]) {
+  background: var(--cm-danger-hover);
+  outline-color: var(--cm-danger);
+}
+
+.wf-menu-item[aria-disabled="true"] {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+/* Dark theme refinement (wrapped in :where() so expressive theme rules win cleanly) */
+:root:where(
+  [data-theme="contrast-black"],
+  [data-theme="aurora"],
+  [data-theme="dusk"],
+  [data-theme="ocean"],
+  [data-theme="obsidian"],
+  [data-theme="blueprint"],
+  [data-theme="terminal"],
+  [data-theme="chalkboard"],
+  [data-theme="coffee"],
+  [data-theme="neon"],
+  [data-theme="contrast-blue"],
+  [data-theme="contrast-amber"],
+  [data-theme="contrast-plum"],
+  [data-theme="custom"][data-tone="dark"]
+) .wf-context-menu {
+  --cm-bg: color-mix(in oklab, var(--sx-raised, var(--g-raised, #1a212c)) 95%, transparent);
+  --cm-border: color-mix(in oklab, var(--sx-line-strong, var(--g-node-bd, #39485c)) 86%, transparent);
+  --cm-text: var(--sx-text, var(--g-text, #f1f5f9));
+  --cm-muted: var(--sx-muted, var(--g-muted, #9aa8b8));
+  --cm-highlight: rgba(255, 255, 255, 0.08);
+  --cm-hover: color-mix(in oklab, var(--sx-accent, var(--g-accent, #66c2a5)) 18%, transparent);
+  --cm-danger: var(--sx-danger, #ff8f85);
+  --cm-danger-hover: color-mix(in oklab, var(--sx-danger, #ff8f85) 16%, transparent);
+  --cm-shadow: 0 22px 54px rgba(0, 0, 0, 0.56), 0 4px 14px rgba(0, 0, 0, 0.32), inset 0 1px 0 var(--cm-highlight);
+}
+
+/* Expressive theme harmony */
+:root[data-theme="blueprint"] .wf-context-menu {
+  border-radius: 0;
+  --cm-bg: rgba(11, 56, 108, 0.96);
+  --cm-border: rgba(236, 247, 255, 0.58);
+  --cm-text: #f0f8ff;
+  --cm-muted: rgba(212, 234, 255, 0.78);
+  --cm-sep: rgba(236, 247, 255, 0.22);
+  --cm-hover: rgba(255, 209, 102, 0.16);
+  --cm-accent: #ffd166;
+  --cm-danger: #ff9c92;
+  --cm-danger-hover: rgba(255, 130, 118, 0.18);
+  --cm-shadow: 0 18px 44px rgba(4, 24, 52, 0.55), inset 0 0 0 1px rgba(236, 247, 255, 0.12);
+}
+:root[data-theme="blueprint"] .wf-menu-item {
+  border-radius: 0;
+}
+
+:root[data-theme="terminal"] .wf-context-menu {
+  border-radius: 4px;
+  --cm-bg: rgba(7, 18, 9, 0.96);
+  --cm-border: rgba(51, 255, 102, 0.48);
+  --cm-text: #d2ffdc;
+  --cm-muted: rgba(126, 232, 150, 0.76);
+  --cm-sep: rgba(51, 255, 102, 0.22);
+  --cm-hover: rgba(51, 255, 102, 0.14);
+  font-family: "JetBrains Mono", "Sarasa Mono SC", "Cascadia Code", ui-monospace, monospace;
+}
+:root[data-theme="terminal"] .wf-menu-item {
+  border-radius: 3px;
+}
+
+:root[data-theme="bauhaus"] .wf-context-menu {
+  border-radius: 0;
+  border-width: 2px;
+  border-color: #111111;
+  box-shadow: 6px 6px 0 #111111;
+}
+:root[data-theme="bauhaus"] .wf-menu-item {
+  border-radius: 0;
+}
+
+@media (pointer: coarse) {
+  .wf-menu-item {
+    min-block-size: 40px;
+    padding: 8px 11px;
+  }
+  .wf-menu-swatch {
+    min-inline-size: 34px;
+    min-block-size: 34px;
+  }
+}
+
+@media (forced-colors: active) {
+  .wf-context-menu {
+    background: Canvas;
+    color: CanvasText;
+    border: 2px solid CanvasText;
+    box-shadow: none;
+  }
+  .wf-menu-sep {
+    border-top-color: CanvasText;
+  }
+  .wf-menu-item:focus-visible,
+  .wf-menu-swatch[aria-pressed="true"],
+  .wf-menu-swatch:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

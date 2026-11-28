@@ -121,3 +121,30 @@ test('parent line endpoints move continuously as a card is dragged across the sw
     assert.ok(next.every((v,i)=>Math.abs(v-prev[i])<8),`jump at x=${x}`);prev=next;
   }
 });
+
+test('parent line endpoint and incoming arrowhead never enter the interior of the target card in the diagonal switch zone',()=>{
+  const parentSize={width:224,height:110},childSize={width:140,height:64};
+  const nums=d=>d.match(/-?[\d.]+(e-?\d+)?/g).map(Number);
+  const insideRoundedRect=(px,py,box,sz)=>{
+    const r=Math.min(14,sz.width*.25,sz.height*.25);
+    const eps=1e-3;
+    if(px<=box.x+eps||px>=box.x+sz.width-eps||py<=box.y+eps||py>=box.y+sz.height-eps)return false;
+    const cx=Math.min(Math.max(px,box.x+r),box.x+sz.width-r);
+    const cy=Math.min(Math.max(py,box.y+r),box.y+sz.height-r);
+    return Math.hypot(px-cx,py-cy)<r-eps;
+  };
+  // Sweep across the entire horizontal switch zone both below and above the parent.
+  for(const y of [220,-180]){
+    for(let x=-200;x<=280;x+=4){
+      const target={x,y};
+      const [x1,y1,c1x,c1y,c2x,c2y,x2,y2]=nums(connectionPath('parent',{x:0,y:0},target,parentSize,childSize));
+      assert.equal(insideRoundedRect(x1,y1,{x:0,y:0},parentSize),false,`start buried inside parent at (${x},${y})`);
+      assert.equal(insideRoundedRect(x2,y2,target,childSize),false,`end buried inside child at (${x},${y})`);
+      // Point 8px back along the incoming tangent (where the arrowhead body sits) must stay strictly outside the child.
+      const dx=c2x-x2,dy=c2y-y2,len=Math.hypot(dx,dy);
+      assert.ok(len>=11,`incoming handle too short at (${x},${y}): ${len}`);
+      const arrowBackX=x2+(dx/len)*8,arrowBackY=y2+(dy/len)*8;
+      assert.equal(insideRoundedRect(arrowBackX,arrowBackY,target,childSize),false,`arrowhead body buried inside child at (${x},${y})`);
+    }
+  }
+});

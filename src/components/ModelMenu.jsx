@@ -98,10 +98,10 @@ function Row({ item, index, selected, starred, starrable, selectedNote, onChange
     <div className={`mm-row ${selected ? "selected" : ""}`} style={{ "--i": Math.min(index, 14) }}>
       <button role="radio" aria-checked={selected} className="mm-pick" onClick={() => onChange(item.value)}>
         <ProviderMark provider={item.provider} label={`${item.label} ${item.hint || ""}`} />
-        <span className="mm-name">{item.label}</span>
+        <span className="mm-name" title={item.label}>{item.label}</span>
         {selected && selectedNote && <b className="mm-level">{selectedNote}</b>}
         {isDefault && <span className="mm-default">{tr("默认", "Default")}</span>}
-        {item.hint && <em>{item.hint}</em>}
+        {item.hint && <em title={item.hint}>{item.hint}</em>}
       </button>
       {onSetDefault && item.value && !isDefault && <button className="mm-set-default" title={tr("新任务默认用这个模型", "Use this model for new tasks by default")} onClick={() => onSetDefault(item.value)}>{tr("设为默认", "Set default")}</button>}
       {starrable && item.value && !item.pinned && <button className={`mm-star ${starred ? "on" : ""}`} aria-pressed={starred} aria-label={starred ? tr("从常用中移除", "Remove from frequently used") : tr("设为常用", "Add to frequently used")} title={starred ? tr("从常用中移除", "Remove from frequently used") : tr("设为常用", "Add to frequently used")} onClick={() => onToggleFavorite(item.value)}>{starred ? "★" : "☆"}</button>}

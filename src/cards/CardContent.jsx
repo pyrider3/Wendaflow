@@ -85,6 +85,7 @@ export function CardContent({
   tr,
   systemText,
   uiLanguage,
+  piModelChoices = EMPTY_ARRAY,
 }) {
   const {
     editing,
@@ -115,7 +116,6 @@ export function CardContent({
     openPiHistory,
     compactPiSession,
     switchPiModel,
-    piModelChoices,
     steerAgent,
     stopGeneration,
     beginResize,

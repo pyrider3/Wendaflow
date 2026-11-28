@@ -309,6 +309,22 @@ export async function listOllamaModels(endpoint, signal) {
   return (data.models || []).map((item) => item.name);
 }
 
+export async function probeModelProfile({ endpoint, format, apiKey, model, local = false }, { signal, publicWeb = false } = {}) {
+  if (publicWeb && local) {
+    const models = await listOllamaModels(endpoint, signal);
+    return { ok: true, endpoint: endpoint.replace(/\/+$/, ''), endpointAdjusted: false, format: 'ollama', formatAdjusted: false, models, model, modelInList: model ? models.includes(model) : null, modelVerified: model ? models.includes(model) : null, latencyMs: 0 };
+  }
+  const response = await fetch(`${LOCAL_PROXY_URL}/models/probe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint, format, apiKey, model, local }),
+    signal,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
+}
+
 // What the conversation options actually do for a profile.  Mirrors the
 // request builders above: a control that is not listed here is never sent.
 export function chatOptionSupport(profile, { local = false } = {}) {

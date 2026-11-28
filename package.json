@@ -23,7 +23,7 @@
     "audit:i18n": "node scripts/audit-i18n.mjs",
     "test:quick-thought": "node --test src/quick-thought/*.test.mjs",
     "test:canvas": "node --test src/canvas/*.test.mjs",
-    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/plugins/*.test.mjs src/plugins/*/*.test.mjs src/agent-api/*.test.mjs src/themes/*.test.mjs",
+    "test": "node --test src/canvas/*.test.mjs src/quick-thought/*.test.mjs src/agents/*.test.mjs src/components/*.test.mjs src/plugins/*.test.mjs src/plugins/*/*.test.mjs src/agent-api/*.test.mjs src/themes/*.test.mjs",
     "test:agent-api": "node --test src/agent-api/*.test.mjs",
     "mcp": "node scripts/wendaflow-mcp.mjs",
     "wendaflow": "node scripts/wendaflow.mjs",

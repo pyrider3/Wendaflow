@@ -1,40 +1,71 @@
 import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
 import {pickerChoices} from '../canvas/picker.mjs';
+import {ContextMenu} from './ContextMenu.jsx';
 import './canvas-picker.css';
 
 function PickerActions({item,menu,groups,onClose,onSearch,onView,onRename,onStar,onDuplicate,onTrash,onMove,say}) {
-  const ref=useRef(null),[pending,setPending]=useState(false);
-  useLayoutEffect(()=>{
-    const el=ref.current;if(!el)return;
-    const rect=el.getBoundingClientRect();el.style.top=`${Math.max(8,Math.min(menu.y,window.innerHeight-rect.height-8))}px`;
-    el.querySelector('button')?.focus();
-  },[menu.view]);
+  const [pending,setPending]=useState(false);
   const run=async action=>{if(pending)return;setPending(true);try{if(await action()!==false)onClose();}finally{setPending(false);}};
-  return createPortal(<div className="picker-actions-scrim" onPointerDown={event=>{event.stopPropagation();if(event.target===event.currentTarget)onClose();}}>
-    <div ref={ref} className="picker-context-menu" role="menu" aria-label={say('画布操作 ','Canvas actions ')+item.name} style={{left:menu.x,top:menu.y}} onKeyDown={event=>{
-      event.stopPropagation();
-      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='p'){event.preventDefault();onSearch();return;}
-      if(event.key==='Escape'){event.preventDefault();if(menu.view==='groups')onView('actions');else onClose();}
-      const buttons=[...ref.current.querySelectorAll('button:not(:disabled)')],index=buttons.indexOf(document.activeElement);
-      if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}
-      if(event.key==='Tab'){event.preventDefault();buttons[(index+(event.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus();}
-    }}>
-      {menu.view==='groups'?<>
-        <button role="menuitem" onClick={()=>onView('actions')}>‹ {say('返回','Back')}</button>
-        <div className="picker-menu-rule"/>
-        <button role="menuitem" disabled={pending} onClick={()=>run(()=>onMove([item.id],''))}>{say('未分组','Ungrouped')}{!item.groupId&&<span aria-hidden="true">✓</span>}</button>
-        {groups.map(group=><button key={group.id} role="menuitem" disabled={pending} onClick={()=>run(()=>onMove([item.id],group.id))}>{group.name}{item.groupId===group.id&&<span aria-hidden="true">✓</span>}</button>)}
-      </>:<>
-        <button role="menuitem" onClick={onRename}>{say('重命名','Rename')}<kbd aria-hidden="true">F2</kbd></button>
-        <button role="menuitem" disabled={pending} onClick={()=>run(()=>onStar(item.id))}>{item.starred?say('取消收藏','Unstar'):say('收藏','Star')}</button>
-        <button role="menuitem" disabled={pending} onClick={()=>run(()=>onDuplicate(item.id))}>{say('复制画布','Duplicate canvas')}</button>
-        <button role="menuitem" onClick={()=>onView('groups')}>{say('移动到分组','Move to group')}<span aria-hidden="true">›</span></button>
-        <div className="picker-menu-rule"/>
-        <button role="menuitem" className="picker-menu-danger" disabled={pending} onClick={()=>run(()=>onTrash([item.id]))}>{say('移入回收站','Move to trash')}</button>
-      </>}
-    </div>
-  </div>,document.body);
+  const sections=menu.view==='groups'
+    ? [
+        [
+          { id: 'back', icon: 'back', label: say('返回','Back'), shortcut: 'Esc', keepOpen: true, onSelect: () => onView('actions') },
+        ],
+        [
+          { id: 'ungrouped', role: 'menuitemradio', groupLabel: say('移动到分组','Move to group'), label: say('未分组','Ungrouped'), checked: !item.groupId, disabled: pending, onSelect: () => void run(() => onMove([item.id], '')) },
+          ...groups.map((group) => ({
+            id: `grp-${group.id}`,
+            role: 'menuitemradio',
+            groupLabel: say('移动到分组','Move to group'),
+            label: group.name,
+            checked: item.groupId === group.id,
+            disabled: pending,
+            onSelect: () => void run(() => onMove([item.id], group.id)),
+          })),
+        ],
+      ]
+    : [
+        [
+          { id: 'rename', icon: 'edit', label: say('重命名','Rename'), shortcut: 'F2', onSelect: onRename },
+          { id: 'star', icon: item.starred ? 'starFilled' : 'star', label: item.starred ? say('取消收藏','Unstar') : say('收藏','Star'), accent: Boolean(item.starred), disabled: pending, onSelect: () => void run(() => onStar(item.id)) },
+          { id: 'duplicate', icon: 'copy', label: say('复制画布','Duplicate canvas'), disabled: pending, onSelect: () => void run(() => onDuplicate(item.id)) },
+          { id: 'move', icon: 'folder', label: say('移动到分组','Move to group'), submenuArrow: true, keepOpen: true, onSelect: () => onView('groups') },
+        ],
+        [
+          { id: 'trash', icon: 'trash', label: say('移入回收站','Move to trash'), danger: true, disabled: pending, onSelect: () => void run(() => onTrash([item.id])) },
+        ],
+      ];
+
+  return (
+    <ContextMenu
+      x={menu.x}
+      y={menu.y}
+      openKey={`picker:${item.id}:${menu.x}:${menu.y}:${menu.openedAt || 0}`}
+      className="picker-context-menu"
+      ariaLabel={say('画布操作 ','Canvas actions ') + item.name}
+      header={menu.view === 'groups'
+        ? { badgeTone: 'canvas', title: say('移动到分组', 'Move to group'), subtitle: item.name }
+        : { badgeTone: 'canvas', title: item.name }}
+      sections={sections}
+      focusFirstOnOpen
+      onKeyDownExtra={(event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+          event.preventDefault();
+          event.stopPropagation();
+          onSearch();
+          return true;
+        }
+        if (event.key === 'Escape' && menu.view === 'groups') {
+          event.preventDefault();
+          event.stopPropagation();
+          onView('actions');
+          return true;
+        }
+        return false;
+      }}
+      onClose={onClose}
+    />
+  );
 }
 
 export function CanvasPicker({items,meta,activeId,onOpen,onClose,onCreate,onManage,onRename,onStar,onDuplicate,onMove,onTrash,say}) {
@@ -66,9 +97,12 @@ export function CanvasPicker({items,meta,activeId,onOpen,onClose,onCreate,onMana
   const rename=item=>{setMenu(null);setEditing(item.id);setName(item.name);};
   const showMenu=(event,item)=>{
     event.preventDefault();event.stopPropagation();
-    trigger.current=event.currentTarget.matches('button')?event.currentTarget:event.currentTarget.querySelector('.picker-row-actions');
+    const isButton=event.currentTarget.matches('button');
+    trigger.current=isButton?event.currentTarget:event.currentTarget.querySelector('.picker-row-actions');
     const rect=event.currentTarget.getBoundingClientRect();
-    setMenu({id:item.id,view:'actions',x:Math.max(8,Math.min(rect.right-190,window.innerWidth-202)),y:Math.max(8,Math.min(rect.bottom+4,window.innerHeight-220))});
+    const x=isButton?rect.right:event.clientX;
+    const y=isButton?rect.bottom+4:event.clientY;
+    setMenu({id:item.id,view:'actions',x,y,openedAt:Date.now()});
   };
   return <div className="canvas-picker-backdrop" onPointerDown={event=>{if(event.target===event.currentTarget)onClose();}}>
     <section ref={root} className="canvas-picker" role="dialog" aria-modal="true" aria-label={say('切换画布','Choose canvas')} onKeyDown={event=>{
